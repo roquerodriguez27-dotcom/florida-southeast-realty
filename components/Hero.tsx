@@ -18,7 +18,7 @@ export default function Hero() {
 
         <div className="relative h-full container-fsre flex flex-col justify-center pt-16">
           <p className="font-mono text-xs md:text-sm uppercase tracking-[0.25em] text-brass mb-4 animate-rise">
-            Fort Lauderdale · Boca Raton · West Palm Beach · The Coastal Corridor
+            West Palm Beach · Boynton Beach · Delray Beach · Boca Raton
           </p>
           <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-sand max-w-3xl leading-[1.05] animate-rise [animation-delay:100ms]">
             Sell Your Home for a 0.5% Listing Fee

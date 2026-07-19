@@ -31,7 +31,8 @@ export default function Header() {
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-colors duration-300 ${
         solid ? "bg-tide/95 backdrop-blur border-b border-white/10" : "bg-transparent"
-      }`}
+         }`}
+  >
     
       <div className="container-fsre flex items-center justify-between h-18 py-3">
         <Link href="/" className="flex items-center">

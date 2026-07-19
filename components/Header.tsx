@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 const NAV = [
@@ -31,16 +32,20 @@ export default function Header() {
       className={`fixed top-0 inset-x-0 z-50 transition-colors duration-300 ${
         solid ? "bg-tide/95 backdrop-blur border-b border-white/10" : "bg-transparent"
       }`}
-    >
+    
       <div className="container-fsre flex items-center justify-between h-18 py-3">
-        <Link href="/" className="flex items-baseline gap-2 group">
-          <span className="font-display text-xl md:text-2xl text-sand tracking-tight">
-            Florida Southeast
-          </span>
-          <span className="font-mono text-[10px] md:text-xs uppercase tracking-[0.2em] text-brass">
-            Realty
-          </span>
-        </Link>
+        <Link href="/" className="flex items-center">
+  <Image
+    src="/full_trimmed_transparent_customcolor (1).png"
+    alt="Florida Southeast Realty"
+    width={260}
+    height={80}
+    priority
+    className="h-12 md:h-14 w-auto object-contain"
+  />
+</Link>
+
+
 
         <nav className="hidden lg:flex items-center gap-8">
           {NAV.map((item) => (

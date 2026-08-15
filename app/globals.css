@@ -47,12 +47,22 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: clip;
 }
 
 body {
   background: var(--color-sand);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  overflow-x: clip;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
 }
 
 ::selection {
@@ -60,7 +70,6 @@ body {
   color: var(--color-sand);
 }
 
-/* visible keyboard focus everywhere */
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
@@ -69,6 +78,15 @@ select:focus-visible {
   outline: 2px solid var(--color-hibiscus);
   outline-offset: 3px;
   border-radius: 2px;
+}
+
+/* iOS Safari auto-zooms focused controls below 16px. Keep mobile forms at 16px. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -82,7 +100,6 @@ select:focus-visible {
   }
 }
 
-/* The Tideline — signature horizon divider used across the site */
 .tideline {
   position: relative;
   height: 1px;
@@ -115,6 +132,7 @@ select:focus-visible {
 }
 
 .container-fsre {
+  width: 100%;
   max-width: 1320px;
   margin-inline: auto;
   padding-inline: 1.25rem;

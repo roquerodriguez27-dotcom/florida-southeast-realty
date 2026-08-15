@@ -1,8 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { SITE } from "@/lib/site-config";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -25,80 +27,120 @@ const jetbrains = JetBrains_Mono({
   display: "swap",
 });
 
-const SITE_URL = "https://www.floridasoutheastrealty.com";
+const analyticsId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION;
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0e2b30",
+};
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  alternates: { canonical: "/" },
+  metadataBase: new URL(SITE.url),
   title: {
-    default: "Florida Southeast Realty | 0.5% Listing Fee, South Florida Real Estate",
+    default: "Florida Southeast Realty | South Florida Homes & 0.5% Listing Fee",
     template: "%s | Florida Southeast Realty",
   },
   description:
-    "Independent South Florida brokerage serving Fort Lauderdale, Boca Raton, Delray Beach, Boynton Beach, Lake Worth, West Palm Beach, Wellington, Palm Beach Gardens, and Jupiter. List your home for a 0.5% listing-side fee.",
-  keywords: [
-    "South Florida real estate",
-    "0.5% listing fee Florida",
-    "Fort Lauderdale waterfront homes",
-    "Boca Raton luxury real estate",
-    "West Palm Beach real estate agent",
-    "Delray Beach homes for sale",
-    "Palm Beach Gardens real estate",
-    "Wellington FL homes for sale",
-  ],
+    "Search South Florida real estate, research neighborhoods, and sell with Florida Southeast Realty's 0.5% listing-side fee. Serving Palm Beach and Broward County communities.",
+  applicationName: SITE.shortName,
+  manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
-    siteName: "Florida Southeast Realty",
-    title: "Florida Southeast Realty | Waterfront & Luxury Homes",
+    siteName: SITE.shortName,
+    title: "Florida Southeast Realty | Search, Research, Buy & Sell in South Florida",
     description:
-      "Waterfront and luxury listings, community guides, and local market expertise across Southeast Florida's Intracoastal corridor.",
-    url: SITE_URL,
+      "South Florida homes, neighborhood research, buyer due diligence, and full-service seller representation with a 0.5% listing-side fee.",
+    url: SITE.url,
+    locale: "en_US",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Florida Southeast Realty" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Florida Southeast Realty",
-    description: "Waterfront and luxury homes from Fort Lauderdale to Boca Raton.",
+    description: "Search South Florida homes, research neighborhoods, and sell for a 0.5% listing-side fee.",
+    images: ["/opengraph-image"],
   },
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  verification: googleSiteVerification ? { google: googleSiteVerification } : undefined,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const agentId = `${SITE.url}/#real-estate-agent`;
+  const brokerId = `${SITE.url}/#broker`;
+  const websiteId = `${SITE.url}/#website`;
+
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "RealEstateAgent",
-    name: "Florida Southeast Realty, Inc.",
-    url: SITE_URL,
-    telephone: "+1-954-555-0100",
-    areaServed: [
-      "Fort Lauderdale, FL",
-      "Boca Raton, FL",
-      "Wilton Manors, FL",
-      "Hillsboro Beach, FL",
-      "Delray Beach, FL",
-      "Boynton Beach, FL",
-      "Lake Worth, FL",
-      "West Palm Beach, FL",
-      "Wellington, FL",
-      "Palm Beach Gardens, FL",
-      "Jupiter, FL",
+    "@graph": [
+      {
+        "@type": ["RealEstateAgent", "LocalBusiness"],
+        "@id": agentId,
+        name: SITE.name,
+        url: SITE.url,
+        telephone: SITE.phoneDisplay,
+        email: SITE.email,
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: SITE.address.street,
+          addressLocality: SITE.address.city,
+          addressRegion: SITE.address.region,
+          postalCode: SITE.address.postalCode,
+          addressCountry: SITE.address.country,
+        },
+        areaServed: SITE.serviceAreas.map((name) => ({ "@type": "Place", name: `${name}, Florida` })),
+        founder: { "@id": brokerId },
+        priceRange: "0.5% listing-side fee; commissions negotiable",
+      },
+      {
+        "@type": "Person",
+        "@id": brokerId,
+        name: SITE.brokerName,
+        jobTitle: "Broker",
+        worksFor: { "@id": agentId },
+      },
+      {
+        "@type": "WebSite",
+        "@id": websiteId,
+        name: SITE.shortName,
+        url: SITE.url,
+        publisher: { "@id": agentId },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${SITE.url}/properties?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
     ],
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: "215 Las Olas Blvd, Suite 400",
-      addressLocality: "Fort Lauderdale",
-      addressRegion: "FL",
-      postalCode: "33301",
-      addressCountry: "US",
-    },
   };
 
   return (
     <html lang="en" className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable}`}>
       <body className="antialiased">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        {analyticsId && (
+          <>
+            <Script src={`https://www.googletagmanager.com/gtag/js?id=${analyticsId}`} strategy="afterInteractive" />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${analyticsId}', { anonymize_ip: true });`}
+            </Script>
+          </>
+        )}
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-sand focus:text-tide focus:px-4 focus:py-2 focus:rounded-sm"

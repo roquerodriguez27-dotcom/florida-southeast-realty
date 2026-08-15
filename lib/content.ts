@@ -3,98 +3,95 @@ import type { GuideArticle, BlogPost } from "./types";
 const img = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1400&q=80`;
 
-// Note: no client testimonials are included in this project. Real, verified
-// client reviews should be added here once collected (with permission),
-// rather than shown as placeholder or invented quotes.
-
 export const GUIDES: GuideArticle[] = [
   {
     slug: "buying-waterfront-property-southeast-florida",
-    title: "What Actually Matters When Buying Waterfront in Southeast Florida",
-    dek: "Fixed bridges, seawall condition, and flood zone letters — the details that decide whether a waterfront deal is a bargain or a liability.",
+    title: "Buying Waterfront Property in South Florida: What to Research First",
+    dek: "A practical starting point for evaluating docks, seawalls, bridge access, flood information, insurance, and permits before you commit.",
     category: "Buying",
-    readMinutes: 9,
+    readMinutes: 8,
     image: img("photo-1600596542815-ffad4c1539a9"),
-    publishedAt: "2026-05-12",
+    publishedAt: "2026-08-08",
     body: [
-      "Waterfront in Southeast Florida isn't one category of home — it's several, and the difference between them changes what a property is worth. A canal lot with a fixed bridge between it and the Intracoastal caps the size of boat you'll ever dock there, permanently. That single fact can separate two otherwise identical seawalls by a wide margin in resale value.",
-      "Ask for the seawall's age and last inspection before you fall for the view. Broward and Palm Beach counties see seawalls fail on a fairly predictable schedule, and replacement runs into six figures on a wide lot. A seller with recent engineering documentation is telling you something worth paying for.",
-      "Flood zone letters matter more than the listing photos suggest. A property in an X zone versus an AE zone can mean a four-figure swing in annual insurance, and that gap has only widened. Pull the flood elevation certificate before you get attached to a floor plan, not after.",
-      "Dock permitting is its own small research project. Older docks were often permitted under rules that no longer apply, which means a full rebuild may require a new, more restrictive permit. If the dock is part of why you're buying, get a straight answer on what you're allowed to build before closing, not after.",
+      "Waterfront property deserves a different due-diligence checklist from a typical inland home. Start by identifying exactly what body of water the property sits on and whether fixed bridges, bridge clearances, canal depth, tidal conditions, or other access constraints matter for the boat you own or plan to own. Do not rely on a listing description alone for navigability or dock capability.",
+      "Review the seawall, dock, lift, and related improvements as separate components of the property. Ask for available permits, repair history, engineering information, and contractor documentation, then use qualified professionals when condition or remaining useful life is important to your decision. A beautiful water view does not answer structural or permitting questions.",
+      "Flood-zone information and insurance should be researched early, not after the inspection period is almost over. Use current FEMA mapping and speak with insurance professionals about the specific address, structure, elevation information, roof, openings, prior claims information when available, and the coverage you would actually need.",
+      "Finally, check local permitting and environmental requirements before assuming you can expand a dock, add a lift, change a seawall, dredge, or alter waterfront structures. What exists today does not automatically tell you what can be rebuilt or modified in the future. The goal is to understand the property you are buying, not just the photograph that brought you to it.",
     ],
   },
   {
-    slug: "selling-your-home-fort-lauderdale-timing",
-    title: "When to List in Fort Lauderdale: Reading the Season Right",
-    dek: "Southeast Florida's market doesn't move on the calendar everyone assumes. Here's what the days-on-market data actually shows.",
+    slug: "prepare-south-florida-home-for-sale",
+    title: "How to Prepare a South Florida Home for Sale",
+    dek: "Pricing, permits, insurance questions, condition, presentation, and the documents that can make a listing easier for buyers to evaluate.",
     category: "Selling",
     readMinutes: 7,
     image: img("photo-1600047509807-ba8f99d2cdde"),
-    publishedAt: "2026-04-03",
+    publishedAt: "2026-08-02",
     body: [
-      "The conventional wisdom says list in spring. In Southeast Florida, the stronger signal is the snowbird calendar: serious buyers with cash and no financing contingency are often in town from January through March, which means homes that list in late fall have time to season before that wave arrives.",
-      "Homes priced right in the first two weeks consistently outperform homes that start high and chase the market down. Southeast Florida buyers who are house-hunting in person, rather than remotely, notice a stale listing fast — the whisper network in condo buildings and gated communities is real.",
-      "Staging trades differently here than up north. Buyers relocating from colder markets respond to move-in-ready more than to blank neutral staging — they're often buying a lifestyle change, not just a floor plan, and want to see it lived in.",
+      "A strong listing starts before the photography. Gather the documents buyers are likely to ask about: permits for major work, roof information, association documents if applicable, survey or elevation information you already have, warranties, and records for meaningful upgrades. You do not need to create documents that do not exist, but knowing what you have prevents avoidable delays later.",
+      "Pricing should be based on current competing inventory, recent relevant sales, property condition, location, and the features buyers can actually compare. An asking price is a marketing decision as much as a mathematical one. The goal is not to choose the highest number a seller would enjoy seeing; it is to choose a strategy that supports the seller's timing and negotiating position.",
+      "Presentation matters because buyers make decisions both online and in person. Repair obvious defects, reduce visual clutter, improve lighting, address landscaping, and make sure major spaces photograph clearly. For occupied homes, the best preparation plan is usually the one the seller can realistically maintain through showings.",
+      "South Florida buyers may also ask about insurance-related features, flood information, impact protection, roof age, association reserves, and assessments depending on the property. A seller who can answer factual questions quickly helps buyers evaluate the home with less uncertainty. Your broker can help identify which questions are likely to arise for your property type.",
     ],
   },
   {
-    slug: "relocating-to-southeast-florida-neighborhood-guide",
-    title: "Relocating to Southeast Florida: How to Actually Choose a Neighborhood",
-    dek: "A framework for narrowing dozens of coastal towns down to the handful that fit how you actually live.",
+    slug: "relocating-to-south-florida-neighborhood-guide",
+    title: "Relocating to South Florida: How to Compare Communities",
+    dek: "A neutral framework for comparing commute, housing type, flood and insurance considerations, schools, associations, and lifestyle without relying on someone else's idea of the 'best' neighborhood.",
     category: "Relocation",
-    readMinutes: 11,
+    readMinutes: 10,
     image: img("photo-1570737543243-cd82cbd1e8c9"),
-    publishedAt: "2026-03-19",
+    publishedAt: "2026-07-24",
     body: [
-      "Most relocation searches start with a map and end in overwhelm — there are more distinct, walkable coastal towns between Boca Raton and Fort Lauderdale than most newcomers expect, and they don't feel alike up close even when they look similar from a listing photo.",
-      "Start with commute reality, not commute distance. Five miles on Federal Highway at 8am is a different commute than five miles on A1A. If you'll drive daily, spend an actual weekday morning in the car before you commit to a zip code.",
-      "Decide early whether you want density or distance from neighbors, because Southeast Florida offers both within a few miles of each other — a boutique high-rise on Las Olas and a wide canal lot in Coral Ridge solve very different problems.",
-      "If schools matter, tour in session, not on a weekend open house circuit. Boundary lines shift, and the only way to know what your kids' daily experience will be is to see the campus while it's running.",
+      "Start with the parts of daily life that are difficult to change after closing. Map the places you expect to visit most often, test commute times at the hours you would actually travel, and decide whether you want a walkable downtown, beach access, boating, a gated community, an equestrian area, a larger lot, or a lower-maintenance condo. Those preferences narrow South Florida quickly.",
+      "Then compare the financial structure of the homes, not just their list prices. Property taxes, insurance, flood exposure, HOA or condominium fees, club requirements, assessments, maintenance responsibility, and future renovation needs can make two similarly priced properties feel very different once you own them.",
+      "If schools matter to your household, use current official district information and verify the assignment for the specific address. Boundaries and programs can change. Review objective school information yourself rather than asking a real estate professional to tell you whether a school or neighborhood is 'good' or 'bad.'",
+      "Finally, spend time in the areas you are considering at more than one time of day. Visit the grocery stores, parks, beaches, downtown areas, marinas, or other places that matter to you. A useful relocation search is not about finding a universally 'best' community; it is about finding the location and property structure that fit your priorities.",
     ],
   },
 ];
 
 export const BLOG_POSTS: BlogPost[] = [
   {
-    slug: "how-we-read-the-broward-palm-beach-market",
-    title: "How We Read the Broward & Palm Beach Market Each Quarter",
-    dek: "The indicators our agents actually track before advising a client on price — and why we don't lean on national headlines to set local strategy.",
-    category: "Market Report",
+    slug: "how-to-research-south-florida-property-before-buying",
+    title: "How to Research a South Florida Property Before You Buy",
+    dek: "The public records and third-party resources worth checking before inspection deadlines and closing dates start moving fast.",
+    category: "Buyer Research",
     image: img("photo-1560518883-ce09059eeffa"),
-    publishedAt: "2026-07-01",
+    publishedAt: "2026-08-12",
+    author: "Roque Rodriguez",
+    body: [
+      "A listing tells you what is being marketed. Due diligence tells you what you are buying. Before you rely on a property description, compare the address with the county property appraiser, current flood mapping, available permit records, the applicable association documents, and any other public or transaction documents relevant to the property.",
+      "The right checklist changes by property type. A waterfront home may call for dock and seawall research. A condo may require close review of association finances, reserves, assessments, inspections, insurance, restrictions, and building documents. An older single-family home may make permit history, roof information, electrical systems, plumbing, additions, and prior renovations especially important.",
+      "Use specialists for specialist questions. Inspectors, engineers, insurance professionals, attorneys, accountants, surveyors, contractors, lenders, and association managers each answer different parts of the puzzle. A broker's job includes helping you recognize the questions and manage the transaction, not pretending one person can replace every expert.",
+    ],
+  },
+  {
+    slug: "south-florida-condo-due-diligence",
+    title: "South Florida Condo Due Diligence: What Buyers Should Review",
+    dek: "A condo purchase is partly a real estate decision and partly a decision about the building and association you are joining.",
+    category: "Condos",
+    image: img("photo-1486406146926-c627a92ad1ab"),
+    publishedAt: "2026-08-05",
     author: "Florida Southeast Realty",
     body: [
-      "Placeholder for a live market report. Rather than publish specific figures we can't currently verify, this space is reserved for a quarterly update built from your MLS's own statistics package once the brokerage is fully set up — inventory counts, median days-on-market, and absorption rate by community.",
-      "In practice, we weight a handful of local indicators over national coverage: how waterfront inventory with no fixed bridges to the Intracoastal is moving relative to fixed-bridge canals, and whether condo buildings with completed structural reserve studies are commanding a premium over buildings still working through assessments.",
-      "When this section goes live, each quarter's post will cite the specific MLS report or public data source it draws from, so readers can check the numbers themselves rather than take our word for it.",
+      "When you buy a condominium, your unit is only part of the decision. Review the association documents and the information available about budgets, reserves, current or proposed assessments, insurance, maintenance responsibilities, rental rules, pet rules, parking, application requirements, and major building projects. The exact documents and review rights depend on the transaction, so use the contract and qualified legal advice when timing matters.",
+      "Ask how the monthly or quarterly fees fit into the building's overall financial picture rather than judging a fee in isolation. A lower fee does not automatically mean a better-run association, and a higher fee does not tell you whether future capital needs are fully funded. The question is what the fee covers, what the building expects to spend, and what obligations could affect owners.",
+      "For coastal and waterfront buildings, also consider flood exposure, wind insurance, building insurance structure, parking elevation, water intrusion history when available, and the condition of common elements. Buyers should make decisions from current documents and professional advice, not assumptions based on the age or appearance of the building.",
     ],
   },
   {
-    slug: "hurricane-season-home-prep-checklist",
-    title: "The Homeowner's Hurricane Season Checklist We Actually Recommend",
-    dek: "Not the generic list — the specific prep steps that matter most for Southeast Florida's building stock and insurance climate.",
-    category: "Homeownership",
-    image: img("photo-1500648767791-00dcc994a43e"),
-    publishedAt: "2026-06-14",
-    author: "Devon Ashford",
-    body: [
-      "Photograph every room and the exterior of your home before the season starts, timestamped and stored somewhere other than your phone. It sounds excessive until you need it for a claim, at which point it's the single most useful thing you did all year.",
-      "Know your roof's actual age and permit history, not the age you assume. Many insurers in this market now require documentation before renewal, and a roof nearing the end of its expected life can affect both your premium and your ability to sell without a credit at closing.",
-      "If you have a dock or seawall, walk it before storm season and after every named storm that passes near you. Small cracks are cheap to address early and expensive to ignore.",
-    ],
-  },
-  {
-    slug: "illustrative-example-coral-ridge-renovation",
-    title: "Illustrative Example: Restoring a Coral Ridge Mid-Century Instead of a Teardown",
-    dek: "A representative, composite scenario — not a specific client — showing how a restoration decision can play out in this neighborhood.",
-    category: "Client Stories",
+    slug: "seller-document-checklist-before-listing",
+    title: "What South Florida Sellers Should Gather Before Listing",
+    dek: "A simple document checklist that can make buyer questions, inspections, and contract-to-close work more smoothly.",
+    category: "Selling",
     image: img("photo-1568605114967-8130f3a36994"),
-    publishedAt: "2026-05-28",
-    author: "Florida Southeast Realty",
+    publishedAt: "2026-07-29",
+    author: "Roque Rodriguez",
     body: [
-      "This is an illustrative, composite scenario built from patterns we see in Coral Ridge, not an account of a specific named client. Real client stories will replace it here once we have permission to share them.",
-      "The scenario: a buyer purchases a Coral Ridge canal lot where most nearby interest has come from buyers planning to demolish and rebuild larger. Instead, they restore original terrazzo and vaulted ceilings while modernizing the kitchen and systems.",
-      "The illustrative outcome is that thoughtful restoration can hold its own against new construction in a neighborhood where the architecture itself is part of the value — though actual results vary by property and should be evaluated with a current comparative market analysis, not this example.",
+      "Before a home goes on the market, collect the records you already have for major improvements and systems. Useful examples can include roof documents, permits, impact-window or shutter information, HVAC records, surveys, elevation certificates, warranties, receipts for major renovations, and association documents. What matters depends on the property, and not every seller will have every item.",
+      "If the home is part of an HOA, condominium, club, or other association, locate the current contact information and the documents available to you. Buyers and their professionals may ask about fees, applications, rules, budgets, assessments, reserves, leasing, pets, parking, or approval timelines. Getting organized early helps avoid searching for documents under a contract deadline.",
+      "Do not guess when a buyer asks for a factual answer you do not know. It is better to identify the right source and verify the information. Clear documentation supports a cleaner transaction and gives buyers more confidence in the information they are using to make a decision.",
     ],
   },
 ];
@@ -104,7 +101,7 @@ export async function getGuides(): Promise<GuideArticle[]> {
 }
 
 export async function getGuideBySlug(slug: string): Promise<GuideArticle | undefined> {
-  return GUIDES.find((g) => g.slug === slug);
+  return GUIDES.find((guide) => guide.slug === slug);
 }
 
 export async function getBlogPosts(): Promise<BlogPost[]> {
@@ -112,5 +109,5 @@ export async function getBlogPosts(): Promise<BlogPost[]> {
 }
 
 export async function getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
-  return BLOG_POSTS.find((b) => b.slug === slug);
+  return BLOG_POSTS.find((post) => post.slug === slug);
 }

@@ -1,21 +1,26 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllListings, getListingBySlug } from "@/lib/listings";
-import { formatFullPrice, formatMileMarker } from "@/lib/format";
+import { getAllListings, getListingBySlug, searchListings } from "@/lib/listings";
+import { formatFullPrice } from "@/lib/format";
 import Tideline from "@/components/Tideline";
 import PropertyGrid from "@/components/PropertyGrid";
 import SampleDataNotice from "@/components/SampleDataNotice";
 import LeadForm from "@/components/LeadForm";
-import { searchListings } from "@/lib/listings";
+import ResearchLinks from "@/components/ResearchLinks";
+import { IDX_PROVIDER } from "@/lib/idx";
+import { SITE } from "@/lib/site-config";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
+const idxLive = IDX_PROVIDER !== "not_connected";
+
 export async function generateStaticParams() {
   const listings = await getAllListings();
-  return listings.map((l) => ({ slug: l.slug }));
+  return listings.map((listing) => ({ slug: listing.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -23,10 +28,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const listing = await getListingBySlug(slug);
   if (!listing) return {};
   return {
-    title: `${listing.address}, ${listing.city} | ${formatFullPrice(listing.price)}`,
+    title: `${listing.address}, ${listing.city} FL | ${formatFullPrice(listing.price)}`,
     description: listing.description,
     alternates: { canonical: `/properties/${listing.slug}` },
-    openGraph: { images: [listing.images[0]] },
+    openGraph: { images: [{ url: listing.images[0], alt: listing.address }] },
+    robots: { index: idxLive, follow: true },
   };
 }
 
@@ -36,63 +42,57 @@ export default async function ListingPage({ params }: Props) {
   if (!listing) notFound();
 
   const similar = (await searchListings({ community: listing.communitySlug }))
-    .filter((l) => l.slug !== listing.slug)
+    .filter((item) => item.slug !== listing.slug)
     .slice(0, 3);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "RealEstateListing",
-    name: listing.address,
-    description: listing.description,
-    url: `https://www.floridasoutheastrealty.com/properties/${listing.slug}`,
-    image: listing.images,
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: listing.address,
-      addressLocality: listing.city,
-      addressRegion: "FL",
-      postalCode: listing.zip,
-    },
-    offers: {
-      "@type": "Offer",
-      price: listing.price,
-      priceCurrency: "USD",
-      availability: listing.status === "Active" ? "https://schema.org/InStock" : "https://schema.org/LimitedAvailability",
-    },
-  };
+  const jsonLd = idxLive
+    ? {
+        "@context": "https://schema.org",
+        "@type": "RealEstateListing",
+        name: listing.address,
+        description: listing.description,
+        url: `${SITE.url}/properties/${listing.slug}`,
+        image: listing.images,
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: listing.address,
+          addressLocality: listing.city,
+          addressRegion: "FL",
+          postalCode: listing.zip,
+          addressCountry: "US",
+        },
+        offers: {
+          "@type": "Offer",
+          price: listing.price,
+          priceCurrency: "USD",
+          availability: listing.status === "Active" ? "https://schema.org/InStock" : "https://schema.org/LimitedAvailability",
+        },
+      }
+    : null;
 
   return (
     <div className="pt-16 pb-20">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}
 
-      {/* Gallery */}
-      <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-1 h-[46vh] md:h-[64vh]">
+      <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-1 h-[46vh] md:h-[64vh] bg-keystone-dim">
         <div className="relative md:col-span-2 md:row-span-2">
-          <Image src={listing.images[0]} alt={listing.address} fill sizes="50vw" className="object-cover" priority />
+          <Image src={listing.images[0]} alt={listing.address} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" priority />
         </div>
-        {listing.images.slice(1, 3).map((src, i) => (
-          <div key={i} className="relative hidden md:block">
-            <Image src={src} alt={`${listing.address} photo ${i + 2}`} fill sizes="25vw" className="object-cover" />
+        {listing.images.slice(1, 3).map((src, index) => (
+          <div key={src} className="relative hidden md:block">
+            <Image src={src} alt={`${listing.address} image ${index + 2}`} fill sizes="25vw" className="object-cover" />
           </div>
         ))}
       </div>
 
-      <div className="container-fsre mt-6">
-        <SampleDataNotice variant="listings" />
-      </div>
+      {!idxLive && <div className="container-fsre mt-6"><SampleDataNotice variant="listings" /></div>}
 
       <div className="container-fsre mt-6 grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-seagrass text-sand">
-              {listing.status}
-            </span>
-            {listing.waterfront && (
-              <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-tide text-sand">
-                Waterfront
-              </span>
-            )}
-            <span className="mile-marker text-xs text-ink/40">{formatMileMarker(listing.mileMarker)}</span>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-seagrass text-sand">{listing.status}</span>
+            {listing.waterfront && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-tide text-sand">Waterfront</span>}
+            {!idxLive && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-brass/20 text-ink">Preview Demo</span>}
           </div>
 
           <h1 className="font-display text-3xl md:text-4xl text-ink">{listing.address}</h1>
@@ -105,57 +105,56 @@ export default async function ListingPage({ params }: Props) {
             <span>{listing.sqft.toLocaleString()} sqft</span>
             {listing.lotSqft && <span>{listing.lotSqft.toLocaleString()} sqft lot</span>}
             <span>Built {listing.yearBuilt}</span>
-            <span>MLS# {listing.mlsId}</span>
+            <span>{idxLive ? `MLS# ${listing.mlsId}` : listing.mlsId}</span>
           </div>
 
           <p className="text-ink/80 leading-relaxed mt-6">{listing.description}</p>
 
-          <h2 className="font-display text-xl text-ink mt-8 mb-3">Features</h2>
-          <ul className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-ink/75">
-            {listing.features.map((f) => (
-              <li key={f} className="flex items-center gap-2">
-                <span className="w-1 h-1 rounded-full bg-hibiscus shrink-0" />
-                {f}
+          <h2 className="font-display text-xl text-ink mt-8 mb-3">Property details</h2>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-ink/75">
+            {listing.features.map((feature) => (
+              <li key={feature} className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-hibiscus shrink-0" />{feature}
               </li>
             ))}
           </ul>
 
-          <div className="mt-10">
-            <Tideline label={`${listing.lat.toFixed(4)}, ${listing.lng.toFixed(4)}`} />
-          </div>
+          <div className="mt-10"><Tideline label={`${listing.lat.toFixed(4)}, ${listing.lng.toFixed(4)}`} /></div>
         </div>
 
-        {/* Agent / inquiry card */}
         <aside className="lg:col-span-1">
           <div className="bg-white border border-ink/10 rounded-sm p-6 sticky top-28">
-            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1">Listing Agent</p>
-            <p className="font-display text-xl text-ink">{listing.agent.name}</p>
-            <a href={`tel:${listing.agent.phone.replace(/[^\d+]/g, "")}`} className="block text-sm text-tide mt-1">
-              {listing.agent.phone}
-            </a>
-
+            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1">Ask about this property</p>
+            <p className="font-display text-xl text-ink">Florida Southeast Realty</p>
+            <p className="text-sm text-ink/60 mt-1">Talk directly with a South Florida broker.</p>
             <div className="mt-5">
               <LeadForm
                 formName="property-inquiry"
-                submitLabel="Request a Showing"
-                successMessage={`A Florida Southeast Realty agent will follow up about ${listing.address} shortly.`}
-                hiddenContext={{ listingAddress: listing.address, mlsId: listing.mlsId }}
+                submitLabel="Request Information"
+                successMessage={`Florida Southeast Realty will follow up about ${listing.address}.`}
+                hiddenContext={{ listingAddress: listing.address, listingId: listing.mlsId }}
                 fields={[
                   { name: "name", label: "Your Name", type: "text", required: true },
                   { name: "email", label: "Your Email", type: "email", required: true },
                   { name: "phone", label: "Phone", type: "tel" },
-                  {
-                    name: "message",
-                    label: "Message",
-                    type: "textarea",
-                    defaultValue: `I'd like more information about ${listing.address}.`,
-                  },
+                  { name: "message", label: "Message", type: "textarea", defaultValue: `I'd like more information about ${listing.address}.`, colSpan: 2 },
                 ]}
               />
             </div>
           </div>
         </aside>
       </div>
+
+      <section className="container-fsre mt-16">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus mb-2">Due Diligence</p>
+            <h2 className="font-display text-2xl md:text-3xl text-ink">Research beyond the listing</h2>
+          </div>
+          <Link href="/research" className="text-sm text-tide underline underline-offset-4">Open full research center</Link>
+        </div>
+        <ResearchLinks limit={4} />
+      </section>
 
       {similar.length > 0 && (
         <div className="container-fsre mt-20">

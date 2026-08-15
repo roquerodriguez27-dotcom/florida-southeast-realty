@@ -25,6 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/about",
     "/testimonials",
     "/contact",
+    "/referral-status",
     "/accessibility-statement",
   ];
   if (idxLive) staticPaths.splice(1, 0, "/properties");

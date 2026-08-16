@@ -55,6 +55,9 @@ export default function ResearchPage() {
           <Link href="/contact" className="border border-tide/25 text-tide font-medium px-5 py-3 rounded-sm hover:bg-tide/5 transition-colors">
             Ask a Local Broker
           </Link>
+          <Link href="/buyer-tools" className="border border-tide/25 text-tide font-medium px-5 py-3 rounded-sm hover:bg-tide/5 transition-colors">
+            Compare Costs & Homes
+          </Link>
         </div>
       </section>
 

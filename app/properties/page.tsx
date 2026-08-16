@@ -63,6 +63,12 @@ export default async function PropertiesPage({ searchParams }: Props) {
 
         <div className="mb-10"><PropertyFilters current={params} /></div>
 
+        <div className="mb-8 flex flex-wrap gap-3">
+          <Link href="/buyer-tools?tool=compare" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Compare homes</Link>
+          <Link href="/buyer-tools?tool=affordability" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Check affordability</Link>
+          <Link href="/buyer-tools?tool=cost" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Estimate true monthly cost</Link>
+        </div>
+
         {!idxLive && listings.length > 0 && <div className="mb-6"><SampleDataNotice variant="listings" /></div>}
 
         {listings.length > 0 ? (

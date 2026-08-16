@@ -111,6 +111,20 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <section className="container-fsre py-16 md:py-24">
+        <div className="grid lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">Buyer Decision Tools</p>
+            <h2 className="font-display text-3xl md:text-4xl text-ink">See the cost behind the listing price</h2>
+            <p className="text-ink/65 mt-4 leading-relaxed">Compare homes side-by-side, estimate affordability, and include Florida property taxes, insurance, flood coverage, HOA fees, PMI, and assessments in one monthly-cost scenario.</p>
+            <Link href="/buyer-tools" className="inline-block mt-6 bg-tide text-sand font-medium px-5 py-3 rounded-sm hover:bg-tide-light transition-colors">Open Buyer Tools</Link>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {[{ title: "True monthly cost", body: "Mortgage, taxes, insurance, flood, HOA, PMI, and assessments." }, { title: "Affordability", body: "Test income, debts, cash, rate, and down-payment scenarios." }, { title: "Compare homes", body: "Evaluate price, size, age, property type, waterfront, and market time." }].map((item) => <div key={item.title} className="bg-white border border-ink/10 rounded-sm p-5"><h3 className="font-display text-xl">{item.title}</h3><p className="text-sm text-ink/60 mt-2 leading-relaxed">{item.body}</p></div>)}
+          </div>
+        </div>
+      </section>
+
       <TestimonialsSection />
       <LeadCaptureBand />
 

@@ -6,6 +6,7 @@ import SampleDataNotice from "@/components/SampleDataNotice";
 import LeadForm from "@/components/LeadForm";
 import { searchListings } from "@/lib/listings";
 import { IDX_PROVIDER } from "@/lib/idx";
+import SavedSearchAlert from "@/components/SavedSearchAlert";
 
 const idxLive = IDX_PROVIDER !== "not_connected";
 
@@ -62,6 +63,15 @@ export default async function PropertiesPage({ searchParams }: Props) {
         )}
 
         <div className="mb-10"><PropertyFilters current={params} /></div>
+
+        <div className="mb-8"><SavedSearchAlert criteria={{
+          q: params.q,
+          minPrice: params.minPrice,
+          maxPrice: params.maxPrice,
+          beds: params.beds,
+          propertyType: params.type,
+          waterfrontOnly: params.waterfront === "1",
+        }} /></div>
 
         <div className="mb-8 flex flex-wrap gap-3">
           <Link href="/buyer-tools?tool=compare" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Compare homes</Link>

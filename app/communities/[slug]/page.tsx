@@ -11,6 +11,7 @@ import ResearchLinks from "@/components/ResearchLinks";
 import SampleDataNotice from "@/components/SampleDataNotice";
 import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
+import CommunityIntelligence from "@/components/CommunityIntelligence";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -120,6 +121,8 @@ export default async function CommunityPage({ params }: Props) {
           <p className="col-span-2 text-[11px] text-ink/45 mt-1">Community photography is illustrative; verify property and location details independently.</p>
         </aside>
       </section>
+
+      <CommunityIntelligence slug={community.slug} name={community.name} />
 
       <div className="container-fsre my-12"><Tideline /></div>
 

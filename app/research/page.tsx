@@ -18,6 +18,13 @@ const CHECKLIST = [
   "Compare commute times, nearby services, parks, beaches, hospitals, shopping, and other lifestyle factors important to your household.",
 ];
 
+const RESEARCH_ORDER = [
+  { step: "01", title: "Start with the parcel", body: "Confirm the legal property record, ownership, assessed value, lot details, exemptions, and recorded sale history." },
+  { step: "02", title: "Check the structure", body: "Review permits, additions, roof and major-system history, code issues, liens, and open inspections with the correct jurisdiction." },
+  { step: "03", title: "Understand the location", body: "Research flood maps, evacuation context, schools, transportation, nearby services, weather, and municipal resources." },
+  { step: "04", title: "Read the restrictions", body: "For HOA and condominium property, examine rules, budgets, reserves, assessments, insurance, leasing, pets, and application requirements." },
+];
+
 export default function ResearchPage() {
   const jsonLd = {
     "@context": "https://schema.org",
@@ -60,6 +67,20 @@ export default function ResearchPage() {
           what matters to you.
         </p>
         <ResearchLinks />
+      </section>
+
+      <section className="container-fsre pb-14 md:pb-16">
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus">A better research order</p>
+        <h2 className="font-display text-2xl md:text-3xl mt-2">From broad neighborhood context to the exact address</h2>
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mt-7">
+          {RESEARCH_ORDER.map((item) => (
+            <article key={item.step} className="bg-white border border-ink/10 rounded-sm p-5">
+              <span className="font-mono text-xs text-brass">{item.step}</span>
+              <h3 className="font-display text-xl mt-3">{item.title}</h3>
+              <p className="text-sm text-ink/65 leading-relaxed mt-2">{item.body}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="bg-tide text-sand">

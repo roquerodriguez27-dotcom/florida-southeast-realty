@@ -33,6 +33,8 @@ function Input({ label, value, onChange, prefix, suffix, step = 1, min = 0 }: {
   step?: number;
   min?: number;
 }) {
+  const [draft, setDraft] = useState(() => String(value));
+
   return (
     <label className="block">
       <span className="block text-[11px] font-mono uppercase tracking-wide text-ink/55 mb-1">{label}</span>
@@ -40,10 +42,21 @@ function Input({ label, value, onChange, prefix, suffix, step = 1, min = 0 }: {
         {prefix && <span className="pl-3 text-ink/45">{prefix}</span>}
         <input
           type="number"
-          value={Number.isFinite(value) ? value : 0}
+          value={draft}
           min={min}
           step={step}
-          onChange={(event) => onChange(Number(event.target.value))}
+          onChange={(event) => {
+            const next = event.target.value;
+            setDraft(next);
+            if (next !== "") onChange(Number(next));
+          }}
+          onBlur={() => {
+            if (draft === "") {
+              setDraft("0");
+              onChange(0);
+            }
+          }}
+          onFocus={(event) => event.currentTarget.select()}
           className="w-full min-w-0 bg-transparent px-2.5 py-2.5 outline-none tabular-nums"
         />
         {suffix && <span className="pr-3 text-ink/45 text-sm">{suffix}</span>}

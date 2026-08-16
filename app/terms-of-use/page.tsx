@@ -13,7 +13,7 @@ export default function TermsOfUsePage() {
     <div className="pt-28 md:pt-32 pb-24">
       <div className="container-fsre max-w-3xl">
         <h1 className="font-display text-3xl md:text-4xl text-ink mb-2">Terms of Use</h1>
-        <p className="text-xs text-ink/45 mb-8">Last updated August 15, 2026</p>
+        <p className="text-xs text-ink/45 mb-8">Last updated August 16, 2026</p>
 
         <div className="space-y-7 text-ink/80 leading-relaxed text-sm">
           <section>
@@ -23,6 +23,17 @@ export default function TermsOfUsePage() {
               {" "}{SITE.name} Information can change without notice. Property, neighborhood, school,
               flood, tax, permit, insurance, association, and market information should be independently
               verified with the applicable source or qualified professional before you rely on it.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="font-display text-xl text-ink mb-2">Calculators and affordability scenarios</h2>
+            <p>
+              Mortgage, payment, affordability, cash-to-close, and comparison tools provide estimates
+              for educational planning only. Results are not a loan approval, credit decision, appraisal,
+              tax or insurance quote, or financial, legal, or tax advice. Actual rates, costs, taxes,
+              insurance, association fees, eligibility, and payments may differ. Confirm figures with
+              the appropriate lender, insurer, taxing authority, association, or licensed professional.
             </p>
           </section>
 

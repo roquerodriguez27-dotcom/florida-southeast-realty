@@ -28,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/contact",
     "/referral-status",
     "/accessibility-statement",
+    "/fair-housing",
   ];
   if (idxLive) staticPaths.splice(1, 0, "/properties");
 

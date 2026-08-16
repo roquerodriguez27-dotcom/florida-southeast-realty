@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
     <div className="pt-28 md:pt-32 pb-24">
       <div className="container-fsre max-w-3xl">
         <h1 className="font-display text-3xl md:text-4xl text-ink mb-2">Privacy Policy</h1>
-        <p className="text-xs text-ink/45 mb-8">Last updated August 15, 2026</p>
+        <p className="text-xs text-ink/45 mb-8">Last updated August 16, 2026</p>
 
         <div className="space-y-7 text-ink/80 leading-relaxed text-sm">
           <section>
@@ -24,6 +24,17 @@ export default function PrivacyPolicyPage() {
               email address, phone number, property address, search criteria, and message. Our hosting
               provider may also process technical information such as IP address, browser type, device
               information, and request logs for security and site operation.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="font-display text-xl text-ink mb-2">Saved searches, favorites, and site activity</h2>
+            <p>
+              When account or personalization features are enabled, we may store your saved searches,
+              favorite properties, comparison selections, listing views, and related website activity.
+              Authorized brokerage personnel may review this activity to operate those features, answer
+              your questions, understand the kind of property information you requested, and provide
+              relevant service. You may ask us to delete this information subject to the retention needs below.
             </p>
           </section>
 

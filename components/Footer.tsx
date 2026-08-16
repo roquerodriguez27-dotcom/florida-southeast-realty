@@ -2,6 +2,7 @@ import Link from "next/link";
 import Tideline from "./Tideline";
 import { SITE, SITE_ADDRESS_LINE } from "@/lib/site-config";
 import { IDX_PROVIDER } from "@/lib/idx";
+import EqualHousingMark from "./EqualHousingMark";
 
 export default function Footer() {
   const usingSampleListings = IDX_PROVIDER === "not_connected";
@@ -11,10 +12,8 @@ export default function Footer() {
       <div className="container-fsre pt-16 pb-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-8">
           <div className="col-span-2">
-            <div className="flex items-baseline gap-2 mb-4">
-              <span className="font-display text-xl text-sand">Florida Southeast</span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-brass">Realty</span>
-            </div>
+            <p className="font-display text-xl text-sand mb-1">{SITE.name}</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-brass mb-4">Licensed Florida real estate brokerage</p>
             <p className="text-sm max-w-md leading-relaxed">
               Independent South Florida brokerage helping buyers research their move and helping
               sellers market their homes with a 0.5% listing-side fee.
@@ -24,6 +23,7 @@ export default function Footer() {
               <p><a href={SITE.phoneHref} className="hover:text-sand">{SITE.phoneDisplay}</a></p>
               <p><a href={`mailto:${SITE.email}`} className="hover:text-sand">{SITE.email}</a></p>
             </address>
+            <EqualHousingMark light className="mt-6" />
           </div>
 
           <div>
@@ -53,6 +53,7 @@ export default function Footer() {
               <li><Link href="/about" className="hover:text-sand">About</Link></li>
               <li><Link href="/testimonials" className="hover:text-sand">Client Reviews</Link></li>
               <li><Link href="/contact" className="hover:text-sand">Contact</Link></li>
+              <li><Link href="/fair-housing" className="hover:text-sand">Fair Housing</Link></li>
               <li><a href={SITE.phoneHref} className="hover:text-sand">Call {SITE.phoneDisplay}</a></li>
             </ul>
           </div>
@@ -68,6 +69,7 @@ export default function Footer() {
             <Link href="/privacy-policy" className="hover:text-sand">Privacy Policy</Link>
             <Link href="/terms-of-use" className="hover:text-sand">Terms of Use</Link>
             <Link href="/accessibility-statement" className="hover:text-sand">Accessibility</Link>
+            <Link href="/fair-housing" className="hover:text-sand">Fair Housing</Link>
           </nav>
         </div>
 

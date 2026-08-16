@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 112" role="img" aria-labelledby="title desc">
+  <title id="title">Equal Housing Opportunity</title>
+  <desc id="desc">A house with an equal sign above the words Equal Housing Opportunity.</desc>
+  <g fill="none" stroke="#b68a45" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M78 51 120 17l42 34"/>
+    <path d="M88 45v38h64V45"/>
+    <path d="M103 56h34M103 70h34"/>
+  </g>
+  <g fill="#b68a45" font-family="Arial, Helvetica, sans-serif" font-weight="700" text-anchor="middle">
+    <text x="120" y="101" font-size="13" letter-spacing="1.2">EQUAL HOUSING OPPORTUNITY</text>
+  </g>
+</svg>

@@ -11,6 +11,7 @@ import LeadForm from "@/components/LeadForm";
 import ResearchLinks from "@/components/ResearchLinks";
 import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
+import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -72,7 +73,7 @@ export default async function ListingPage({ params }: Props) {
 
   return (
     <div className="pt-16 pb-20">
-      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}
+      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />}
 
       <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-1 h-[46vh] md:h-[64vh] bg-keystone-dim">
         <div className="relative md:col-span-2 md:row-span-2">

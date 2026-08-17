@@ -1,47 +1,49 @@
 # Florida Southeast Realty
 
-A luxury-feel, IDX-ready, mobile-first real estate site built with Next.js 16 (App Router) and Tailwind CSS v4.
+Production-oriented Next.js 16 website for Florida Southeast Realty, Inc. The site is mobile-first, IDX-ready, and connected to a private Supabase CRM.
 
-## Local preview
+## What is already built
+
+- Public brokerage site with verified company contact details, client reviews, seller disclosures, fair-housing content, privacy terms, accessibility information, and legacy URL redirects.
+- Palm Beach and Broward community guides with official Census and National Weather Service context.
+- Buyer calculators for affordability, monthly ownership cost, and property comparison.
+- Lead capture for contact, valuation, seller, buyer, and calculator-review requests.
+- Private `/crm` workspace with Supabase passwordless authentication, lead stages, notes, tasks, follow-up dates, submitted form details, and saved-search criteria.
+- SEO foundations: canonical metadata, structured data, Open Graph image, manifest, robots rules, sitemap, and optional GA4/Search Console configuration.
+- Production-safe listing behavior: demonstration inventory is disabled unless explicitly enabled outside production, and listing URLs stay out of the production sitemap until IDX is live.
+
+## Local development
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Visit http://localhost:3000. No environment variables are required to preview the site — it runs entirely on the sample dataset in `lib/` and honestly reports any unconfigured integrations (lead forms, IDX feed) rather than faking success.
+Visit `http://localhost:3000`. Copy `.env.example` to `.env.local` and add only the integrations needed for the feature being tested.
 
-## Production build
+## Verification
 
 ```bash
+npm run lint
 npm run build
-npm start
 ```
 
-## Deployment (Vercel, recommended for Next.js)
+## Required configuration
 
-1. Push this repository to GitHub/GitLab/Bitbucket.
-2. Import the repo at https://vercel.com/new.
-3. Set the environment variables you actually have (see `.env.example`) in the Vercel project's Settings → Environment Variables. None are required for the site to build and run — only for lead delivery and live IDX data.
-4. Deploy. Point your domain's DNS at Vercel per their custom-domain instructions once the deploy is live.
+See `.env.example` for the supported variable names.
 
-Any Node-hosting platform works too (`npm run build && npm start` on a server with Node 20+, or a Docker image running the same commands).
+- Supabase public URL/key plus a server-only secret key power CRM storage and broker authentication.
+- `CRM_ADMIN_EMAILS` controls which authenticated email addresses may open `/crm`.
+- Resend or a webhook can provide immediate lead notifications in addition to CRM storage.
+- GA4 and Google Search Console values are optional.
+- IDX variables remain intentionally blank until BeachesMLS approves broker API access.
 
-## What's real vs. sample in this project
+## Current launch dependencies
 
-- **Listings, communities, guides, and blog posts** are sample content for demonstration. See `SampleDataNotice` banners throughout the site and `lib/idx.ts` for the IDX/MLS integration seam.
-- **No testimonials, sales statistics, or awards are included** — none should be added until you have real, verifiable ones.
-- **Lead forms** (`components/LeadForm.tsx`, `app/api/lead/route.ts`) work end-to-end but will not actually deliver anywhere until you set `LEAD_WEBHOOK_URL` or the `RESEND_*` variables in `.env.local`. Until then, the form honestly tells the visitor it isn't connected and gives them the phone/email fallback.
-- **Legal pages** (`/privacy-policy`, `/terms-of-use`) are templates flagged for attorney review — do not publish as-is.
-- **Brokerage license number** in the footer is a placeholder — replace with your verified Florida DBPR license number.
+1. BeachesMLS/IDX approval and credentials for live inventory.
+2. Production environment-variable review, including the Supabase server secret and CRM admin allowlist.
+3. A verified Resend sender or CRM webhook if immediate lead notifications are desired.
+4. Final legal review of privacy, terms, fair-housing, and advertised-fee language.
+5. Final domain/DNS and production deployment verification.
 
-## Remaining real blockers before this can go live as an actual business site
-
-1. **IDX/MLS credentials** — pick a provider (RESO Web API, IDX Broker, or Spark/FlexMLS), get API access from your MLS, and wire `fetchLiveListings()` in `lib/idx.ts`.
-2. **Verified brokerage license number** — replace the footer placeholder with your real Florida DBPR license number.
-3. **Lead delivery credentials** — a CRM webhook URL or a Resend API key + verified sending domain (see `.env.example`).
-4. **Legal review** — have a Florida-licensed attorney review `/privacy-policy` and `/terms-of-use` before publishing.
-5. **Real photography** — every image on this site is a stock placeholder; replace with licensed or original photography of actual listings, communities, and staff.
-6. **Analytics ID** — none is configured; add one (GA4, Plausible, etc.) if you want traffic reporting.
-7. **Domain DNS** — point your real domain at wherever you deploy.
-8. **Real team bios and any future client testimonials** — collect with permission before publishing; do not use the placeholder bios or invented reviews in production.
+Do not add invented listings, market statistics, transaction results, awards, or reviews. Any future public claims should be traceable to brokerage records or an authoritative source.

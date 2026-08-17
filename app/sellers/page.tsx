@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import LeadForm from "@/components/LeadForm";
+import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 export const metadata: Metadata = {
   title: "Sell Your South Florida Home for a 0.5% Listing Fee",
@@ -68,7 +69,7 @@ export default function SellersPage() {
 
   return (
     <div className="pb-24">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }} />
 
       <section className="pt-32 pb-16 bg-tide">
         <div className="container-fsre max-w-4xl">

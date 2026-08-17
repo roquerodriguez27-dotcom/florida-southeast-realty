@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ResearchLinks from "@/components/ResearchLinks";
+import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 export const metadata: Metadata = {
   title: "South Florida Home & Neighborhood Research Center",
@@ -36,7 +37,7 @@ export default function ResearchPage() {
 
   return (
     <div className="pt-28 md:pt-32 pb-24">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
       <section className="container-fsre max-w-4xl">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">FSR Research Center</p>

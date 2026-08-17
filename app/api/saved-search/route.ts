@@ -1,29 +1,32 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { readSameOriginJson } from "@/lib/api/request";
+import { z } from "zod";
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const frequencies = new Set(["instant", "daily", "weekly"]);
-
-function clean(value: unknown, max = 200) {
-  return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
+const criteriaValueSchema = z.union([z.string().trim().max(300), z.boolean()]);
+const savedSearchSchema = z.object({
+  fullName: z.string().trim().min(1).max(120),
+  email: z.email().max(254).transform((value) => value.toLowerCase()),
+  phone: z.string().trim().max(40).optional().default(""),
+  frequency: z.enum(["instant", "daily", "weekly"]),
+  smsConsent: z.boolean().optional().default(false),
+  honeypot: z.string().max(500).optional().default(""),
+  criteria: z.record(z.string().max(60), criteriaValueSchema)
+    .refine((value) => Object.keys(value).length <= 20, "Too many search criteria."),
+});
 
 export async function POST(request: Request) {
-  let body: Record<string, unknown>;
-  try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  const body = await readSameOriginJson(request);
+  if (!body.ok) {
+    return NextResponse.json({ error: "Invalid request." }, { status: body.status });
+  }
 
-  const fullName = clean(body.fullName, 120);
-  const email = clean(body.email, 254).toLowerCase();
-  const phone = clean(body.phone, 40);
-  const frequency = clean(body.frequency, 20);
-  const criteria = body.criteria && typeof body.criteria === "object" && !Array.isArray(body.criteria)
-    ? body.criteria as Record<string, unknown>
-    : {};
-  const smsConsent = body.smsConsent === true;
-
-  if (!fullName || !EMAIL.test(email) || !frequencies.has(frequency)) {
+  const parsed = savedSearchSchema.safeParse(body.value);
+  if (!parsed.success) {
     return NextResponse.json({ error: "Please provide your name, a valid email, and an alert frequency." }, { status: 400 });
   }
+  const { fullName, email, phone, frequency, smsConsent, honeypot, criteria } = parsed.data;
+  if (honeypot) return NextResponse.json({ saved: true, pendingIdx: true });
   if (smsConsent && !phone) return NextResponse.json({ error: "A phone number is required for text alerts." }, { status: 400 });
 
   try {

@@ -8,9 +8,22 @@ export const dynamic = "force-dynamic";
 
 interface Activity { id: number; lead_id: number; kind: string; body: string; created_at: string }
 interface Task { id: number; lead_id: number | null; title: string; due_at: string | null; completed_at: string | null }
+interface SavedSearch {
+  id: string;
+  criteria: Record<string, string | boolean | number | null>;
+  frequency: string;
+  status: string;
+  sms_consent_at: string | null;
+  created_at: string;
+}
 
 function label(value: string) { return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function shortDate(value: string | null) { return value ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value)) : "—"; }
+function detailValue(value: unknown) {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (value === null || value === undefined || value === "") return "Any";
+  return String(value);
+}
 
 export default async function CrmPage({ searchParams }: { searchParams: Promise<{ status?: string; lead?: string; q?: string }> }) {
   const user = await requireCrmUser();
@@ -32,10 +45,22 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
   const leads = (leadsData ?? []) as CrmLead[];
   const selectedLead = leads.find((lead) => String(lead.id) === params.lead) ?? leads[0] ?? null;
   const leadIds = selectedLead ? [selectedLead.id] : [];
-  const { data: activitiesData } = leadIds.length ? await supabase.from("crm_activities").select("*").eq("lead_id", selectedLead!.id).order("created_at", { ascending: false }).limit(50) : { data: [] };
+  const [{ data: activitiesData }, { data: savedSearchData }] = leadIds.length
+    ? await Promise.all([
+        supabase.from("crm_activities").select("*").eq("lead_id", selectedLead!.id).order("created_at", { ascending: false }).limit(50),
+        supabase.from("saved_searches").select("id,criteria,frequency,status,sms_consent_at,created_at").eq("lead_id", selectedLead!.id).order("created_at", { ascending: false }).limit(20),
+      ])
+    : [{ data: [] }, { data: [] }];
   const activities = (activitiesData ?? []) as Activity[];
+  const savedSearches = (savedSearchData ?? []) as SavedSearch[];
   const tasks = (taskData ?? []) as Task[];
   const counts = Object.fromEntries(CRM_STATUSES.map((status) => [status, (countsData ?? []).filter((row) => row.status === status).length]));
+  const submittedDetails = selectedLead
+    ? Object.entries(selectedLead.fields ?? {}).filter(([key, value]) =>
+        !["name", "full_name", "first_name", "email", "phone", "telephone", "contact_consent"].includes(key)
+        && String(value ?? "").trim(),
+      )
+    : [];
 
   return (
     <main className="min-h-screen bg-[#eef0e9] text-ink">
@@ -66,6 +91,8 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
               <form action={updateLead} className="grid sm:grid-cols-3 gap-3 mt-6 bg-keystone/70 p-4 rounded-sm"><input type="hidden" name="leadId" value={selectedLead.id}/><label className="text-xs uppercase tracking-wide">Stage<select name="status" defaultValue={selectedLead.status} className="mt-1 w-full bg-white border border-ink/15 rounded-sm p-2 text-sm">{CRM_STATUSES.map((status) => <option key={status} value={status}>{label(status)}</option>)}</select></label><label className="text-xs uppercase tracking-wide">Priority<select name="priority" defaultValue={selectedLead.priority} className="mt-1 w-full bg-white border border-ink/15 rounded-sm p-2 text-sm">{["low","normal","high","urgent"].map((priority) => <option key={priority} value={priority}>{label(priority)}</option>)}</select></label><label className="text-xs uppercase tracking-wide">Next follow-up<input name="nextFollowUp" type="datetime-local" defaultValue={selectedLead.next_follow_up_at?.slice(0,16) ?? ""} className="mt-1 w-full bg-white border border-ink/15 rounded-sm p-2 text-sm"/></label><button className="sm:col-span-3 bg-tide text-white rounded-sm py-2 text-sm">Save lead</button></form>
               {selectedLead.message && <div className="mt-6"><h3 className="font-semibold text-sm">Request</h3><p className="mt-2 text-sm whitespace-pre-wrap text-ink/70">{selectedLead.message}</p></div>}
               {selectedLead.property_interest && <p className="mt-4 text-sm"><span className="font-semibold">Property interest:</span> {selectedLead.property_interest}</p>}
+              {submittedDetails.length > 0 && <div className="mt-6"><h3 className="font-semibold text-sm">Submitted details</h3><dl className="mt-3 grid sm:grid-cols-2 gap-3">{submittedDetails.map(([key, value]) => <div key={key} className="bg-keystone/60 rounded-sm p-3"><dt className="text-[10px] uppercase tracking-wide text-ink/45">{label(key)}</dt><dd className="text-sm mt-1 whitespace-pre-wrap break-words">{detailValue(value)}</dd></div>)}</dl></div>}
+              {savedSearches.length > 0 && <div className="mt-7"><h3 className="font-semibold">Saved searches</h3><div className="mt-3 space-y-3">{savedSearches.map((search) => <article key={search.id} className="border border-ink/10 rounded-sm p-4"><div className="flex flex-wrap justify-between gap-2"><p className="text-sm font-medium">{label(search.frequency)} alerts · {label(search.status)}</p><time className="text-xs text-ink/40">{shortDate(search.created_at)}</time></div><dl className="grid sm:grid-cols-2 gap-x-5 gap-y-2 mt-3">{Object.entries(search.criteria).map(([key, value]) => <div key={key} className="flex justify-between gap-3 text-xs"><dt className="text-ink/50">{label(key)}</dt><dd className="font-medium text-right">{detailValue(value)}</dd></div>)}</dl>{search.sms_consent_at && <p className="text-[10px] text-seagrass mt-3">Text alerts requested {shortDate(search.sms_consent_at)}</p>}</article>)}</div></div>}
               <div className="grid md:grid-cols-2 gap-4 mt-7"><form action={addNote} className="border border-ink/10 p-4 rounded-sm"><input type="hidden" name="leadId" value={selectedLead.id}/><h3 className="font-semibold">Add note</h3><textarea name="body" required rows={3} className="mt-3 w-full border border-ink/15 rounded-sm p-2 text-sm" placeholder="Call notes, needs, financing…"/><button className="mt-2 bg-hibiscus text-white rounded-sm px-4 py-2 text-sm">Save note</button></form><form action={addTask} className="border border-ink/10 p-4 rounded-sm"><input type="hidden" name="leadId" value={selectedLead.id}/><h3 className="font-semibold">Create follow-up</h3><input name="title" required className="mt-3 w-full border border-ink/15 rounded-sm p-2 text-sm" placeholder="Call about valuation"/><input name="dueAt" type="datetime-local" className="mt-2 w-full border border-ink/15 rounded-sm p-2 text-sm"/><button className="mt-2 bg-hibiscus text-white rounded-sm px-4 py-2 text-sm">Add task</button></form></div>
               <div className="mt-7"><h3 className="font-semibold">Activity</h3><div className="mt-3 space-y-3">{activities.map((activity) => <div key={activity.id} className="border-l-2 border-brass pl-3"><div className="flex justify-between gap-3"><span className="text-xs uppercase tracking-wide text-ink/45">{label(activity.kind)}</span><time className="text-xs text-ink/40">{shortDate(activity.created_at)}</time></div><p className="text-sm mt-1 whitespace-pre-wrap">{activity.body}</p></div>)}{!activities.length && <p className="text-sm text-ink/50">No activity yet.</p>}</div></div>
             </> : <div className="h-full flex items-center justify-center text-ink/50">New website leads will appear here automatically.</div>}

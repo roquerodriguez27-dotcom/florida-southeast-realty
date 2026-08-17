@@ -6,6 +6,7 @@ import { BLOG_POSTS, getBlogPostBySlug } from "@/lib/content";
 import { formatDate } from "@/lib/format";
 import LeadCaptureBand from "@/components/LeadCaptureBand";
 import { SITE } from "@/lib/site-config";
+import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -54,7 +55,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <article className="pb-20">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
       <div className="relative h-[42svh] min-h-[320px] bg-tide">
         <Image src={post.image} alt={post.title} fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-tide/95 via-tide/35 to-tide/35" />

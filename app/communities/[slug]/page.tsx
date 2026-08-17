@@ -12,6 +12,7 @@ import SampleDataNotice from "@/components/SampleDataNotice";
 import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
 import CommunityIntelligence from "@/components/CommunityIntelligence";
+import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -69,7 +70,7 @@ export default async function CommunityPage({ params }: Props) {
 
   return (
     <div className="pb-20">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
       <div className="relative h-[48svh] min-h-[360px] overflow-hidden bg-tide">
         <Image

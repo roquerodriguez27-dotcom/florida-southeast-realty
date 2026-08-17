@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { readSameOriginJson } from "@/lib/api/request";
 import { z } from "zod";
 
 /**
@@ -34,9 +35,14 @@ function first(fields: Record<string, string>, names: string[]) {
 }
 
 export async function POST(req: Request) {
+  const body = await readSameOriginJson(req);
+  if (!body.ok) {
+    return NextResponse.json({ delivered: false, reason: body.reason }, { status: body.status });
+  }
+
   let payload: z.infer<typeof leadSchema>;
   try {
-    payload = leadSchema.parse(await req.json());
+    payload = leadSchema.parse(body.value);
   } catch {
     return NextResponse.json({ delivered: false, reason: "invalid_payload" }, { status: 400 });
   }
@@ -44,6 +50,10 @@ export async function POST(req: Request) {
   // Honeypot: real visitors never fill this hidden field.
   if (payload.honeypot) {
     return NextResponse.json({ delivered: false, reason: "spam" });
+  }
+
+  if (payload.fields.contact_consent !== "yes") {
+    return NextResponse.json({ delivered: false, reason: "invalid_payload" }, { status: 400 });
   }
 
   let stored = false;
@@ -56,8 +66,17 @@ export async function POST(req: Request) {
       phone: first(fields, ["phone", "telephone"]),
       form_name: payload.formName,
       source: "website",
-      property_interest: first(fields, ["property", "property_address", "community", "areas", "location"]),
-      message: first(fields, ["message", "comments", "notes", "goals"]),
+      property_interest: first(fields, [
+        "property",
+        "property_address",
+        "address",
+        "criteria",
+        "community",
+        "areas",
+        "location",
+        "scenario",
+      ]),
+      message: first(fields, ["message", "comments", "notes", "goals", "criteria", "scenario"]),
       consent: fields.contact_consent === "yes",
       fields,
     });

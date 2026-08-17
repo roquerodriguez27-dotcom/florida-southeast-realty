@@ -12,18 +12,29 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("saving");
+    setMessage("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/saved-search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fullName: form.get("fullName"), email: form.get("email"), phone: form.get("phone"),
-        frequency: form.get("frequency"), smsConsent: form.get("smsConsent") === "on", criteria,
-      }),
-    });
-    const result = await response.json();
-    if (!response.ok) { setState("error"); setMessage(result.error ?? "Unable to save this alert."); return; }
-    setState("saved");
+    try {
+      const response = await fetch("/api/saved-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: form.get("fullName"), email: form.get("email"), phone: form.get("phone"),
+          frequency: form.get("frequency"), smsConsent: form.get("smsConsent") === "on",
+          honeypot: form.get("companyWebsite"), criteria,
+        }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) {
+        setState("error");
+        setMessage(result.error ?? "Unable to save this alert.");
+        return;
+      }
+      setState("saved");
+    } catch {
+      setState("error");
+      setMessage("Unable to save this alert. Please try again.");
+    }
   }
 
   if (state === "saved") return (
@@ -40,6 +51,7 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
         <button type="button" onClick={() => setOpen((value) => !value)} className="bg-tide text-sand px-5 py-3 rounded-sm font-medium">{open ? "Close" : "Save search"}</button>
       </div>
       {open && <form onSubmit={submit} className="mt-5 grid sm:grid-cols-2 gap-4">
+        <div className="hidden" aria-hidden="true"><label>Company website<input name="companyWebsite" tabIndex={-1} autoComplete="off" /></label></div>
         <label className="text-sm">Name<input name="fullName" required autoComplete="name" className="mt-1 w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm" /></label>
         <label className="text-sm">Email<input name="email" type="email" required autoComplete="email" className="mt-1 w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm" /></label>
         <label className="text-sm">Phone (optional)<input name="phone" type="tel" autoComplete="tel" className="mt-1 w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm" /></label>

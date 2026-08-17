@@ -12,6 +12,7 @@ const NAV = [
   { href: "/guides", label: "Guides" },
   { href: "/blog", label: "Blog" },
   { href: "/about", label: "About" },
+  { href: "/join", label: "Join Us" },
 ];
 
 export default function Header() {
@@ -30,25 +31,24 @@ export default function Header() {
   return (
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-colors duration-300 ${
-        solid ? "bg-tide/95 backdrop-blur border-b border-white/10" : "bg-transparent"
-         }`}
-  >
-    
+        solid
+          ? "bg-tide/95 backdrop-blur border-b border-white/10"
+          : "bg-transparent"
+      }`}
+    >
       <div className="container-fsre flex items-center justify-between h-18 py-3">
         <Link href="/" className="flex items-center">
-  <Image
-    src="/full_trimmed_transparent_customcolor (1).png"
-    alt="Florida Southeast Realty"
-    width={260}
-    height={80}
-    priority
-    className="h-12 md:h-14 w-auto object-contain"
-  />
-</Link>
+          <Image
+            src="/full_trimmed_transparent_customcolor (1).png"
+            alt="Florida Southeast Realty"
+            width={260}
+            height={80}
+            priority
+            className="h-12 md:h-14 w-auto object-contain"
+          />
+        </Link>
 
-
-
-        <nav className="hidden lg:flex items-center gap-8">
+        <nav className="hidden xl:flex items-center gap-6">
           {NAV.map((item) => (
             <Link
               key={item.href}
@@ -60,8 +60,11 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="hidden lg:flex items-center gap-4">
-          <a href="tel:+19545550100" className="font-mono text-sm text-sand/85 hover:text-sand">
+        <div className="hidden xl:flex items-center gap-4">
+          <a
+            href="tel:+19545550100"
+            className="font-mono text-sm text-sand/85 hover:text-sand"
+          >
             (954) 555-0100
           </a>
           <Link
@@ -76,9 +79,16 @@ export default function Header() {
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="lg:hidden text-sand p-2 -mr-2"
+          className="xl:hidden text-sand p-2 -mr-2"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+          >
             {open ? (
               <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
             ) : (
@@ -89,7 +99,7 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="lg:hidden bg-tide border-t border-white/10 px-5 pb-6 pt-2 animate-rise">
+        <div className="xl:hidden bg-tide border-t border-white/10 px-5 pb-6 pt-2 animate-rise">
           <nav className="flex flex-col">
             {NAV.map((item) => (
               <Link
@@ -103,7 +113,10 @@ export default function Header() {
             ))}
           </nav>
           <div className="flex flex-col gap-3 mt-4">
-            <a href="tel:+19545550100" className="font-mono text-sand/85 text-sm">
+            <a
+              href="tel:+19545550100"
+              className="font-mono text-sand/85 text-sm"
+            >
               (954) 555-0100
             </a>
             <Link

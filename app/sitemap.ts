@@ -14,10 +14,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
-    "", "/properties", "/sellers", "/communities", "/home-valuation", "/guides", "/blog", "/about", "/contact", "/accessibility-statement",
+    "",
+    "/properties",
+    "/sellers",
+    "/communities",
+    "/home-valuation",
+    "/guides",
+    "/blog",
+    "/about",
+    "/join",
+    "/contact",
+    "/accessibility-statement",
   ].map((route) => ({
     url: `${SITE_URL}${route}`,
-    changeFrequency: route === "" || route === "/properties" ? "daily" : "weekly",
+    changeFrequency:
+      route === "" || route === "/properties" ? "daily" : "weekly",
     priority: route === "" || route === "/sellers" ? 1 : 0.7,
   }));
 
@@ -45,5 +56,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticRoutes, ...listingRoutes, ...communityRoutes, ...guideRoutes, ...postRoutes];
+  return [
+    ...staticRoutes,
+    ...listingRoutes,
+    ...communityRoutes,
+    ...guideRoutes,
+    ...postRoutes,
+  ];
 }

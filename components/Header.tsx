@@ -33,23 +33,23 @@ export default function Header() {
     };
   }, [open]);
 
-  const solid = scrolled || open;
+  const elevated = scrolled || open;
 
   return (
     <header
-      className={`fixed top-0 inset-x-0 z-50 transition-colors duration-300 ${
-        solid ? "bg-tide/95 backdrop-blur border-b border-white/10" : "bg-transparent"
+      className={`fixed top-0 inset-x-0 z-50 bg-sand/95 backdrop-blur border-b border-tide/10 transition-shadow duration-300 ${
+        elevated ? "shadow-sm" : ""
       }`}
     >
       <div className="container-fsre flex items-center justify-between min-h-16 py-2.5">
         <Link href="/" className="flex items-center shrink-0" aria-label="Florida Southeast Realty home">
           <Image
-            src="/full_trimmed_transparent_customcolor (1).png"
+            src="/fsr-logo-2026.webp"
             alt="Florida Southeast Realty"
-            width={260}
-            height={80}
+            width={720}
+            height={161}
             priority
-            className="h-11 md:h-13 w-auto max-w-[210px] md:max-w-[240px] object-contain"
+            className="h-10 md:h-11 w-auto max-w-[230px] md:max-w-[270px] object-contain"
           />
         </Link>
 
@@ -58,7 +58,7 @@ export default function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className="font-sans text-sm text-sand/85 hover:text-sand transition-colors whitespace-nowrap"
+              className="font-sans text-sm text-tide/80 hover:text-tide transition-colors whitespace-nowrap"
             >
               {item.label}
             </Link>
@@ -66,12 +66,12 @@ export default function Header() {
         </nav>
 
         <div className="hidden xl:flex items-center gap-4 shrink-0">
-          <a href={SITE.phoneHref} className="font-mono text-xs text-sand/85 hover:text-sand whitespace-nowrap">
+          <a href={SITE.phoneHref} className="font-mono text-xs text-tide/80 hover:text-tide whitespace-nowrap">
             {SITE.phoneDisplay}
           </a>
           <Link
             href="/contact"
-            className="bg-hibiscus hover:bg-hibiscus-dark text-sand text-sm font-medium px-4 py-2.5 rounded-sm transition-colors whitespace-nowrap"
+            className="bg-brass hover:bg-[#98753b] text-white text-sm font-medium px-4 py-2.5 rounded-sm transition-colors whitespace-nowrap"
           >
             Talk to a Broker
           </Link>
@@ -82,7 +82,7 @@ export default function Header() {
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="xl:hidden text-sand p-2 -mr-2 shrink-0"
+          className="xl:hidden text-tide p-2 -mr-2 shrink-0"
         >
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             {open ? (
@@ -95,27 +95,27 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="xl:hidden bg-tide border-t border-white/10 px-5 pb-7 pt-2 max-h-[calc(100svh-64px)] overflow-y-auto animate-rise">
+        <div className="xl:hidden bg-sand border-t border-tide/10 px-5 pb-7 pt-2 max-h-[calc(100svh-64px)] overflow-y-auto animate-rise">
           <nav className="flex flex-col" aria-label="Mobile navigation">
             {NAV.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className="py-3.5 text-sand/90 border-b border-white/10 font-sans text-base"
+                className="py-3.5 text-tide/90 border-b border-tide/10 font-sans text-base"
               >
                 {item.label}
               </Link>
             ))}
           </nav>
           <div className="flex flex-col gap-3 mt-5">
-            <a href={SITE.phoneHref} className="font-mono text-sand/85 text-sm">
+            <a href={SITE.phoneHref} className="font-mono text-tide/80 text-sm">
               {SITE.phoneDisplay}
             </a>
             <Link
               href="/contact"
               onClick={() => setOpen(false)}
-              className="bg-hibiscus text-sand text-center font-medium px-4 py-3 rounded-sm"
+              className="bg-brass text-white text-center font-medium px-4 py-3 rounded-sm"
             >
               Talk to a Broker
             </Link>

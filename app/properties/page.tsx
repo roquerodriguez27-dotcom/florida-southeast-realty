@@ -4,9 +4,11 @@ import PropertyFilters from "@/components/PropertyFilters";
 import PropertyGrid from "@/components/PropertyGrid";
 import SampleDataNotice from "@/components/SampleDataNotice";
 import LeadForm from "@/components/LeadForm";
-import { searchListings } from "@/lib/listings";
+import { searchListingPage } from "@/lib/listings";
 import { IDX_PROVIDER } from "@/lib/idx";
 import SavedSearchAlert from "@/components/SavedSearchAlert";
+import { IdxPageDisclaimer } from "@/components/IdxAttribution";
+import type { PropertyType } from "@/lib/types";
 
 const idxLive = IDX_PROVIDER !== "not_connected";
 
@@ -26,39 +28,63 @@ interface Props {
     beds?: string;
     type?: string;
     waterfront?: string;
+    page?: string;
   }>;
+}
+
+const PROPERTY_TYPES: PropertyType[] = ["Single Family", "Condo", "Townhome", "Estate", "Multi-Family", "Land", "Commercial", "Other"];
+
+function propertyType(value?: string): PropertyType | undefined {
+  return PROPERTY_TYPES.includes(value as PropertyType) ? value as PropertyType : undefined;
+}
+
+function pageHref(params: Awaited<Props["searchParams"]>, page: number): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value && key !== "page") query.set(key, value);
+  }
+  query.set("page", String(page));
+  return `/properties?${query.toString()}`;
 }
 
 export default async function PropertiesPage({ searchParams }: Props) {
   const params = await searchParams;
 
-  const listings = await searchListings({
+  const result = await searchListingPage({
     q: params.q,
     minPrice: params.minPrice ? Number(params.minPrice) : undefined,
     maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
     beds: params.beds ? Number(params.beds) : undefined,
-    propertyType: params.type as never,
+    propertyType: propertyType(params.type),
     waterfrontOnly: params.waterfront === "1",
-  });
+  }, params.page ? Number(params.page) : 1);
+  const { listings } = result;
 
   return (
     <div className="pt-28 md:pt-32 pb-20">
       <div className="container-fsre">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">Property Search</p>
         <h1 className="font-display text-3xl md:text-5xl text-ink mb-4">
-          {idxLive ? `${listings.length} ${listings.length === 1 ? "home" : "homes"} found` : "South Florida home search"}
+          {result.live && !result.unavailable ? `${result.pagination.totalRows.toLocaleString()} ${result.pagination.totalRows === 1 ? "home" : "homes"} found` : "South Florida home search"}
         </h1>
         <p className="text-ink/60 max-w-2xl mb-7">
           Search by city, community, address, price, property type, bedrooms, and waterfront status.
-          The live BeachesMLS feed will power this experience once the broker API connection is approved and activated.
+          {result.live ? " Results are supplied by the live BeachesMLS feed through Spark Platform." : " The secure Spark connection is being finalized following MLS approval."}
         </p>
 
-        {!idxLive && (
+        {!result.live && (
           <div className="mb-6 bg-brass/10 border border-brass/30 rounded-sm p-5">
-            <p className="font-medium text-ink">Live MLS connection in progress</p>
+            <p className="font-medium text-ink">Secure MLS activation in progress</p>
             <p className="text-sm text-ink/65 mt-1">
               Preview deployments may show clearly labeled demonstration properties so we can test the search experience. Production will never publish demonstration inventory as real listings.
             </p>
+          </div>
+        )}
+
+        {result.unavailable && (
+          <div className="mb-6 bg-hibiscus/5 border border-hibiscus/20 rounded-sm p-5" role="status">
+            <p className="font-medium text-ink">Live listings are temporarily unavailable</p>
+            <p className="text-sm text-ink/65 mt-1">Please try again shortly or contact Florida Southeast Realty for a current search.</p>
           </div>
         )}
 
@@ -79,15 +105,25 @@ export default async function PropertiesPage({ searchParams }: Props) {
           <Link href="/buyer-tools?tool=cost" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Estimate true monthly cost</Link>
         </div>
 
-        {!idxLive && listings.length > 0 && <div className="mb-6"><SampleDataNotice variant="listings" /></div>}
+        {!result.live && listings.length > 0 && <div className="mb-6"><SampleDataNotice variant="listings" /></div>}
 
         {listings.length > 0 ? (
-          <PropertyGrid listings={listings} />
+          <>
+            <PropertyGrid listings={listings} />
+            <IdxPageDisclaimer attribution={listings[0]?.idx} />
+            {result.pagination.totalPages > 1 && (
+              <nav className="mt-8 flex items-center justify-between gap-4" aria-label="Listing results pages">
+                {result.pagination.page > 1 ? <Link href={pageHref(params, result.pagination.page - 1)} className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Previous</Link> : <span />}
+                <span className="text-sm text-ink/55">Page {result.pagination.page} of {result.pagination.totalPages}</span>
+                {result.pagination.page < result.pagination.totalPages ? <Link href={pageHref(params, result.pagination.page + 1)} className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Next</Link> : <span />}
+              </nav>
+            )}
+          </>
         ) : (
           <div className="bg-white border border-ink/10 rounded-sm p-7 md:p-10">
             <h2 className="font-display text-2xl text-ink">Tell us what you want to find</h2>
             <p className="text-sm text-ink/65 mt-2 max-w-2xl">
-              While the new site&apos;s live IDX connection is being finalized, Florida Southeast Realty can search current inventory directly for you.
+              No matching homes are available in this search right now. Florida Southeast Realty can refine the criteria or watch for new inventory.
             </p>
             <Link href="/contact" className="inline-block mt-5 bg-hibiscus text-sand font-medium px-5 py-3 rounded-sm">Start a property search</Link>
           </div>

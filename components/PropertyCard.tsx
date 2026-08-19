@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Listing } from "@/lib/types";
 import { formatPrice, formatMileMarker } from "@/lib/format";
+import IdxAttribution from "./IdxAttribution";
 
 const STATUS_STYLE: Record<Listing["status"], string> = {
   Active: "bg-seagrass text-sand",
@@ -39,7 +40,7 @@ export default function PropertyCard({ listing }: { listing: Listing }) {
       <div className="p-4">
         <div className="flex items-baseline justify-between">
           <p className="font-display text-xl text-ink">{formatPrice(listing.price)}</p>
-          <span className="mile-marker text-[11px] text-ink/45">{formatMileMarker(listing.mileMarker)}</span>
+          {listing.mileMarker > 0 && <span className="mile-marker text-[11px] text-ink/45">{formatMileMarker(listing.mileMarker)}</span>}
         </div>
         <p className="text-sm text-ink/80 mt-1">{listing.address}</p>
         <p className="text-sm text-ink/50">{listing.community}, {listing.city}</p>
@@ -47,8 +48,9 @@ export default function PropertyCard({ listing }: { listing: Listing }) {
         <div className="flex items-center gap-4 mt-3 pt-3 border-t border-ink/10 font-mono text-xs text-ink/70">
           <span>{listing.beds} bd</span>
           <span>{listing.baths} ba</span>
-          <span>{listing.sqft.toLocaleString()} sqft</span>
+          {listing.sqft > 0 && <span>{listing.sqft.toLocaleString()} sqft</span>}
         </div>
+        <IdxAttribution attribution={listing.idx} compact />
       </div>
     </Link>
   );

@@ -1,5 +1,5 @@
-import type { Listing } from "./types";
-import { fetchLiveListings } from "./idx";
+import type { Listing, ListingFilters, ListingSearchPage } from "./types";
+import { fetchLiveListingBySlug, fetchLiveListingPage } from "./idx";
 
 const img = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1600&q=80`;
@@ -122,29 +122,22 @@ function canUseSampleListings() {
 }
 
 export async function getAllListings(): Promise<Listing[]> {
-  const live = await fetchLiveListings();
-  if (live) return live;
-  return canUseSampleListings() ? LISTINGS : [];
+  return (await searchListingPage()).listings;
 }
 
 export async function getListingBySlug(slug: string): Promise<Listing | undefined> {
-  const all = await getAllListings();
-  return all.find((l) => l.slug === slug);
+  try {
+    const live = await fetchLiveListingBySlug(slug);
+    if (live) return live;
+  } catch {
+    return undefined;
+  }
+
+  return canUseSampleListings() ? LISTINGS.find((listing) => listing.slug === slug) : undefined;
 }
 
-export interface ListingFilters {
-  q?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  beds?: number;
-  propertyType?: Listing["propertyType"];
-  waterfrontOnly?: boolean;
-  community?: string;
-}
-
-export async function searchListings(filters: ListingFilters): Promise<Listing[]> {
-  const all = await getAllListings();
-  return all.filter((l) => {
+function filterSampleListings(filters: ListingFilters): Listing[] {
+  return LISTINGS.filter((l) => {
     if (filters.q) {
       const q = filters.q.toLowerCase();
       if (
@@ -162,4 +155,39 @@ export async function searchListings(filters: ListingFilters): Promise<Listing[]
     if (filters.community && l.communitySlug !== filters.community) return false;
     return true;
   });
+}
+
+export async function searchListingPage(filters: ListingFilters = {}, page = 1): Promise<ListingSearchPage> {
+  try {
+    const live = await fetchLiveListingPage(filters, page);
+    if (live) return live;
+  } catch {
+    return {
+      listings: [],
+      live: true,
+      unavailable: true,
+      pagination: { page: 1, pageSize: 24, totalPages: 1, totalRows: 0 },
+    };
+  }
+
+  const filtered = canUseSampleListings() ? filterSampleListings(filters) : [];
+  const pageSize = 24;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(Math.max(1, Math.floor(page) || 1), totalPages);
+
+  return {
+    listings: filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    live: false,
+    unavailable: false,
+    pagination: {
+      page: currentPage,
+      pageSize,
+      totalPages,
+      totalRows: filtered.length,
+    },
+  };
+}
+
+export async function searchListings(filters: ListingFilters): Promise<Listing[]> {
+  return (await searchListingPage(filters)).listings;
 }

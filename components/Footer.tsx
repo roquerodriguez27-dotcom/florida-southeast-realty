@@ -1,11 +1,12 @@
 import Link from "next/link";
 import Tideline from "./Tideline";
 import { SITE, SITE_ADDRESS_LINE } from "@/lib/site-config";
-import { IDX_PROVIDER } from "@/lib/idx";
+import { getIdxDisclosure, IDX_PROVIDER } from "@/lib/idx";
 import EqualHousingMark from "./EqualHousingMark";
 
-export default function Footer() {
+export default async function Footer() {
   const usingSampleListings = IDX_PROVIDER === "not_connected";
+  const idxDisclosure = usingSampleListings ? null : await getIdxDisclosure();
 
   return (
     <footer className="bg-tide text-sand/80">
@@ -84,6 +85,12 @@ export default function Footer() {
               Preview notice: listing data on preview deployments is demonstration data while the
               live BeachesMLS/IDX connection is being completed. Demonstration listing pages are
               excluded from production indexing and are not represented as active MLS inventory.
+            </p>
+          )}
+          {idxDisclosure?.disclaimer && (
+            <p>
+              {idxDisclosure.mlsName ? `${idxDisclosure.mlsName}: ` : "MLS data: "}
+              {idxDisclosure.disclaimer}
             </p>
           )}
         </div>

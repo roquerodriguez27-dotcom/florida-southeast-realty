@@ -8,6 +8,7 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [pendingIdx, setPendingIdx] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,12 +25,13 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
           honeypot: form.get("companyWebsite"), criteria,
         }),
       });
-      const result = await response.json() as { error?: string };
+      const result = await response.json() as { error?: string; pendingIdx?: boolean };
       if (!response.ok) {
         setState("error");
         setMessage(result.error ?? "Unable to save this alert.");
         return;
       }
+      setPendingIdx(Boolean(result.pendingIdx));
       setState("saved");
     } catch {
       setState("error");
@@ -40,7 +42,11 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   if (state === "saved") return (
     <div className="border border-tide/20 bg-tide/5 rounded-sm p-5" role="status">
       <p className="font-medium text-tide">Your search is saved.</p>
-      <p className="text-sm text-ink/60 mt-1">We recorded your criteria. Matching-listing alerts will activate when the live BeachesMLS connection is approved.</p>
+      <p className="text-sm text-ink/60 mt-1">
+        {pendingIdx
+          ? "We recorded your criteria in the brokerage CRM. An agent will confirm delivery while the secure MLS connection is finalized."
+          : "We recorded your criteria against the live MLS feed. An agent will confirm your alert delivery preferences."}
+      </p>
     </div>
   );
 

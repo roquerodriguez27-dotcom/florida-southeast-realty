@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { readSameOriginJson } from "@/lib/api/request";
 import { z } from "zod";
+import { checkIdxConnection } from "@/lib/idx";
 
 const criteriaValueSchema = z.union([z.string().trim().max(300), z.boolean()]);
 const savedSearchSchema = z.object({
@@ -26,10 +27,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please provide your name, a valid email, and an alert frequency." }, { status: 400 });
   }
   const { fullName, email, phone, frequency, smsConsent, honeypot, criteria } = parsed.data;
-  if (honeypot) return NextResponse.json({ saved: true, pendingIdx: true });
+  if (honeypot) return NextResponse.json({ saved: true, pendingIdx: false });
   if (smsConsent && !phone) return NextResponse.json({ error: "A phone number is required for text alerts." }, { status: 400 });
 
   try {
+    const idxConnection = await checkIdxConnection();
+    const idxActive = idxConnection.connected && idxConnection.idxRoleVerified !== false;
     const supabase = createSupabaseAdminClient();
     const { data: existingLead } = await supabase.from("crm_leads").select("id").eq("email", email).order("created_at", { ascending: false }).limit(1).maybeSingle();
     let leadId = existingLead?.id ?? null;
@@ -58,18 +61,20 @@ export async function POST(request: Request) {
       criteria,
       frequency,
       sms_consent_at: smsConsent ? new Date().toISOString() : null,
-      status: "pending_idx",
+      status: idxActive ? "active" : "pending_idx",
     });
     if (error) throw error;
 
     await supabase.from("crm_activities").insert({
       lead_id: leadId,
       kind: "system",
-      body: `Saved a ${frequency} property alert. It will activate when the live IDX feed is connected.`,
+      body: idxActive
+        ? `Saved a ${frequency} property alert against the live MLS feed.`
+        : `Saved a ${frequency} property alert pending the live MLS connection.`,
       created_by: "website",
     });
 
-    return NextResponse.json({ saved: true, pendingIdx: true });
+    return NextResponse.json({ saved: true, pendingIdx: !idxActive });
   } catch (error) {
     console.error("Saved-search creation failed", error);
     return NextResponse.json({ error: "We could not save this alert right now. Please try again or contact us." }, { status: 503 });

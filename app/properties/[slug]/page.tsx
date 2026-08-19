@@ -12,12 +12,14 @@ import ResearchLinks from "@/components/ResearchLinks";
 import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
+import IdxAttribution from "@/components/IdxAttribution";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
 const idxLive = IDX_PROVIDER !== "not_connected";
+export const revalidate = 300;
 
 export async function generateStaticParams() {
   const listings = await getAllListings();
@@ -41,12 +43,13 @@ export default async function ListingPage({ params }: Props) {
   const { slug } = await params;
   const listing = await getListingBySlug(slug);
   if (!listing) notFound();
+  const isLiveListing = Boolean(listing.idx);
 
   const similar = (await searchListings({ community: listing.communitySlug }))
     .filter((item) => item.slug !== listing.slug)
     .slice(0, 3);
 
-  const jsonLd = idxLive
+  const jsonLd = isLiveListing
     ? {
         "@context": "https://schema.org",
         "@type": "RealEstateListing",
@@ -79,21 +82,21 @@ export default async function ListingPage({ params }: Props) {
         <div className="relative md:col-span-2 md:row-span-2">
           <Image src={listing.images[0]} alt={listing.address} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" priority />
         </div>
-        {listing.images.slice(1, 3).map((src, index) => (
+        {listing.images.slice(1, 5).map((src, index) => (
           <div key={src} className="relative hidden md:block">
             <Image src={src} alt={`${listing.address} image ${index + 2}`} fill sizes="25vw" className="object-cover" />
           </div>
         ))}
       </div>
 
-      {!idxLive && <div className="container-fsre mt-6"><SampleDataNotice variant="listings" /></div>}
+      {!isLiveListing && <div className="container-fsre mt-6"><SampleDataNotice variant="listings" /></div>}
 
       <div className="container-fsre mt-6 grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2">
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-seagrass text-sand">{listing.status}</span>
             {listing.waterfront && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-tide text-sand">Waterfront</span>}
-            {!idxLive && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-brass/20 text-ink">Preview Demo</span>}
+            {!isLiveListing && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-brass/20 text-ink">Preview Demo</span>}
           </div>
 
           <h1 className="font-display text-3xl md:text-4xl text-ink">{listing.address}</h1>
@@ -108,10 +111,10 @@ export default async function ListingPage({ params }: Props) {
           <div className="flex flex-wrap gap-x-8 gap-y-3 mt-6 py-5 border-y border-ink/10 font-mono text-sm text-ink/80">
             <span>{listing.beds} beds</span>
             <span>{listing.baths} baths{listing.halfBaths ? ` + ${listing.halfBaths} half` : ""}</span>
-            <span>{listing.sqft.toLocaleString()} sqft</span>
+            {listing.sqft > 0 && <span>{listing.sqft.toLocaleString()} sqft</span>}
             {listing.lotSqft && <span>{listing.lotSqft.toLocaleString()} sqft lot</span>}
-            <span>Built {listing.yearBuilt}</span>
-            <span>{idxLive ? `MLS# ${listing.mlsId}` : listing.mlsId}</span>
+            {listing.yearBuilt > 0 && <span>Built {listing.yearBuilt}</span>}
+            <span>{isLiveListing ? `MLS# ${listing.mlsId}` : listing.mlsId}</span>
           </div>
 
           <p className="text-ink/80 leading-relaxed mt-6">{listing.description}</p>
@@ -125,7 +128,9 @@ export default async function ListingPage({ params }: Props) {
             ))}
           </ul>
 
-          <div className="mt-10"><Tideline label={`${listing.lat.toFixed(4)}, ${listing.lng.toFixed(4)}`} /></div>
+          <IdxAttribution attribution={listing.idx} />
+
+          {(listing.lat !== 0 || listing.lng !== 0) && <div className="mt-10"><Tideline label={`${listing.lat.toFixed(4)}, ${listing.lng.toFixed(4)}`} /></div>}
         </div>
 
         <aside className="lg:col-span-1">

@@ -514,7 +514,9 @@ function locationSearchCondition(value: string): string {
 
 function areaSearchCondition(value: string): string {
   const fields = ["City", "PostalCode", "SubdivisionName"];
-  return `(${fields.map((field) => contains(field, value)).join(" or ")})`;
+  // Keep the individual area terms ungrouped so the combined multi-area
+  // expression stays within FBS RESO's two-level nesting limit.
+  return fields.map((field) => contains(field, value)).join(" or ");
 }
 
 function buildResoFilter(filters: ListingFilters): string {

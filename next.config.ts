@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
+    // Vercel's image optimizer is unavailable for this project (HTTP 402).
+    // Serve source images directly so community and MLS photos always render.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

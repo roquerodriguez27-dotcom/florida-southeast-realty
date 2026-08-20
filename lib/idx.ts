@@ -99,20 +99,40 @@ function truthy(value: unknown): boolean {
 
 function getAccessToken(): string | null {
   const raw = process.env.SPARK_ACCESS_TOKEN ?? process.env.IDX_PROVIDER_API_KEY;
-  const token = raw?.trim().replace(/^Bearer\s+/i, "");
+  const token = raw?.trim().replace(/^(?:Bearer|OAuth)\s+/i, "");
   return token || null;
 }
 
-function getApiBase(): string {
-  const configured = process.env.SPARK_API_BASE_URL ?? process.env.IDX_PROVIDER_BASE_URL;
-  const url = new URL(configured?.trim() || DEFAULT_SPARK_API_BASE);
+function normalizeApiBase(value: string): string {
+  const url = new URL(value);
 
   if (url.protocol !== "https:") throw new Error("Spark API base URL must use HTTPS.");
-  if (process.env.NODE_ENV === "production" && url.hostname !== "sparkapi.com") {
-    throw new Error("Production Spark requests must use sparkapi.com.");
+  if (
+    process.env.NODE_ENV === "production" &&
+    !["sparkapi.com", "replication.sparkapi.com"].includes(url.hostname)
+  ) {
+    throw new Error("Production Spark requests must use an official Spark API host.");
   }
 
   return url.toString().replace(/\/$/, "");
+}
+
+function getApiBases(): string[] {
+  const configured = process.env.SPARK_API_BASE_URL ?? process.env.IDX_PROVIDER_BASE_URL;
+  const primary = normalizeApiBase(configured?.trim() || DEFAULT_SPARK_API_BASE);
+  const primaryUrl = new URL(primary);
+  const alternateHost =
+    primaryUrl.hostname === "sparkapi.com"
+      ? "replication.sparkapi.com"
+      : primaryUrl.hostname === "replication.sparkapi.com"
+        ? "sparkapi.com"
+        : null;
+
+  if (!alternateHost) return [primary];
+
+  const alternateUrl = new URL(primary);
+  alternateUrl.hostname = alternateHost;
+  return [primary, alternateUrl.toString().replace(/\/$/, "")];
 }
 
 export const IDX_PROVIDER = getAccessToken() ? ("spark" as const) : ("not_connected" as const);
@@ -125,24 +145,75 @@ async function sparkRequest(
   const accessToken = getAccessToken();
   if (!accessToken) throw new Error("Spark access token is not configured.");
 
-  const url = new URL(`${getApiBase()}${path.startsWith("/") ? path : `/${path}`}`);
-  for (const [key, value] of Object.entries(query)) url.searchParams.set(key, String(value));
+  const bases = getApiBases();
+  const failures: Array<Record<string, string | number>> = [];
 
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    next: { revalidate, tags: ["spark-idx"] },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+  for (const [index, base] of bases.entries()) {
+    const url = new URL(`${base}${path.startsWith("/") ? path : `/${path}`}`);
+    for (const [key, value] of Object.entries(query)) url.searchParams.set(key, String(value));
 
-  if (!response.ok) throw new Error(`Spark API request failed with status ${response.status}.`);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          "User-Agent": "FloridaSoutheastRealty/1.0",
+        },
+        next: { revalidate, tags: ["spark-idx"] },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      failures.push({ host: url.hostname, status: "network_error" });
+      if (index < bases.length - 1) continue;
+      console.error("[Spark IDX] API request failed.", { path, failures });
+      throw new Error("Spark API request failed.");
+    }
 
-  const envelope = asObject(await response.json());
-  const payload = asObject(envelope.D) as SparkPayload;
-  if (payload.Success === false) throw new Error("Spark API rejected the request.");
-  return payload;
+    if (!response.ok) {
+      let code = "";
+      let message = "";
+      try {
+        const envelope = asObject(await response.json());
+        const failure = asObject(envelope.D);
+        code = firstString(failure, ["Code", "code"]);
+        message = firstString(failure, ["Message", "message", "error_description"]);
+      } catch {
+        // The HTTP status remains sufficient for safe diagnostics.
+      }
+
+      failures.push({
+        host: url.hostname,
+        status: response.status,
+        ...(code ? { code } : {}),
+        ...(message ? { message } : {}),
+      });
+
+      if (index < bases.length - 1 && [400, 401, 403, 404].includes(response.status)) continue;
+
+      console.error("[Spark IDX] API request failed.", { path, failures });
+      throw new Error(`Spark API request failed with status ${response.status}.`);
+    }
+
+    const envelope = asObject(await response.json());
+    const payload = asObject(envelope.D) as SparkPayload;
+    if (payload.Success === false) {
+      failures.push({ host: url.hostname, status: "rejected" });
+      if (index < bases.length - 1) continue;
+      console.error("[Spark IDX] API request rejected.", { path, failures });
+      throw new Error("Spark API rejected the request.");
+    }
+
+    if (index > 0) {
+      console.info("[Spark IDX] Connected using alternate official endpoint.", {
+        host: url.hostname,
+      });
+    }
+    return payload;
+  }
+
+  console.error("[Spark IDX] API request failed.", { path, failures });
+  throw new Error("Spark API request failed.");
 }
 
 function stringList(value: unknown): string[] {

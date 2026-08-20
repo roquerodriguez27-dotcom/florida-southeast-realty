@@ -83,7 +83,7 @@ export default async function Footer() {
           {usingSampleListings && (
             <p>
               Preview notice: listing data on preview deployments is demonstration data while the
-              live BeachesMLS/IDX connection is being completed. Demonstration listing pages are
+              live BeachesMLS/RESO connection is being completed. Demonstration listing pages are
               excluded from production indexing and are not represented as active MLS inventory.
             </p>
           )}

@@ -16,7 +16,7 @@ export interface IdxLogo {
 }
 
 export interface IdxAttribution {
-  provider: "Spark";
+  provider: "RESO";
   mlsId?: string;
   mlsName?: string;
   view: "Summary" | "Detail";
@@ -28,7 +28,7 @@ export interface IdxAttribution {
 export interface Listing {
   /** MLS number — passthrough field from the IDX/RESO feed, never generated client-side */
   mlsId: string;
-  /** Spark's internal listing resource id, used to retrieve the detail view. */
+  /** RESO ListingKey, used to retrieve the detail view. */
   listingKey?: string;
   slug: string;
   status: ListingStatus;

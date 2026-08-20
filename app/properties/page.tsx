@@ -69,7 +69,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
         </h1>
         <p className="text-ink/60 max-w-2xl mb-7">
           Search by city, community, address, price, property type, bedrooms, and waterfront status.
-          {result.live ? " Results are supplied by the live BeachesMLS feed through Spark Platform." : " The secure Spark connection is being finalized following MLS approval."}
+          {result.live ? " Results are supplied by the live BeachesMLS feed through the RESO Web API." : " The secure RESO connection is being finalized following MLS approval."}
         </p>
 
         {!result.live && (

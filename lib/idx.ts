@@ -12,6 +12,7 @@ import type {
 
 const DEFAULT_RESO_API_BASE = "https://replication.sparkapi.com/Version/3/Reso/OData";
 const DEFAULT_MLS_NAME = "BeachesMLS";
+const DEFAULT_ORIGINATING_SYSTEM_ID = "M00000170";
 const DEFAULT_MLS_DISCLAIMER =
   "Real estate listings and related data displayed on this site are provided by BeachesMLS through the RESO Web API. Information is deemed reliable but is not guaranteed and should be independently verified.";
 const LISTING_PAGE_SIZE = 24;
@@ -109,6 +110,10 @@ function getApiBase(): string {
   ].find((value) => value && /\/Reso\/OData\/?$/i.test(value.trim()));
 
   return normalizeApiBase(configured?.trim() || DEFAULT_RESO_API_BASE);
+}
+
+function getOriginatingSystemId(): string {
+  return process.env.IDX_ORIGINATING_SYSTEM_ID?.trim() || DEFAULT_ORIGINATING_SYSTEM_ID;
 }
 
 export const IDX_PROVIDER = getAccessToken() ? ("reso" as const) : ("not_connected" as const);
@@ -472,6 +477,7 @@ function contains(field: string, value: string): string {
 
 function buildResoFilter(filters: ListingFilters): string {
   const conditions = [
+    `OriginatingSystemID eq ${odataString(getOriginatingSystemId())}`,
     "(StandardStatus eq 'Active' or StandardStatus eq 'Coming Soon' or StandardStatus eq 'Active Under Contract')",
   ];
 
@@ -590,6 +596,7 @@ export async function checkIdxConnection(): Promise<IdxConnectionState> {
       "Property",
       {
         "$top": 1,
+        "$filter": `OriginatingSystemID eq ${odataString(getOriginatingSystemId())}`,
         "$select": "ListingKey,ListingId,OriginatingSystemID,OriginatingSystemName,ModificationTimestamp",
       },
       60,

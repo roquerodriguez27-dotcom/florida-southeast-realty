@@ -37,7 +37,7 @@ See `.env.example` for the supported variable names.
 - `CRM_ADMIN_EMAILS` controls which authenticated email addresses may open `/crm`.
 - Resend or a webhook can provide immediate lead notifications in addition to CRM storage.
 - GA4 and Google Search Console values are optional.
-- `RESO_ACCESS_TOKEN` is the preferred server-only BeachesMLS credential. The existing `SPARK_ACCESS_TOKEN` and `IDX_PROVIDER_API_KEY` names remain supported so credentials can be migrated without downtime. `RESO_API_BASE_URL` should remain `https://replication.sparkapi.com/Version/3/Reso/OData`.
+- `RESO_ACCESS_TOKEN` is the preferred server-only BeachesMLS credential. The existing `SPARK_ACCESS_TOKEN` and `IDX_PROVIDER_API_KEY` names remain supported so credentials can be migrated without downtime. `RESO_API_BASE_URL` should remain `https://replication.sparkapi.com/Version/3/Reso/OData`, and `IDX_ORIGINATING_SYSTEM_ID=M00000170` keeps public results scoped to the approved BeachesMLS system.
 
 ## Current launch dependencies
 

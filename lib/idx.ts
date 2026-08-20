@@ -14,7 +14,7 @@ const DEFAULT_RESO_API_BASE = "https://replication.sparkapi.com/Version/3/Reso/O
 const DEFAULT_MLS_NAME = "BeachesMLS";
 const DEFAULT_ORIGINATING_SYSTEM_ID = "M00000170";
 const DEFAULT_MLS_DISCLAIMER =
-  "Real estate listings and related data displayed on this site are provided by BeachesMLS through the RESO Web API. Information is deemed reliable but is not guaranteed and should be independently verified.";
+  "© 2026 Beaches MLS. All Rights Reserved. This information is for your personal, non-commercial use and may not be used for any purpose other than to identify prospective properties you may be interested in purchasing. Display of MLS data is usually deemed reliable but is NOT guaranteed accurate by the MLS. Buyers are responsible for verifying the accuracy of all information and should investigate the data themselves or retain appropriate professionals. Information from sources other than the Listing Agent may have been included in the MLS data. Unless otherwise specified in writing, Broker/Agent has not and will not verify any information obtained from other sources. The Broker/Agent providing the information contained herein may or may not have been the Listing and/or Selling Agent.";
 const LISTING_PAGE_SIZE = 24;
 const REQUEST_TIMEOUT_MS = 10_000;
 

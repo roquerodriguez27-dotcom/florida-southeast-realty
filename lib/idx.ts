@@ -475,6 +475,43 @@ function contains(field: string, value: string): string {
   return `contains(${field},${odataString(value)})`;
 }
 
+const STREET_SUFFIXES = new Set([
+  "avenue", "ave", "boulevard", "blvd", "circle", "cir", "court", "ct",
+  "drive", "dr", "highway", "hwy", "lane", "ln", "loop", "parkway", "pkwy",
+  "path", "place", "pl", "road", "rd", "street", "st", "terrace", "ter",
+  "trail", "trl", "way",
+]);
+const STREET_DIRECTIONS = new Set([
+  "n", "north", "s", "south", "e", "east", "w", "west",
+  "ne", "northeast", "nw", "northwest", "se", "southeast", "sw", "southwest",
+]);
+
+function streetAddressTokens(value: string): string[] | null {
+  const streetPortion = value.split(",", 1)[0]?.trim() ?? "";
+  const rawTokens = streetPortion.match(/[A-Za-z0-9]+/g) ?? [];
+  const firstToken = rawTokens[0];
+  if (rawTokens.length < 2 || !firstToken || !/^\d+[A-Za-z]?$/.test(firstToken)) return null;
+
+  const suffixIndex = rawTokens.findIndex((token, index) =>
+    index >= 2 && STREET_SUFFIXES.has(token.toLowerCase()),
+  );
+  const addressTokens = (suffixIndex >= 2 ? rawTokens.slice(0, suffixIndex) : rawTokens.slice(0, 5))
+    .filter((token, index) => index === 0 || !STREET_DIRECTIONS.has(token.toLowerCase()))
+    .slice(0, 4);
+
+  return addressTokens.length >= 2 ? addressTokens : null;
+}
+
+function locationSearchCondition(value: string): string {
+  const addressTokens = streetAddressTokens(value);
+  if (addressTokens) {
+    return `(${addressTokens.map((token) => contains("UnparsedAddress", token)).join(" and ")})`;
+  }
+
+  const fields = ["City", "PostalCode", "SubdivisionName", "UnparsedAddress", "StreetName", "ListingId"];
+  return `(${fields.map((field) => contains(field, value)).join(" or ")})`;
+}
+
 function buildResoFilter(filters: ListingFilters): string {
   const conditions = [
     `OriginatingSystemID eq ${odataString(getOriginatingSystemId())}`,
@@ -483,8 +520,7 @@ function buildResoFilter(filters: ListingFilters): string {
 
   if (filters.q?.trim()) {
     const value = filters.q.trim().slice(0, 100);
-    const fields = ["City", "PostalCode", "SubdivisionName", "UnparsedAddress", "StreetName", "ListingId"];
-    conditions.push(`(${fields.map((field) => contains(field, value)).join(" or ")})`);
+    conditions.push(locationSearchCondition(value));
   }
   if (Number.isFinite(filters.minPrice) && Number(filters.minPrice) > 0) {
     conditions.push(`ListPrice ge ${Number(filters.minPrice)}`);

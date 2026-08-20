@@ -3,6 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import LeadForm from "@/components/LeadForm";
+import {
+  clearComparisonListings,
+  removeComparisonListing,
+  useComparisonListings,
+} from "@/components/useComparisonListings";
+import {
+  MAX_COMPARE_LISTINGS,
+  savedComparisonListing,
+  type SavedComparisonListing,
+} from "@/lib/comparison";
 import type { Listing } from "@/lib/types";
 
 type Tool = "cost" | "affordability" | "compare";
@@ -42,7 +52,7 @@ function emptyComparisonHome(index: number): ComparisonHome {
   };
 }
 
-function comparisonHomeFromListing(listing: Listing, index: number): ComparisonHome {
+function comparisonHomeFromSavedListing(listing: SavedComparisonListing, index: number): ComparisonHome {
   return {
     id: `home-${index}`,
     sourceSlug: listing.slug,
@@ -210,10 +220,27 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
   const [monthlyDebt, setMonthlyDebt] = useState(900);
   const [cash, setCash] = useState(120000);
   const [dti, setDti] = useState(36);
-  const [comparisonHomes, setComparisonHomes] = useState<ComparisonHome[]>(() => {
-    const homes = [emptyComparisonHome(1), emptyComparisonHome(2), emptyComparisonHome(3)];
-    if (initialListing) homes[0] = comparisonHomeFromListing(initialListing, 1);
-    return homes;
+  const selectedListings = useComparisonListings();
+  const [dismissedInitialListing, setDismissedInitialListing] = useState(false);
+  const [manualComparisonHomes, setManualComparisonHomes] = useState<ComparisonHome[]>(() => [
+    emptyComparisonHome(1),
+    emptyComparisonHome(2),
+    emptyComparisonHome(3),
+  ]);
+  const [listingEdits, setListingEdits] = useState<Record<string, Partial<Omit<ComparisonHome, "id" | "sourceSlug">>>>({});
+
+  const initialSavedListing = initialListing ? savedComparisonListing(initialListing) : undefined;
+  const loadedListings = [
+    ...(initialSavedListing && !dismissedInitialListing ? [initialSavedListing] : []),
+    ...selectedListings.filter((listing) => listing.slug !== initialSavedListing?.slug),
+  ].slice(0, MAX_COMPARE_LISTINGS);
+  const comparisonHomes = Array.from({ length: MAX_COMPARE_LISTINGS }, (_, index) => {
+    const listing = loadedListings[index];
+    if (!listing) return manualComparisonHomes[index];
+    return {
+      ...comparisonHomeFromSavedListing(listing, index + 1),
+      ...listingEdits[listing.slug],
+    };
   });
 
   const downPayment = price * downPercent / 100;
@@ -240,11 +267,43 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
       : `Compared properties: ${enteredHomes.map((home) => `${home.address}${positiveNumber(home.price) ? ` (${money.format(positiveNumber(home.price))})` : ""}`).join(", ") || "none entered yet"}.`;
 
   function updateComparisonHome(index: number, field: keyof Omit<ComparisonHome, "id" | "sourceSlug">, value: string) {
-    setComparisonHomes((current) => current.map((home, homeIndex) => homeIndex === index ? { ...home, [field]: value } : home));
+    const home = comparisonHomes[index];
+    const sourceSlug = home.sourceSlug;
+    if (sourceSlug) {
+      setListingEdits((current) => ({
+        ...current,
+        [sourceSlug]: { ...current[sourceSlug], [field]: value },
+      }));
+      return;
+    }
+    setManualComparisonHomes((current) => current.map((item, homeIndex) => homeIndex === index ? { ...item, [field]: value } : item));
   }
 
   function clearComparisonHome(index: number) {
-    setComparisonHomes((current) => current.map((home, homeIndex) => homeIndex === index ? emptyComparisonHome(index + 1) : home));
+    const home = comparisonHomes[index];
+    const sourceSlug = home.sourceSlug;
+    if (sourceSlug) {
+      removeComparisonListing(sourceSlug);
+      if (sourceSlug === initialListing?.slug) setDismissedInitialListing(true);
+      setListingEdits((current) => {
+        const next = { ...current };
+        delete next[sourceSlug];
+        return next;
+      });
+      return;
+    }
+    setManualComparisonHomes((current) => current.map((item, homeIndex) => homeIndex === index ? emptyComparisonHome(index + 1) : item));
+  }
+
+  function clearAllComparisonHomes() {
+    clearComparisonListings();
+    setDismissedInitialListing(true);
+    setListingEdits({});
+    setManualComparisonHomes([
+      emptyComparisonHome(1),
+      emptyComparisonHome(2),
+      emptyComparisonHome(3),
+    ]);
   }
 
   const tabs: { id: Tool; label: string }[] = [
@@ -322,9 +381,22 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
       {tool === "compare" && (
         <section className="mt-6" aria-label="Property comparison">
           <div className="bg-white border border-ink/10 rounded-sm p-5 md:p-7">
-            <div>
-              <h2 className="font-display text-2xl">Compare up to three homes</h2>
-              <p className="text-sm text-ink/60 mt-1 max-w-3xl">Type any address or MLS number below. Add as much information as you have—the comparison updates as you type, and every field can be edited.</p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="font-display text-2xl">Compare up to three homes</h2>
+                <p className="text-sm text-ink/60 mt-1 max-w-3xl">Select homes from any search card or listing page. Your saved choices load here automatically, and every field remains editable.</p>
+                <p className="mt-2 text-xs font-medium text-tide" aria-live="polite">
+                  {loadedListings.length > 0
+                    ? `${loadedListings.length} selected ${loadedListings.length === 1 ? "listing" : "listings"} loaded`
+                    : "No MLS listings selected yet"}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <Link href="/properties" className="rounded-sm border border-tide/25 px-4 py-2.5 font-medium text-tide hover:bg-tide/5">Browse homes to select</Link>
+                {enteredHomes.length > 0 && (
+                  <button type="button" onClick={clearAllComparisonHomes} className="px-2 py-2.5 text-ink/55 underline underline-offset-4 hover:text-hibiscus">Clear all</button>
+                )}
+              </div>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-4 mt-6">
@@ -372,7 +444,12 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
                 </tbody>
               </table>
             </div>
-          ) : <p className="mt-5 p-8 border border-dashed border-ink/20 text-center text-ink/55">Enter the first home&apos;s address or MLS number to begin comparing.</p>}
+          ) : (
+            <div className="mt-5 p-8 border border-dashed border-ink/20 text-center text-ink/55">
+              <p>Choose homes from the listing search, or enter the first address or MLS number above.</p>
+              <Link href="/properties" className="inline-block mt-3 text-tide underline underline-offset-4">Browse homes to compare</Link>
+            </div>
+          )}
         </section>
       )}
 

@@ -13,6 +13,8 @@ import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
 import IdxAttribution from "@/components/IdxAttribution";
+import CompareToggle from "@/components/CompareToggle";
+import { savedComparisonListing } from "@/lib/comparison";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -100,8 +102,10 @@ export default async function ListingPage({ params }: Props) {
 
           <div className="flex flex-wrap gap-3 mt-5">
             <Link href={`/buyer-tools?listing=${listing.slug}&tool=cost`} className="bg-tide text-sand px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide-light transition-colors">Calculate true monthly cost</Link>
-            <Link href={`/buyer-tools?listing=${listing.slug}&tool=compare`} className="border border-tide/25 text-tide px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide/5 transition-colors">Compare this home</Link>
+            <CompareToggle listing={savedComparisonListing(listing)} variant="detail" />
+            <Link href="/properties" className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">Choose more homes</Link>
           </div>
+          <p className="mt-2 text-xs text-ink/50">Select up to three listings as you browse. Your choices stay saved until you compare or clear them.</p>
 
           <div className="flex flex-wrap gap-x-8 gap-y-3 mt-6 py-5 border-y border-ink/10 font-mono text-sm text-ink/80">
             <span>{listing.beds} beds</span>

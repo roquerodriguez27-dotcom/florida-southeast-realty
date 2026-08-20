@@ -24,7 +24,14 @@ const REASONS = [
   },
 ];
 
-export default function HomeValuationPage() {
+interface Props {
+  searchParams: Promise<{ address?: string }>;
+}
+
+export default async function HomeValuationPage({ searchParams }: Props) {
+  const params = await searchParams;
+  const address = params.address?.trim().slice(0, 200) ?? "";
+
   return (
     <div className="pt-28 md:pt-32 pb-24">
       <div className="container-fsre grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
@@ -62,7 +69,7 @@ export default function HomeValuationPage() {
             submitLabel="Get My Home Value"
             successMessage="Florida Southeast Realty will review your property information and follow up about your valuation request."
             fields={[
-              { name: "address", label: "Property Address", type: "text", required: true, placeholder: "Street address, city, FL ZIP", colSpan: 2 },
+              { name: "address", label: "Property Address", type: "text", required: true, placeholder: "Street address, city, FL ZIP", defaultValue: address, colSpan: 2 },
               { name: "name", label: "Name", type: "text", required: true },
               { name: "email", label: "Email", type: "email", required: true },
               { name: "phone", label: "Phone", type: "tel" },

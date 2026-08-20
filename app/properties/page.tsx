@@ -49,6 +49,10 @@ function optionalPositiveInteger(value?: string): number | undefined {
   return parsed !== undefined && parsed > 0 ? Math.floor(parsed) : undefined;
 }
 
+function looksLikeStreetAddress(value?: string): value is string {
+  return Boolean(value?.trim() && /^\s*\d+[A-Za-z]?\s+\S+/.test(value));
+}
+
 function pageHref(params: Awaited<Props["searchParams"]>, page: number): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -70,16 +74,30 @@ export default async function PropertiesPage({ searchParams }: Props) {
     waterfrontOnly: params.waterfront === "1",
   }, optionalPositiveInteger(params.page) ?? 1);
   const { listings } = result;
+  const addressQuery = looksLikeStreetAddress(params.q) ? params.q.trim().slice(0, 200) : undefined;
+  const hasSecondaryFilters = Boolean(
+    params.minPrice || params.maxPrice || params.beds || params.type || params.waterfront === "1",
+  );
+  const noCurrentAddressListing = Boolean(
+    addressQuery && !hasSecondaryFilters && result.live && !result.unavailable && listings.length === 0,
+  );
+  const valuationHref = addressQuery
+    ? `/home-valuation?address=${encodeURIComponent(addressQuery)}`
+    : "/home-valuation";
 
   return (
     <div className="pt-28 md:pt-32 pb-20">
       <div className="container-fsre">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">Property Search</p>
         <h1 className="font-display text-3xl md:text-5xl text-ink mb-4">
-          {result.live && !result.unavailable ? `${result.pagination.totalRows.toLocaleString()} ${result.pagination.totalRows === 1 ? "home" : "homes"} found` : "South Florida home search"}
+          {noCurrentAddressListing
+            ? "This address is not currently listed"
+            : result.live && !result.unavailable
+              ? `${result.pagination.totalRows.toLocaleString()} ${result.pagination.totalRows === 1 ? "home" : "homes"} found`
+              : "South Florida home search"}
         </h1>
         <p className="text-ink/60 max-w-2xl mb-7">
-          Search by city, community, address, price, property type, bedrooms, and waterfront status.
+          Search current for-sale inventory by city, community, address, price, property type, bedrooms, and waterfront status.
           {result.live ? " Results are supplied by the live BeachesMLS feed through the RESO Web API." : " The secure RESO connection is being finalized following MLS approval."}
         </p>
 
@@ -130,6 +148,18 @@ export default async function PropertiesPage({ searchParams }: Props) {
               </nav>
             )}
           </>
+        ) : noCurrentAddressListing ? (
+          <div className="bg-white border border-ink/10 rounded-sm p-7 md:p-10" role="status">
+            <p className="font-mono text-xs uppercase tracking-[0.16em] text-hibiscus">Possibly off market</p>
+            <h2 className="font-display text-2xl text-ink mt-2">No current listing was found for {addressQuery}</h2>
+            <p className="text-sm text-ink/65 mt-3 max-w-2xl leading-relaxed">
+              The live BeachesMLS feed returned no Active, Coming Soon, or Active Under Contract listing for this address. It may be off market rather than unavailable as a property. MLS coverage and address formatting can vary, so this result is not a legal determination of the home&apos;s status.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href={valuationHref} className="inline-block bg-hibiscus text-sand font-medium px-5 py-3 rounded-sm">Research this off-market home</Link>
+              <Link href="/properties" className="inline-block border border-tide/25 text-tide font-medium px-5 py-3 rounded-sm">Search another address</Link>
+            </div>
+          </div>
         ) : (
           <div className="bg-white border border-ink/10 rounded-sm p-7 md:p-10">
             <h2 className="font-display text-2xl text-ink">Tell us what you want to find</h2>

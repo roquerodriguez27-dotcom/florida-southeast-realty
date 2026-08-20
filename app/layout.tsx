@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { SITE } from "@/lib/site-config";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
+import CompareTray from "@/components/CompareTray";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -150,6 +151,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <Header />
         <main id="main-content">{children}</main>
+        <CompareTray />
         <Footer />
       </body>
     </html>

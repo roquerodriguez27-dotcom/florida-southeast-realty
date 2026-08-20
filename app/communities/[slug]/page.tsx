@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${community.name} Real Estate & Neighborhood Guide`,
       description: community.overview,
-      images: [{ url: community.heroImage, alt: `${community.name}, Florida` }],
+      images: [{ url: community.heroImage, alt: community.heroImageAlt }],
     },
   };
 }
@@ -72,7 +72,7 @@ export default async function CommunityPage({ params }: Props) {
       <div className="relative h-[48svh] min-h-[360px] overflow-hidden bg-tide">
         <Image
           src={community.heroImage}
-          alt={`${community.name}, Florida community guide`}
+          alt={community.heroImageAlt}
           fill
           priority
           sizes="100vw"
@@ -86,8 +86,17 @@ export default async function CommunityPage({ params }: Props) {
         </div>
       </div>
 
-      <section className="container-fsre mt-12 grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2">
+      <p className="container-fsre mt-2 text-right text-[10px] leading-relaxed text-ink/45">
+        Photo: <a href={community.heroImageCredit.sourceUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">{community.heroImageCredit.author}</a>
+        {" · "}
+        {community.heroImageCredit.licenseUrl ? (
+          <a href={community.heroImageCredit.licenseUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">{community.heroImageCredit.license}</a>
+        ) : community.heroImageCredit.license}
+        {" · resized for web"}
+      </p>
+
+      <section className={`container-fsre mt-10 ${community.images.length > 0 ? "grid grid-cols-1 lg:grid-cols-3 gap-12" : ""}`}>
+        <div className={community.images.length > 0 ? "lg:col-span-2" : "max-w-4xl"}>
           <h2 className="font-display text-2xl text-ink mb-4">Living in {community.name}</h2>
           <p className="text-ink/80 leading-relaxed text-lg">{community.overview}</p>
 
@@ -110,14 +119,15 @@ export default async function CommunityPage({ params }: Props) {
           </div>
         </div>
 
-        <aside className="grid grid-cols-2 gap-2 content-start">
-          {community.images.map((src, i) => (
-            <div key={src} className="relative aspect-square overflow-hidden rounded-sm bg-keystone-dim">
-              <Image src={src} alt={`${community.name} area lifestyle image ${i + 1}`} fill sizes="(max-width: 1024px) 50vw, 20vw" className="object-cover" />
-            </div>
-          ))}
-          <p className="col-span-2 text-[11px] text-ink/45 mt-1">Community photography is illustrative; verify property and location details independently.</p>
-        </aside>
+        {community.images.length > 0 && (
+          <aside className="grid grid-cols-2 gap-2 content-start">
+            {community.images.map((src, i) => (
+              <div key={src} className="relative aspect-square overflow-hidden rounded-sm bg-keystone-dim">
+                <Image src={src} alt={`${community.name} area lifestyle image ${i + 1}`} fill sizes="(max-width: 1024px) 50vw, 20vw" className="object-cover" />
+              </div>
+            ))}
+          </aside>
+        )}
       </section>
 
       <CommunityIntelligence slug={community.slug} name={community.name} />

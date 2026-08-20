@@ -13,7 +13,7 @@ export default function SearchPanel() {
           id="q"
           name="q"
           type="search"
-          placeholder="Boca Raton, Delray Beach, 33426…"
+          placeholder="City, full address, ZIP, or MLS #…"
           enterKeyHint="search"
           autoComplete="off"
           className="w-full min-w-0 border border-ink/15 rounded-sm px-3 py-2.5 text-base md:text-sm text-ink focus:border-tide outline-none"

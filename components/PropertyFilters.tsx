@@ -18,7 +18,7 @@ export default function PropertyFilters({
           name="q"
           defaultValue={current.q}
           type="text"
-          placeholder="City, community, zip…"
+          placeholder="City, address, ZIP, or MLS #…"
           className="w-full border border-ink/15 rounded-sm px-3 py-2 text-sm focus:border-tide outline-none"
         />
       </div>

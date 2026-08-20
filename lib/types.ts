@@ -87,6 +87,13 @@ export interface Community {
   county: string;
   mileMarker: number;
   heroImage: string;
+  heroImageAlt: string;
+  heroImageCredit: {
+    author: string;
+    sourceUrl: string;
+    license: string;
+    licenseUrl?: string;
+  };
   tagline: string;
   overview: string;
   medianPrice: number;

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import BuyerTools from "@/components/BuyerTools";
-import { getAllListings } from "@/lib/listings";
+import { getListingBySlug } from "@/lib/listings";
 
 export const metadata: Metadata = {
   title: "Mortgage, Affordability & Property Comparison Tools",
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default async function BuyerToolsPage({ searchParams }: { searchParams: Promise<{ listing?: string; tool?: string }> }) {
   const params = await searchParams;
-  const listings = await getAllListings();
+  const initialListing = params.listing ? await getListingBySlug(params.listing) : undefined;
   const tool = params.tool === "compare" || params.tool === "affordability" ? params.tool : "cost";
 
   return (
@@ -21,7 +21,7 @@ export default async function BuyerToolsPage({ searchParams }: { searchParams: P
         <p className="text-lg text-ink/65 leading-relaxed mt-5 max-w-3xl">Test monthly-cost and affordability scenarios with the Florida expenses that matter, then compare homes side-by-side before deciding what deserves a showing.</p>
       </section>
       <section className="container-fsre mt-10">
-        <BuyerTools listings={listings} initialListingSlug={params.listing} initialTool={tool} />
+        <BuyerTools initialListing={initialListing} initialTool={tool} />
       </section>
     </main>
   );

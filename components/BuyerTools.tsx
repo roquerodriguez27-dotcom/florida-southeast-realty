@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import LeadForm from "@/components/LeadForm";
 import type { Listing } from "@/lib/types";
@@ -8,13 +8,96 @@ import type { Listing } from "@/lib/types";
 type Tool = "cost" | "affordability" | "compare";
 
 interface BuyerToolsProps {
-  listings: Listing[];
-  initialListingSlug?: string;
+  initialListing?: Listing;
   initialTool?: Tool;
+}
+
+interface ComparisonHome {
+  id: string;
+  sourceSlug?: string;
+  address: string;
+  price: string;
+  beds: string;
+  baths: string;
+  sqft: string;
+  hoa: string;
+  yearBuilt: string;
+  notes: string;
 }
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+
+function emptyComparisonHome(index: number): ComparisonHome {
+  return {
+    id: `home-${index}`,
+    address: "",
+    price: "",
+    beds: "",
+    baths: "",
+    sqft: "",
+    hoa: "",
+    yearBuilt: "",
+    notes: "",
+  };
+}
+
+function comparisonHomeFromListing(listing: Listing, index: number): ComparisonHome {
+  return {
+    id: `home-${index}`,
+    sourceSlug: listing.slug,
+    address: `${listing.address}, ${listing.city}, FL ${listing.zip}`,
+    price: String(listing.price),
+    beds: String(listing.beds),
+    baths: String(listing.baths + (listing.halfBaths ?? 0) * 0.5),
+    sqft: String(listing.sqft),
+    hoa: "",
+    yearBuilt: listing.yearBuilt ? String(listing.yearBuilt) : "",
+    notes: `${listing.propertyType}${listing.waterfront ? " · Waterfront" : ""} · MLS ${listing.mlsId}`,
+  };
+}
+
+function positiveNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function ComparisonField({
+  label,
+  value,
+  onChange,
+  type = "text",
+  prefix,
+  placeholder,
+  step,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: "text" | "number";
+  prefix?: string;
+  placeholder?: string;
+  step?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-mono uppercase tracking-wide text-ink/50 mb-1">{label}</span>
+      <span className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+        {prefix && <span className="pl-2.5 text-ink/45">{prefix}</span>}
+        <input
+          type={type}
+          value={value}
+          min={type === "number" ? "0" : undefined}
+          step={step}
+          inputMode={type === "number" ? "decimal" : undefined}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-full min-w-0 bg-transparent px-2.5 py-2 text-sm outline-none"
+        />
+      </span>
+    </label>
+  );
+}
 
 function payment(principal: number, annualRate: number, years: number) {
   if (principal <= 0 || years <= 0) return 0;
@@ -111,8 +194,7 @@ function CostBreakdown({ price, downPayment, rate, years, taxRate, insurance, fl
   );
 }
 
-export default function BuyerTools({ listings, initialListingSlug, initialTool = "cost" }: BuyerToolsProps) {
-  const initialListing = listings.find((listing) => listing.slug === initialListingSlug);
+export default function BuyerTools({ initialListing, initialTool = "cost" }: BuyerToolsProps) {
   const [tool, setTool] = useState<Tool>(initialTool);
   const [price, setPrice] = useState(initialListing?.price ?? 600000);
   const [downPercent, setDownPercent] = useState(20);
@@ -128,7 +210,11 @@ export default function BuyerTools({ listings, initialListingSlug, initialTool =
   const [monthlyDebt, setMonthlyDebt] = useState(900);
   const [cash, setCash] = useState(120000);
   const [dti, setDti] = useState(36);
-  const [selected, setSelected] = useState<string[]>(initialListingSlug ? [initialListingSlug] : listings.slice(0, 3).map((listing) => listing.slug));
+  const [comparisonHomes, setComparisonHomes] = useState<ComparisonHome[]>(() => {
+    const homes = [emptyComparisonHome(1), emptyComparisonHome(2), emptyComparisonHome(3)];
+    if (initialListing) homes[0] = comparisonHomeFromListing(initialListing, 1);
+    return homes;
+  });
 
   const downPayment = price * downPercent / 100;
   const monthlyIncome = income / 12;
@@ -146,15 +232,19 @@ export default function BuyerTools({ listings, initialListingSlug, initialTool =
   const cashLimitedPrice = downFraction > 0 ? cashLimitedDown / downFraction : paymentLimitedPrice;
   const affordablePrice = Math.max(0, Math.min(paymentLimitedPrice, cashLimitedPrice));
 
-  const chosen = useMemo(() => selected.map((slug) => listings.find((listing) => listing.slug === slug)).filter(Boolean) as Listing[], [listings, selected]);
+  const enteredHomes = comparisonHomes.filter((home) => home.address.trim());
   const scenarioSummary = tool === "cost"
     ? `${money.format(price)} purchase; ${downPercent}% down; ${decimal.format(rate)}% rate; ${years}-year term; ${money.format(hoa)}/mo HOA; ${money.format(insurance)}/mo insurance; ${money.format(flood)}/mo flood estimate.`
     : tool === "affordability"
       ? `${money.format(income)} annual income; ${money.format(monthlyDebt)}/mo debts; ${money.format(cash)} available cash; estimated planning range ${money.format(affordablePrice)}.`
-      : `Compared properties: ${chosen.map((listing) => `${listing.address} (${listing.mlsId})`).join(", ") || "none selected"}.`;
+      : `Compared properties: ${enteredHomes.map((home) => `${home.address}${positiveNumber(home.price) ? ` (${money.format(positiveNumber(home.price))})` : ""}`).join(", ") || "none entered yet"}.`;
 
-  function toggleListing(slug: string) {
-    setSelected((current) => current.includes(slug) ? current.filter((item) => item !== slug) : current.length < 3 ? [...current, slug] : current);
+  function updateComparisonHome(index: number, field: keyof Omit<ComparisonHome, "id" | "sourceSlug">, value: string) {
+    setComparisonHomes((current) => current.map((home, homeIndex) => homeIndex === index ? { ...home, [field]: value } : home));
+  }
+
+  function clearComparisonHome(index: number) {
+    setComparisonHomes((current) => current.map((home, homeIndex) => homeIndex === index ? emptyComparisonHome(index + 1) : home));
   }
 
   const tabs: { id: Tool; label: string }[] = [
@@ -232,45 +322,64 @@ export default function BuyerTools({ listings, initialListingSlug, initialTool =
       {tool === "compare" && (
         <section className="mt-6" aria-label="Property comparison">
           <div className="bg-white border border-ink/10 rounded-sm p-5 md:p-7">
-            <div className="flex flex-wrap justify-between gap-3 items-end">
-              <div><h2 className="font-display text-2xl">Compare up to three homes</h2><p className="text-sm text-ink/55 mt-1">Live MLS fields will replace preview data after IDX activation.</p></div>
-              <span className="font-mono text-xs text-ink/45">{selected.length}/3 selected</span>
+            <div>
+              <h2 className="font-display text-2xl">Compare up to three homes</h2>
+              <p className="text-sm text-ink/60 mt-1 max-w-3xl">Type any address or MLS number below. Add as much information as you have—the comparison updates as you type, and every field can be edited.</p>
             </div>
-            <div className="flex gap-2 overflow-x-auto py-4 mt-2">
-              {listings.map((listing) => {
-                const active = selected.includes(listing.slug);
-                return <button key={listing.slug} type="button" onClick={() => toggleListing(listing.slug)} disabled={!active && selected.length >= 3} className={`shrink-0 text-left border rounded-sm p-3 w-56 disabled:opacity-40 ${active ? "border-tide bg-tide/5" : "border-ink/10"}`}><span className="block font-medium text-sm truncate">{listing.address}</span><span className="block text-xs text-ink/50 mt-1">{money.format(listing.price)} · {listing.city}</span></button>;
-              })}
+
+            <div className="grid lg:grid-cols-3 gap-4 mt-6">
+              {comparisonHomes.map((home, index) => (
+                <fieldset key={home.id} className="border border-ink/10 rounded-sm bg-keystone/35 p-4">
+                  <legend className="sr-only">Home {index + 1}</legend>
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-hibiscus">Home {index + 1}</p>
+                      {home.sourceSlug && <Link href={`/properties/${home.sourceSlug}`} className="text-xs text-tide underline">View loaded MLS listing</Link>}
+                    </div>
+                    <button type="button" onClick={() => clearComparisonHome(index)} className="text-xs text-ink/55 underline hover:text-hibiscus">Clear</button>
+                  </div>
+                  <div className="space-y-3">
+                    <ComparisonField label="Address or MLS number" value={home.address} onChange={(value) => updateComparisonHome(index, "address", value)} placeholder="123 Main St or MLS R12345678" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <ComparisonField label="Price" value={home.price} onChange={(value) => updateComparisonHome(index, "price", value)} type="number" prefix="$" step="1" />
+                      <ComparisonField label="Living area" value={home.sqft} onChange={(value) => updateComparisonHome(index, "sqft", value)} type="number" placeholder="Sq. ft." step="1" />
+                      <ComparisonField label="Bedrooms" value={home.beds} onChange={(value) => updateComparisonHome(index, "beds", value)} type="number" step="1" />
+                      <ComparisonField label="Bathrooms" value={home.baths} onChange={(value) => updateComparisonHome(index, "baths", value)} type="number" step="0.5" />
+                      <ComparisonField label="Year built" value={home.yearBuilt} onChange={(value) => updateComparisonHome(index, "yearBuilt", value)} type="number" step="1" />
+                      <ComparisonField label="HOA / month" value={home.hoa} onChange={(value) => updateComparisonHome(index, "hoa", value)} type="number" prefix="$" step="1" />
+                    </div>
+                    <ComparisonField label="Notes" value={home.notes} onChange={(value) => updateComparisonHome(index, "notes", value)} placeholder="Pool, waterfront, repairs, deal breakers…" />
+                  </div>
+                </fieldset>
+              ))}
             </div>
           </div>
 
-          {chosen.length > 0 ? (
+          {enteredHomes.length > 0 ? (
             <div className="mt-5 overflow-x-auto border border-ink/10 rounded-sm bg-white">
               <table className="w-full min-w-[760px] text-sm">
-                <thead><tr className="bg-tide text-sand"><th className="text-left p-4 font-medium">Comparison</th>{chosen.map((listing) => <th key={listing.slug} className="text-left p-4 font-medium"><Link href={`/properties/${listing.slug}`} className="hover:underline">{listing.address}</Link><span className="block text-xs font-normal text-sand/55 mt-1">{listing.city}</span></th>)}</tr></thead>
+                <thead><tr className="bg-tide text-sand"><th className="text-left p-4 font-medium">Comparison</th>{enteredHomes.map((home) => <th key={home.id} className="text-left p-4 font-medium">{home.address}</th>)}</tr></thead>
                 <tbody className="divide-y divide-ink/10">
                   {[
-                    ["Price", (listing: Listing) => money.format(listing.price)],
-                    ["Price per sq. ft.", (listing: Listing) => money.format(listing.price / listing.sqft)],
-                    ["Bedrooms / bathrooms", (listing: Listing) => `${listing.beds} / ${listing.baths}${listing.halfBaths ? ` + ${listing.halfBaths} half` : ""}`],
-                    ["Living area", (listing: Listing) => `${listing.sqft.toLocaleString()} sq. ft.`],
-                    ["Lot", (listing: Listing) => listing.lotSqft ? `${listing.lotSqft.toLocaleString()} sq. ft.` : "Not provided"],
-                    ["Year built", (listing: Listing) => String(listing.yearBuilt)],
-                    ["Property type", (listing: Listing) => listing.propertyType],
-                    ["Waterfront", (listing: Listing) => listing.waterfront ? "Yes" : "No"],
-                    ["Days on market", (listing: Listing) => String(listing.daysOnMarket)],
-                  ].map(([label, getValue]) => <tr key={label as string}><th className="text-left p-4 font-medium text-ink/60 bg-keystone/50">{label as string}</th>{chosen.map((listing) => <td key={listing.slug} className="p-4">{(getValue as (item: Listing) => string)(listing)}</td>)}</tr>)}
+                    ["Price", (home: ComparisonHome) => positiveNumber(home.price) ? money.format(positiveNumber(home.price)) : "Not entered"],
+                    ["Price per sq. ft.", (home: ComparisonHome) => positiveNumber(home.price) && positiveNumber(home.sqft) ? money.format(positiveNumber(home.price) / positiveNumber(home.sqft)) : "Not entered"],
+                    ["Bedrooms / bathrooms", (home: ComparisonHome) => home.beds || home.baths ? `${home.beds || "—"} / ${home.baths || "—"}` : "Not entered"],
+                    ["Living area", (home: ComparisonHome) => positiveNumber(home.sqft) ? `${positiveNumber(home.sqft).toLocaleString()} sq. ft.` : "Not entered"],
+                    ["HOA / month", (home: ComparisonHome) => positiveNumber(home.hoa) ? money.format(positiveNumber(home.hoa)) : "$0 or not entered"],
+                    ["Year built", (home: ComparisonHome) => home.yearBuilt || "Not entered"],
+                    ["Notes", (home: ComparisonHome) => home.notes || "None entered"],
+                  ].map(([label, getValue]) => <tr key={label as string}><th className="text-left p-4 font-medium text-ink/60 bg-keystone/50">{label as string}</th>{enteredHomes.map((home) => <td key={home.id} className="p-4">{(getValue as (item: ComparisonHome) => string)(home)}</td>)}</tr>)}
                 </tbody>
               </table>
             </div>
-          ) : <p className="mt-5 p-8 border border-dashed border-ink/20 text-center text-ink/55">Select at least one property to begin comparing.</p>}
+          ) : <p className="mt-5 p-8 border border-dashed border-ink/20 text-center text-ink/55">Enter the first home&apos;s address or MLS number to begin comparing.</p>}
         </section>
       )}
 
       <section className="mt-12 grid lg:grid-cols-2 gap-8 items-start border-t border-ink/10 pt-10">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus">Save your work</p>
-          <h2 className="font-display text-3xl mt-2">Ask Rocky to review this scenario</h2>
+          <h2 className="font-display text-3xl mt-2">Ask Roque to review this scenario</h2>
           <p className="text-ink/65 mt-3 max-w-lg">Send the current assumptions to Florida Southeast Realty. We can help identify missing property costs, compare homes, and connect you with a licensed lender when appropriate.</p>
           <p className="mt-5 bg-keystone p-4 rounded-sm text-sm text-ink/65"><span className="font-medium text-ink">Current scenario:</span> {scenarioSummary}</p>
         </div>

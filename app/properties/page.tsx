@@ -38,6 +38,17 @@ function propertyType(value?: string): PropertyType | undefined {
   return PROPERTY_TYPES.includes(value as PropertyType) ? value as PropertyType : undefined;
 }
 
+function optionalNonNegativeNumber(value?: string): number | undefined {
+  if (!value?.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function optionalPositiveInteger(value?: string): number | undefined {
+  const parsed = optionalNonNegativeNumber(value);
+  return parsed !== undefined && parsed > 0 ? Math.floor(parsed) : undefined;
+}
+
 function pageHref(params: Awaited<Props["searchParams"]>, page: number): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -52,12 +63,12 @@ export default async function PropertiesPage({ searchParams }: Props) {
 
   const result = await searchListingPage({
     q: params.q,
-    minPrice: params.minPrice ? Number(params.minPrice) : undefined,
-    maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
-    beds: params.beds ? Number(params.beds) : undefined,
+    minPrice: optionalNonNegativeNumber(params.minPrice),
+    maxPrice: optionalNonNegativeNumber(params.maxPrice),
+    beds: optionalPositiveInteger(params.beds),
     propertyType: propertyType(params.type),
     waterfrontOnly: params.waterfront === "1",
-  }, params.page ? Number(params.page) : 1);
+  }, optionalPositiveInteger(params.page) ?? 1);
   const { listings } = result;
 
   return (

@@ -3,7 +3,7 @@ export default function SearchPanel() {
     <form
       action="/properties"
       method="get"
-      className="bg-white rounded-sm shadow-[0_20px_60px_-15px_rgba(14,43,48,0.35)] p-4 md:p-5 grid grid-cols-2 md:grid-cols-5 gap-3"
+      className="bg-white rounded-sm shadow-[0_20px_60px_-15px_rgba(14,43,48,0.35)] p-4 md:p-5 grid grid-cols-2 md:grid-cols-6 gap-3"
     >
       <div className="col-span-2 md:col-span-2 min-w-0">
         <label htmlFor="q" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
@@ -24,20 +24,40 @@ export default function SearchPanel() {
         <label htmlFor="minPrice" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Min Price
         </label>
-        <select
-          id="minPrice"
-          name="minPrice"
-          defaultValue=""
-          className="w-full min-w-0 border border-ink/15 rounded-sm px-2 py-2.5 text-base md:text-sm text-ink bg-white focus:border-tide outline-none"
-        >
-          <option value="">No Min</option>
-          <option value="250000">$250k</option>
-          <option value="500000">$500k</option>
-          <option value="750000">$750k</option>
-          <option value="1000000">$1M</option>
-          <option value="2000000">$2M</option>
-          <option value="3000000">$3M</option>
-        </select>
+        <div className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+          <span className="pl-2.5 text-ink/45">$</span>
+          <input
+            id="minPrice"
+            name="minPrice"
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            placeholder="Any"
+            autoComplete="off"
+            className="w-full min-w-0 bg-transparent px-2 py-2.5 text-base md:text-sm text-ink outline-none"
+          />
+        </div>
+      </div>
+
+      <div className="min-w-0">
+        <label htmlFor="maxPrice" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
+          Max Price
+        </label>
+        <div className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+          <span className="pl-2.5 text-ink/45">$</span>
+          <input
+            id="maxPrice"
+            name="maxPrice"
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            placeholder="Any"
+            autoComplete="off"
+            className="w-full min-w-0 bg-transparent px-2 py-2.5 text-base md:text-sm text-ink outline-none"
+          />
+        </div>
       </div>
 
       <div className="min-w-0">

@@ -138,6 +138,15 @@ export async function getListingBySlug(slug: string): Promise<Listing | undefine
 
 function filterSampleListings(filters: ListingFilters): Listing[] {
   return LISTINGS.filter((l) => {
+    if (filters.locations?.length) {
+      const matchesLocation = filters.locations.some((location) => {
+        const value = location.toLowerCase();
+        return l.city.toLowerCase().includes(value)
+          || l.community.toLowerCase().includes(value)
+          || l.zip.includes(value);
+      });
+      if (!matchesLocation) return false;
+    }
     if (filters.q) {
       const q = filters.q.toLowerCase();
       if (

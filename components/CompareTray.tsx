@@ -34,7 +34,7 @@ export default function CompareTray() {
             Clear
           </button>
           <Link href="/buyer-tools?tool=compare" className="rounded-sm bg-brass px-4 py-2 font-medium text-tide">
-            Compare now
+            Compare {listings.length} {listings.length === 1 ? "home" : "homes"}
           </Link>
         </div>
       </div>

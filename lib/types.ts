@@ -61,6 +61,7 @@ export interface Listing {
 
 export interface ListingFilters {
   q?: string;
+  locations?: string[];
   minPrice?: number;
   maxPrice?: number;
   beds?: number;

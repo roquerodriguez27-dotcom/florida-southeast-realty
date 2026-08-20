@@ -1,7 +1,17 @@
+import MultiLocationField from "@/components/MultiLocationField";
+
 export default function PropertyFilters({
   current,
 }: {
-  current: { q?: string; minPrice?: string; maxPrice?: string; beds?: string; type?: string; waterfront?: string };
+  current: {
+    locations: string[];
+    q?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    beds?: string;
+    type?: string;
+    waterfront?: string;
+  };
 }) {
   return (
     <form
@@ -9,16 +19,23 @@ export default function PropertyFilters({
       method="get"
       className="bg-white border border-ink/10 rounded-sm p-4 md:p-5 grid grid-cols-2 md:grid-cols-6 gap-3 items-end"
     >
-      <div className="col-span-2 md:col-span-2">
+      <div className="col-span-2 md:col-span-3">
+        <label htmlFor="f-location" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
+          Cities / communities
+        </label>
+        <MultiLocationField key={current.locations.join("|")} initialLocations={current.locations} />
+      </div>
+
+      <div className="col-span-2 md:col-span-3">
         <label htmlFor="f-q" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
-          Location
+          Address, ZIP, or MLS # <span className="normal-case tracking-normal">(optional)</span>
         </label>
         <input
           id="f-q"
           name="q"
           defaultValue={current.q}
           type="text"
-          placeholder="City, address, ZIP, or MLS #…"
+          placeholder="2815 SW 9th Street or B26065561"
           className="w-full border border-ink/15 rounded-sm px-3 py-2 text-sm focus:border-tide outline-none"
         />
       </div>

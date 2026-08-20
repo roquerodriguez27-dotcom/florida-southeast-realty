@@ -512,6 +512,11 @@ function locationSearchCondition(value: string): string {
   return `(${fields.map((field) => contains(field, value)).join(" or ")})`;
 }
 
+function areaSearchCondition(value: string): string {
+  const fields = ["City", "PostalCode", "SubdivisionName"];
+  return `(${fields.map((field) => contains(field, value)).join(" or ")})`;
+}
+
 function buildResoFilter(filters: ListingFilters): string {
   const conditions = [
     `OriginatingSystemID eq ${odataString(getOriginatingSystemId())}`,
@@ -521,6 +526,13 @@ function buildResoFilter(filters: ListingFilters): string {
   if (filters.q?.trim()) {
     const value = filters.q.trim().slice(0, 100);
     conditions.push(locationSearchCondition(value));
+  }
+  const locations = filters.locations
+    ?.map((location) => location.trim().slice(0, 100))
+    .filter(Boolean)
+    .slice(0, 5) ?? [];
+  if (locations.length > 0) {
+    conditions.push(`(${locations.map(areaSearchCondition).join(" or ")})`);
   }
   if (Number.isFinite(filters.minPrice) && Number(filters.minPrice) > 0) {
     conditions.push(`ListPrice ge ${Number(filters.minPrice)}`);

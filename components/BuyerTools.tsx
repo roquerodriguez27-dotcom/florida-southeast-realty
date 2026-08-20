@@ -227,6 +227,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
     emptyComparisonHome(2),
     emptyComparisonHome(3),
   ]);
+  const [manualEntrySlots, setManualEntrySlots] = useState(() => [false, false, false]);
   const [listingEdits, setListingEdits] = useState<Record<string, Partial<Omit<ComparisonHome, "id" | "sourceSlug">>>>({});
 
   const initialSavedListing = initialListing ? savedComparisonListing(initialListing) : undefined;
@@ -282,6 +283,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
   function clearComparisonHome(index: number) {
     const home = comparisonHomes[index];
     const sourceSlug = home.sourceSlug;
+    setManualEntrySlots((current) => current.map((value, homeIndex) => homeIndex === index ? false : value));
     if (sourceSlug) {
       removeComparisonListing(sourceSlug);
       if (sourceSlug === initialListing?.slug) setDismissedInitialListing(true);
@@ -299,6 +301,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
     clearComparisonListings();
     setDismissedInitialListing(true);
     setListingEdits({});
+    setManualEntrySlots([false, false, false]);
     setManualComparisonHomes([
       emptyComparisonHome(1),
       emptyComparisonHome(2),
@@ -384,7 +387,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="font-display text-2xl">Compare up to three homes</h2>
-                <p className="text-sm text-ink/60 mt-1 max-w-3xl">Select homes from any search card or listing page. Your saved choices load here automatically, and every field remains editable.</p>
+                <p className="text-sm text-ink/60 mt-1 max-w-3xl">Check homes on the search-results page and they will load here automatically. You can still add an off-market home manually when needed.</p>
                 <p className="mt-2 text-xs font-medium text-tide" aria-live="polite">
                   {loadedListings.length > 0
                     ? `${loadedListings.length} selected ${loadedListings.length === 1 ? "listing" : "listings"} loaded`
@@ -392,7 +395,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <Link href="/properties" className="rounded-sm border border-tide/25 px-4 py-2.5 font-medium text-tide hover:bg-tide/5">Browse homes to select</Link>
+                <Link href="/properties" className="rounded-sm border border-tide/25 px-4 py-2.5 font-medium text-tide hover:bg-tide/5">Choose homes from search</Link>
                 {enteredHomes.length > 0 && (
                   <button type="button" onClick={clearAllComparisonHomes} className="px-2 py-2.5 text-ink/55 underline underline-offset-4 hover:text-hibiscus">Clear all</button>
                 )}
@@ -400,30 +403,53 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
             </div>
 
             <div className="grid lg:grid-cols-3 gap-4 mt-6">
-              {comparisonHomes.map((home, index) => (
-                <fieldset key={home.id} className="border border-ink/10 rounded-sm bg-keystone/35 p-4">
-                  <legend className="sr-only">Home {index + 1}</legend>
-                  <div className="flex items-center justify-between gap-3 mb-4">
-                    <div>
+              {comparisonHomes.map((home, index) => {
+                const showEntryForm = Boolean(home.sourceSlug || home.address.trim() || manualEntrySlots[index]);
+                if (!showEntryForm) {
+                  return (
+                    <section key={home.id} className="flex min-h-56 flex-col rounded-sm border border-dashed border-ink/20 bg-keystone/20 p-5">
                       <p className="font-mono text-[10px] uppercase tracking-widest text-hibiscus">Home {index + 1}</p>
-                      {home.sourceSlug && <Link href={`/properties/${home.sourceSlug}`} className="text-xs text-tide underline">View loaded MLS listing</Link>}
+                      <h3 className="font-display text-xl text-ink mt-4">Choose another home</h3>
+                      <p className="mt-2 text-sm leading-relaxed text-ink/55">Return to the listings and check “Compare this home.” It will fill this space automatically.</p>
+                      <div className="mt-auto pt-5 space-y-2">
+                        <Link href="/properties" className="block rounded-sm bg-tide px-4 py-2.5 text-center text-sm font-medium text-sand">Browse listings</Link>
+                        <button
+                          type="button"
+                          onClick={() => setManualEntrySlots((current) => current.map((value, homeIndex) => homeIndex === index ? true : value))}
+                          className="w-full px-3 py-2 text-sm text-tide underline underline-offset-4"
+                        >
+                          Enter an off-market home instead
+                        </button>
+                      </div>
+                    </section>
+                  );
+                }
+
+                return (
+                  <fieldset key={home.id} className="border border-ink/10 rounded-sm bg-keystone/35 p-4">
+                    <legend className="sr-only">Home {index + 1}</legend>
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-widest text-hibiscus">Home {index + 1}</p>
+                        {home.sourceSlug ? <Link href={`/properties/${home.sourceSlug}`} className="text-xs text-tide underline">View loaded MLS listing</Link> : <p className="text-xs text-ink/50">Manual / off-market entry</p>}
+                      </div>
+                      <button type="button" onClick={() => clearComparisonHome(index)} className="text-xs text-ink/55 underline hover:text-hibiscus">Clear</button>
                     </div>
-                    <button type="button" onClick={() => clearComparisonHome(index)} className="text-xs text-ink/55 underline hover:text-hibiscus">Clear</button>
-                  </div>
-                  <div className="space-y-3">
-                    <ComparisonField label="Address or MLS number" value={home.address} onChange={(value) => updateComparisonHome(index, "address", value)} placeholder="123 Main St or MLS R12345678" />
-                    <div className="grid grid-cols-2 gap-3">
-                      <ComparisonField label="Price" value={home.price} onChange={(value) => updateComparisonHome(index, "price", value)} type="number" prefix="$" step="1" />
-                      <ComparisonField label="Living area" value={home.sqft} onChange={(value) => updateComparisonHome(index, "sqft", value)} type="number" placeholder="Sq. ft." step="1" />
-                      <ComparisonField label="Bedrooms" value={home.beds} onChange={(value) => updateComparisonHome(index, "beds", value)} type="number" step="1" />
-                      <ComparisonField label="Bathrooms" value={home.baths} onChange={(value) => updateComparisonHome(index, "baths", value)} type="number" step="0.5" />
-                      <ComparisonField label="Year built" value={home.yearBuilt} onChange={(value) => updateComparisonHome(index, "yearBuilt", value)} type="number" step="1" />
-                      <ComparisonField label="HOA / month" value={home.hoa} onChange={(value) => updateComparisonHome(index, "hoa", value)} type="number" prefix="$" step="1" />
+                    <div className="space-y-3">
+                      <ComparisonField label="Address or MLS number" value={home.address} onChange={(value) => updateComparisonHome(index, "address", value)} placeholder="123 Main St or MLS R12345678" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <ComparisonField label="Price" value={home.price} onChange={(value) => updateComparisonHome(index, "price", value)} type="number" prefix="$" step="1" />
+                        <ComparisonField label="Living area" value={home.sqft} onChange={(value) => updateComparisonHome(index, "sqft", value)} type="number" placeholder="Sq. ft." step="1" />
+                        <ComparisonField label="Bedrooms" value={home.beds} onChange={(value) => updateComparisonHome(index, "beds", value)} type="number" step="1" />
+                        <ComparisonField label="Bathrooms" value={home.baths} onChange={(value) => updateComparisonHome(index, "baths", value)} type="number" step="0.5" />
+                        <ComparisonField label="Year built" value={home.yearBuilt} onChange={(value) => updateComparisonHome(index, "yearBuilt", value)} type="number" step="1" />
+                        <ComparisonField label="HOA / month" value={home.hoa} onChange={(value) => updateComparisonHome(index, "hoa", value)} type="number" prefix="$" step="1" />
+                      </div>
+                      <ComparisonField label="Notes" value={home.notes} onChange={(value) => updateComparisonHome(index, "notes", value)} placeholder="Pool, waterfront, repairs, deal breakers…" />
                     </div>
-                    <ComparisonField label="Notes" value={home.notes} onChange={(value) => updateComparisonHome(index, "notes", value)} placeholder="Pool, waterfront, repairs, deal breakers…" />
-                  </div>
-                </fieldset>
-              ))}
+                  </fieldset>
+                );
+              })}
             </div>
           </div>
 
@@ -446,7 +472,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
             </div>
           ) : (
             <div className="mt-5 p-8 border border-dashed border-ink/20 text-center text-ink/55">
-              <p>Choose homes from the listing search, or enter the first address or MLS number above.</p>
+              <p>Choose homes from the listing search, or use an off-market entry option above.</p>
               <Link href="/properties" className="inline-block mt-3 text-tide underline underline-offset-4">Browse homes to compare</Link>
             </div>
           )}

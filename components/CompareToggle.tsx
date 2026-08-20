@@ -18,19 +18,23 @@ export default function CompareToggle({
   const atLimit = !selected && selectedListings.length >= MAX_COMPARE_LISTINGS;
 
   const baseClass = variant === "detail"
-    ? "border border-tide/25 text-tide px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide/5 disabled:cursor-not-allowed disabled:opacity-55"
-    : "w-full border-t border-ink/10 px-4 py-3 text-sm font-medium text-tide hover:bg-tide/5 disabled:cursor-not-allowed disabled:text-ink/40";
+    ? "inline-flex cursor-pointer items-center gap-2.5 rounded-sm border border-tide/25 px-4 py-2.5 text-sm font-medium text-tide hover:bg-tide/5 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55"
+    : "flex w-full cursor-pointer items-center gap-2.5 border-t border-ink/10 px-4 py-3 text-sm font-medium text-tide hover:bg-tide/5 has-[:disabled]:cursor-not-allowed has-[:disabled]:text-ink/40";
 
   return (
-    <button
-      type="button"
-      disabled={atLimit}
-      aria-pressed={selected}
+    <label
       title={atLimit ? "Remove a selected home before adding another." : undefined}
-      onClick={() => toggleComparisonListing(listing)}
       className={baseClass}
     >
-      {selected ? "✓ Added to compare" : atLimit ? "3 homes already selected" : "+ Add to compare"}
-    </button>
+      <input
+        type="checkbox"
+        checked={selected}
+        disabled={atLimit}
+        onChange={() => toggleComparisonListing(listing)}
+        className="h-5 w-5 shrink-0 accent-hibiscus"
+        aria-label={`${selected ? "Remove" : "Add"} ${listing.address} ${selected ? "from" : "to"} comparison`}
+      />
+      <span>{selected ? "Selected for comparison" : atLimit ? "3 homes already selected" : "Compare this home"}</span>
+    </label>
   );
 }

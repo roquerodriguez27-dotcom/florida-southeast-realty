@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 interface Props {
   searchParams: Promise<{
     q?: string;
+    location?: string | string[];
     minPrice?: string;
     maxPrice?: string;
     beds?: string;
@@ -53,10 +54,34 @@ function looksLikeStreetAddress(value?: string): value is string {
   return Boolean(value?.trim() && /^\s*\d+[A-Za-z]?\s+\S+/.test(value));
 }
 
+function looksLikePropertyLookup(value?: string): value is string {
+  if (!value) return false;
+  return looksLikeStreetAddress(value)
+    || /^\d{5}(?:-\d{4})?$/.test(value)
+    || /^[A-Za-z]{1,5}\d{5,}$/.test(value);
+}
+
+function normalizeLocations(value?: string | string[]): string[] {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  const locations: string[] = [];
+  for (const item of values) {
+    for (const part of item.split(/[,|]/)) {
+      const location = part.trim().slice(0, 100);
+      if (!location || locations.some((current) => current.toLowerCase() === location.toLowerCase())) continue;
+      locations.push(location);
+      if (locations.length === 5) return locations;
+    }
+  }
+  return locations;
+}
+
 function pageHref(params: Awaited<Props["searchParams"]>, page: number): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value && key !== "page") query.set(key, value);
+    if (!value || key === "page") continue;
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item) query.append(key, item);
+    }
   }
   query.set("page", String(page));
   return `/properties?${query.toString()}`;
@@ -64,9 +89,20 @@ function pageHref(params: Awaited<Props["searchParams"]>, page: number): string 
 
 export default async function PropertiesPage({ searchParams }: Props) {
   const params = await searchParams;
+  const rawQuery = params.q?.trim().slice(0, 200) || undefined;
+  const requestedLocations = normalizeLocations(params.location);
+  const propertyQuery = requestedLocations.length > 0 || looksLikePropertyLookup(rawQuery)
+    ? rawQuery
+    : undefined;
+  const locations = requestedLocations.length > 0
+    ? requestedLocations
+    : propertyQuery
+      ? []
+      : normalizeLocations(rawQuery);
 
   const result = await searchListingPage({
-    q: params.q,
+    q: propertyQuery,
+    locations,
     minPrice: optionalNonNegativeNumber(params.minPrice),
     maxPrice: optionalNonNegativeNumber(params.maxPrice),
     beds: optionalPositiveInteger(params.beds),
@@ -74,9 +110,9 @@ export default async function PropertiesPage({ searchParams }: Props) {
     waterfrontOnly: params.waterfront === "1",
   }, optionalPositiveInteger(params.page) ?? 1);
   const { listings } = result;
-  const addressQuery = looksLikeStreetAddress(params.q) ? params.q.trim().slice(0, 200) : undefined;
+  const addressQuery = looksLikeStreetAddress(propertyQuery) ? propertyQuery : undefined;
   const hasSecondaryFilters = Boolean(
-    params.minPrice || params.maxPrice || params.beds || params.type || params.waterfront === "1",
+    locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.type || params.waterfront === "1",
   );
   const noCurrentAddressListing = Boolean(
     addressQuery && !hasSecondaryFilters && result.live && !result.unavailable && listings.length === 0,
@@ -97,7 +133,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
               : "South Florida home search"}
         </h1>
         <p className="text-ink/60 max-w-2xl mb-7">
-          Search current for-sale inventory by city, community, address, price, property type, bedrooms, and waterfront status.
+          Search current for-sale inventory across one or several cities or communities, then narrow by address, price, property type, bedrooms, and waterfront status.
           {result.live ? " Results are supplied by the live BeachesMLS feed through the RESO Web API." : " The secure RESO connection is being finalized following MLS approval."}
         </p>
 
@@ -117,10 +153,19 @@ export default async function PropertiesPage({ searchParams }: Props) {
           </div>
         )}
 
-        <div className="mb-10"><PropertyFilters current={params} /></div>
+        <div className="mb-10"><PropertyFilters current={{
+          locations,
+          q: propertyQuery,
+          minPrice: params.minPrice,
+          maxPrice: params.maxPrice,
+          beds: params.beds,
+          type: params.type,
+          waterfront: params.waterfront,
+        }} /></div>
 
         <div className="mb-8"><SavedSearchAlert criteria={{
-          q: params.q,
+          locations: locations.length > 0 ? locations.join(", ") : undefined,
+          q: propertyQuery,
           minPrice: params.minPrice,
           maxPrice: params.maxPrice,
           beds: params.beds,
@@ -128,16 +173,21 @@ export default async function PropertiesPage({ searchParams }: Props) {
           waterfrontOnly: params.waterfront === "1",
         }} /></div>
 
-        <div className="mb-8 flex flex-wrap gap-3">
-          <Link href="/buyer-tools?tool=compare" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Compare homes</Link>
-          <Link href="/buyer-tools?tool=affordability" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Check affordability</Link>
-          <Link href="/buyer-tools?tool=cost" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Estimate true monthly cost</Link>
+        <div className="mb-8">
+          <div className="flex flex-wrap gap-3">
+            <a href="#property-results" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Select homes to compare</a>
+            <Link href="/buyer-tools?tool=affordability" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Check affordability</Link>
+            <Link href="/buyer-tools?tool=cost" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Estimate true monthly cost</Link>
+          </div>
+          {listings.length > 0 ? (
+            <p className="mt-3 text-sm text-ink/55">Check “Compare this home” on up to three listings below. A Compare selected button will stay on screen while you choose.</p>
+          ) : null}
         </div>
 
         {!result.live && listings.length > 0 && <div className="mb-6"><SampleDataNotice variant="listings" /></div>}
 
         {listings.length > 0 ? (
-          <>
+          <section id="property-results" className="scroll-mt-32" aria-label="Property search results">
             <PropertyGrid listings={listings} />
             <IdxPageDisclaimer attribution={listings[0]?.idx} />
             {result.pagination.totalPages > 1 && (
@@ -147,7 +197,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
                 {result.pagination.page < result.pagination.totalPages ? <Link href={pageHref(params, result.pagination.page + 1)} className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Next</Link> : <span />}
               </nav>
             )}
-          </>
+          </section>
         ) : noCurrentAddressListing ? (
           <div className="bg-white border border-ink/10 rounded-sm p-7 md:p-10" role="status">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-hibiscus">Possibly off market</p>

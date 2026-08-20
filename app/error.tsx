@@ -1,5 +1,7 @@
 "use client";
 
+import { SITE } from "@/lib/site-config";
+
 export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <div className="pt-32 pb-24 min-h-[60vh] flex items-center">
@@ -8,7 +10,7 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
         <h1 className="font-display text-3xl text-ink mb-4">We hit a snag loading this page.</h1>
         <p className="text-ink/65 mb-8">
           Try again, or call us directly at{" "}
-          <a href="tel:+19545550100" className="text-tide underline">(954) 555-0100</a>.
+          <a href={SITE.phoneHref} className="text-tide underline">{SITE.phoneDisplay}</a>.
         </p>
         <button
           onClick={() => reset()}

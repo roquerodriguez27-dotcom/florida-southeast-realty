@@ -1,8 +1,35 @@
 export type ListingStatus = "Active" | "Pending" | "Sold" | "Coming Soon";
 
+export type PropertyType =
+  | "Single Family"
+  | "Condo"
+  | "Townhome"
+  | "Estate"
+  | "Multi-Family"
+  | "Land"
+  | "Commercial"
+  | "Other";
+
+export interface IdxLogo {
+  type: "Uri" | "Text";
+  value: string;
+}
+
+export interface IdxAttribution {
+  provider: "RESO";
+  mlsId?: string;
+  mlsName?: string;
+  view: "Summary" | "Detail";
+  disclaimer?: string;
+  logo?: IdxLogo;
+  requiredFields: Array<{ label: string; value: string }>;
+}
+
 export interface Listing {
   /** MLS number — passthrough field from the IDX/RESO feed, never generated client-side */
   mlsId: string;
+  /** RESO ListingKey, used to retrieve the detail view. */
+  listingKey?: string;
   slug: string;
   status: ListingStatus;
   price: number;
@@ -18,7 +45,7 @@ export interface Listing {
   lotSqft?: number;
   yearBuilt: number;
   waterfront: boolean;
-  propertyType: "Single Family" | "Condo" | "Townhome" | "Estate";
+  propertyType: PropertyType;
   images: string[];
   description: string;
   features: string[];
@@ -27,7 +54,32 @@ export interface Listing {
   /** Distance marker along the coast, in the same convention as A1A mile markers */
   mileMarker: number;
   daysOnMarket: number;
+  listingUpdatedAt?: string;
+  idx?: IdxAttribution;
   agent: { name: string; phone: string; email: string };
+}
+
+export interface ListingFilters {
+  q?: string;
+  locations?: string[];
+  minPrice?: number;
+  maxPrice?: number;
+  beds?: number;
+  propertyType?: PropertyType;
+  waterfrontOnly?: boolean;
+  community?: string;
+}
+
+export interface ListingSearchPage {
+  listings: Listing[];
+  live: boolean;
+  unavailable: boolean;
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    totalRows: number;
+  };
 }
 
 export interface Community {
@@ -36,6 +88,13 @@ export interface Community {
   county: string;
   mileMarker: number;
   heroImage: string;
+  heroImageAlt: string;
+  heroImageCredit: {
+    author: string;
+    sourceUrl: string;
+    license: string;
+    licenseUrl?: string;
+  };
   tagline: string;
   overview: string;
   medianPrice: number;

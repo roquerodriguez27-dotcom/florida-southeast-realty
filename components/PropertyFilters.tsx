@@ -1,7 +1,17 @@
+import MultiLocationField from "@/components/MultiLocationField";
+
 export default function PropertyFilters({
   current,
 }: {
-  current: { q?: string; minPrice?: string; maxPrice?: string; beds?: string; type?: string; waterfront?: string };
+  current: {
+    locations: string[];
+    q?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    beds?: string;
+    type?: string;
+    waterfront?: string;
+  };
 }) {
   return (
     <form
@@ -9,16 +19,23 @@ export default function PropertyFilters({
       method="get"
       className="bg-white border border-ink/10 rounded-sm p-4 md:p-5 grid grid-cols-2 md:grid-cols-6 gap-3 items-end"
     >
-      <div className="col-span-2 md:col-span-2">
+      <div className="col-span-2 md:col-span-3">
+        <label htmlFor="f-location" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
+          Cities / communities
+        </label>
+        <MultiLocationField key={current.locations.join("|")} initialLocations={current.locations} />
+      </div>
+
+      <div className="col-span-2 md:col-span-3">
         <label htmlFor="f-q" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
-          Location
+          Address, ZIP, or MLS # <span className="normal-case tracking-normal">(optional)</span>
         </label>
         <input
           id="f-q"
           name="q"
           defaultValue={current.q}
           type="text"
-          placeholder="City, community, zip…"
+          placeholder="2815 SW 9th Street or B26065561"
           className="w-full border border-ink/15 rounded-sm px-3 py-2 text-sm focus:border-tide outline-none"
         />
       </div>
@@ -27,26 +44,42 @@ export default function PropertyFilters({
         <label htmlFor="f-min" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Min Price
         </label>
-        <select id="f-min" name="minPrice" defaultValue={current.minPrice ?? ""} className="w-full border border-ink/15 rounded-sm px-2 py-2 text-sm bg-white focus:border-tide outline-none">
-          <option value="">No Min</option>
-          <option value="500000">$500k</option>
-          <option value="1000000">$1M</option>
-          <option value="2000000">$2M</option>
-          <option value="3000000">$3M</option>
-        </select>
+        <div className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+          <span className="pl-2.5 text-ink/45">$</span>
+          <input
+            id="f-min"
+            name="minPrice"
+            defaultValue={current.minPrice ?? ""}
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            placeholder="Any"
+            autoComplete="off"
+            className="w-full min-w-0 bg-transparent px-2 py-2 text-sm outline-none"
+          />
+        </div>
       </div>
 
       <div>
         <label htmlFor="f-max" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Max Price
         </label>
-        <select id="f-max" name="maxPrice" defaultValue={current.maxPrice ?? ""} className="w-full border border-ink/15 rounded-sm px-2 py-2 text-sm bg-white focus:border-tide outline-none">
-          <option value="">No Max</option>
-          <option value="1000000">$1M</option>
-          <option value="2000000">$2M</option>
-          <option value="3000000">$3M</option>
-          <option value="5000000">$5M</option>
-        </select>
+        <div className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+          <span className="pl-2.5 text-ink/45">$</span>
+          <input
+            id="f-max"
+            name="maxPrice"
+            defaultValue={current.maxPrice ?? ""}
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            placeholder="Any"
+            autoComplete="off"
+            className="w-full min-w-0 bg-transparent px-2 py-2 text-sm outline-none"
+          />
+        </div>
       </div>
 
       <div>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Property photo coming soon</title>
+  <desc id="desc">Florida Southeast Realty property image placeholder</desc>
+  <rect width="1200" height="900" fill="#e8e2d4"/>
+  <path d="M0 650c170-100 300-40 455-112 189-87 322-49 745 76v286H0Z" fill="#b7c7bf"/>
+  <path d="M425 494 600 352l175 142v198H425Z" fill="#164b58"/>
+  <path d="M392 505 600 334l208 171" fill="none" stroke="#c26b4e" stroke-linecap="round" stroke-linejoin="round" stroke-width="30"/>
+  <rect x="554" y="556" width="92" height="136" rx="2" fill="#e8e2d4"/>
+  <text x="600" y="770" fill="#164b58" font-family="Georgia, serif" font-size="34" text-anchor="middle">Property photo coming soon</text>
+</svg>

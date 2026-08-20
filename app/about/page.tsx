@@ -1,75 +1,73 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import Link from "next/link";
 import ValuePropsBar from "@/components/ValuePropsBar";
 import LeadCaptureBand from "@/components/LeadCaptureBand";
+import TestimonialsSection from "@/components/TestimonialsSection";
+import { SITE } from "@/lib/site-config";
 
 export const metadata: Metadata = {
-  title: "About Us | Florida Southeast Realty",
+  title: "About Roque Rodriguez & Florida Southeast Realty",
   description:
-    "An independent South Florida brokerage built around one coastal corridor and the agents who know it well.",
+    "Meet Roque Rodriguez, Broker of Florida Southeast Realty, an independent brokerage serving buyers and sellers across South Florida.",
   alternates: { canonical: "/about" },
 };
 
-const AGENTS = [
+const PRINCIPLES = [
   {
-    name: "Marisol Vega",
-    title: "Founding Broker",
-    bio: "Lists waterfront property from Hillsboro Beach to Coral Ridge, with close attention to seawall and dock condition before it becomes a buyer's negotiating point.",
-    image: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=800&q=80",
+    title: "Direct broker access",
+    body: "You are not routed into a national call center. Buyers and sellers can work directly with the brokerage and get answers tied to the transaction in front of them.",
   },
   {
-    name: "Colin Hartwell",
-    title: "Partner, Downtown & Las Olas",
-    bio: "Focuses on condo buildings with dockage, including post-Surfside structural reserve compliance.",
-    image: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=800&q=80",
+    title: "Research before pressure",
+    body: "Flood maps, public property records, permits, community rules, transportation, and other due-diligence questions should be part of the conversation before you commit.",
   },
   {
-    name: "Devon Ashford",
-    title: "Partner, Boca Raton & Golf Communities",
-    bio: "Works Boca Raton's golf-course communities and school-boundary-driven neighborhoods.",
-    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80",
+    title: "A clear seller fee",
+    body: "Florida Southeast Realty advertises a 0.5% listing-side brokerage fee. Commission rates are negotiable, and any buyer-broker compensation is separate and negotiable.",
   },
 ];
 
 export default function AboutPage() {
   return (
     <div className="pb-20">
-      <div className="pt-32 pb-16 container-fsre max-w-3xl">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">About Us</p>
-        <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight mb-6">
-          We only work one stretch of coast — so we work it better than anyone else.
+      <section className="pt-32 pb-16 container-fsre max-w-4xl">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">About Florida Southeast Realty</p>
+        <h1 className="font-display text-4xl md:text-5xl text-ink leading-tight mb-6">
+          Local brokerage. Direct answers. Better research before the decision.
         </h1>
-        <p className="text-ink/75 leading-relaxed text-lg">
-          Florida Southeast Realty was founded on a simple bet: that a brokerage covering a
-          defined stretch of coastline, rather than an entire metro area, could know that
-          coastline better than any national platform ever would. We represent buyers and
-          sellers across Southeast Florida&apos;s coastal corridor — which means when we tell you
-          a seawall needs attention, a school boundary is stable, or a fixed bridge caps a
-          dock&apos;s future resale value, we&apos;re speaking from direct, local experience.
+        <p className="text-ink/75 leading-relaxed text-lg max-w-3xl">
+          {SITE.brokerName} has worked in real estate since 1997, beginning in New Jersey and now
+          serving South Florida as Broker of {SITE.name} The brokerage is built for clients who
+          want experienced representation without the layers of a national lead platform.
         </p>
-      </div>
+        <p className="text-ink/70 leading-relaxed mt-4 max-w-3xl">
+          Our goal is simple: make it easier to understand the property, the neighborhood, the
+          transaction, and the numbers before you make a major decision.
+        </p>
+        <div className="flex flex-wrap gap-3 mt-7">
+          <Link href="/contact" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium px-5 py-3 rounded-sm transition-colors">
+            Talk to Roque
+          </Link>
+          <Link href="/research" className="border border-tide/25 text-tide font-medium px-5 py-3 rounded-sm hover:bg-tide/5 transition-colors">
+            Explore the Research Center
+          </Link>
+        </div>
+      </section>
 
       <ValuePropsBar />
 
-      <div className="container-fsre py-16 md:py-20">
-        <h2 className="font-display text-2xl md:text-3xl text-ink mb-3">The team</h2>
-        <p className="text-xs text-brass bg-brass/10 border border-brass/30 rounded-sm px-4 py-2.5 mb-8 inline-block">
-          Sample team profiles for demonstration — replace with real staff photos, titles, and bios.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-          {AGENTS.map((a) => (
-            <div key={a.name}>
-              <div className="relative aspect-[4/5] overflow-hidden rounded-sm mb-4">
-                <Image src={a.image} alt={a.name} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" />
-              </div>
-              <h3 className="font-display text-xl text-ink">{a.name}</h3>
-              <p className="font-mono text-xs uppercase tracking-wide text-hibiscus mt-1">{a.title}</p>
-              <p className="text-sm text-ink/65 mt-2 leading-relaxed">{a.bio}</p>
+      <section className="container-fsre py-16 md:py-20">
+        <div className="grid lg:grid-cols-3 gap-6">
+          {PRINCIPLES.map((item) => (
+            <div key={item.title} className="bg-white border border-ink/10 rounded-sm p-6">
+              <h2 className="font-display text-xl text-ink">{item.title}</h2>
+              <p className="text-sm text-ink/65 mt-3 leading-relaxed">{item.body}</p>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
+      <TestimonialsSection />
       <LeadCaptureBand />
     </div>
   );

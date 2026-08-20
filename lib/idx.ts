@@ -141,6 +141,7 @@ async function sparkRequest(
   path: string,
   query: Record<string, string | number> = {},
   revalidate = 300,
+  reportFailures = true,
 ): Promise<SparkPayload> {
   const accessToken = getAccessToken();
   if (!accessToken) throw new Error("Spark access token is not configured.");
@@ -166,7 +167,7 @@ async function sparkRequest(
     } catch {
       failures.push({ host: url.hostname, status: "network_error" });
       if (index < bases.length - 1) continue;
-      console.error("[Spark IDX] API request failed.", { path, failures });
+      if (reportFailures) console.error("[Spark IDX] API request failed.", { path, failures });
       throw new Error("Spark API request failed.");
     }
 
@@ -191,7 +192,7 @@ async function sparkRequest(
 
       if (index < bases.length - 1 && [400, 401, 403, 404].includes(response.status)) continue;
 
-      console.error("[Spark IDX] API request failed.", { path, failures });
+      if (reportFailures) console.error("[Spark IDX] API request failed.", { path, failures });
       throw new Error(`Spark API request failed with status ${response.status}.`);
     }
 
@@ -200,7 +201,7 @@ async function sparkRequest(
     if (payload.Success === false) {
       failures.push({ host: url.hostname, status: "rejected" });
       if (index < bases.length - 1) continue;
-      console.error("[Spark IDX] API request rejected.", { path, failures });
+      if (reportFailures) console.error("[Spark IDX] API request rejected.", { path, failures });
       throw new Error("Spark API rejected the request.");
     }
 
@@ -212,7 +213,7 @@ async function sparkRequest(
     return payload;
   }
 
-  console.error("[Spark IDX] API request failed.", { path, failures });
+  if (reportFailures) console.error("[Spark IDX] API request failed.", { path, failures });
   throw new Error("Spark API request failed.");
 }
 
@@ -223,27 +224,33 @@ function stringList(value: unknown): string[] {
 async function getSparkSystemInfo(): Promise<SparkSystemInfo | null> {
   if (!getAccessToken()) return null;
 
-  const payload = await sparkRequest("/system", {}, 60 * 60);
-  const result = asObject(payload.Results?.[0]);
-  const complianceByMls = asObject(result.DisplayCompliance);
-  const mlsId = firstString(result, ["MlsId"]) || Object.keys(complianceByMls)[0];
-  const compliance = asObject(mlsId ? complianceByMls[mlsId] : undefined);
-  const views = asObject(compliance.View);
-  const summary = asObject(views.Summary);
-  const detail = asObject(views.Detail);
-  const configuration = asObject(asArray(result.Configuration)[0]);
+  try {
+    // Replication keys can retrieve listings while being denied access to /system.
+    // System metadata improves attribution but must not block the live feed.
+    const payload = await sparkRequest("/system", {}, 60 * 60, false);
+    const result = asObject(payload.Results?.[0]);
+    const complianceByMls = asObject(result.DisplayCompliance);
+    const mlsId = firstString(result, ["MlsId"]) || Object.keys(complianceByMls)[0];
+    const compliance = asObject(mlsId ? complianceByMls[mlsId] : undefined);
+    const views = asObject(compliance.View);
+    const summary = asObject(views.Summary);
+    const detail = asObject(views.Detail);
+    const configuration = asObject(asArray(result.Configuration)[0]);
 
-  return {
-    mlsId: mlsId || undefined,
-    mlsName: firstString(result, ["Mls"]) || undefined,
-    disclaimer:
-      firstString(compliance, ["DisclaimerTextOnly", "DisclaimerText"]) ||
-      firstString(configuration, ["IdxDisclaimerTextOnly", "IdxDisclaimer"]) ||
-      process.env.IDX_MLS_DISCLAIMER_TEXT?.trim() ||
-      undefined,
-    summaryFields: stringList(summary.DisplayCompliance),
-    detailFields: stringList(detail.DisplayCompliance),
-  };
+    return {
+      mlsId: mlsId || undefined,
+      mlsName: firstString(result, ["Mls"]) || undefined,
+      disclaimer:
+        firstString(compliance, ["DisclaimerTextOnly", "DisclaimerText"]) ||
+        firstString(configuration, ["IdxDisclaimerTextOnly", "IdxDisclaimer"]) ||
+        process.env.IDX_MLS_DISCLAIMER_TEXT?.trim() ||
+        undefined,
+      summaryFields: stringList(summary.DisplayCompliance),
+      detailFields: stringList(detail.DisplayCompliance),
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function getSparkFieldMetadata(): Promise<SparkFieldMetadata> {

@@ -52,11 +52,26 @@ function emptyComparisonHome(index: number): ComparisonHome {
   };
 }
 
+function comparisonAddress(listing: SavedComparisonListing): string {
+  const address = listing.address.trim();
+  const city = listing.city.trim();
+  const zip = listing.zip.trim();
+  const addressLower = address.toLowerCase();
+
+  // RESO UnparsedAddress frequently already includes the city, state, and ZIP.
+  // Add the location suffix only when the feed returned a street-only address.
+  if ((city && addressLower.includes(city.toLowerCase())) || (zip && address.includes(zip))) {
+    return address;
+  }
+
+  return [address, city, ["FL", zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+}
+
 function comparisonHomeFromSavedListing(listing: SavedComparisonListing, index: number): ComparisonHome {
   return {
     id: `home-${index}`,
     sourceSlug: listing.slug,
-    address: `${listing.address}, ${listing.city}, FL ${listing.zip}`,
+    address: comparisonAddress(listing),
     price: String(listing.price),
     beds: String(listing.beds),
     baths: String(listing.baths + (listing.halfBaths ?? 0) * 0.5),

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import Hero from "@/components/Hero";
 import ValuePropsBar from "@/components/ValuePropsBar";
 import AreasWeServe from "@/components/AreasWeServe";
@@ -25,6 +26,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
+  await connection();
   const [listings, communities, guides] = await Promise.all([
     getAllListings(),
     getAllCommunities(),

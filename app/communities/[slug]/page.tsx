@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllCommunities, getCommunityBySlug } from "@/lib/communities";
+import { connection } from "next/server";
+import { getCommunityBySlug } from "@/lib/communities";
 import { searchListings } from "@/lib/listings";
 import PropertyGrid from "@/components/PropertyGrid";
 import Tideline from "@/components/Tideline";
@@ -16,11 +17,6 @@ import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 interface Props {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  const communities = await getAllCommunities();
-  return communities.map((c) => ({ slug: c.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -40,6 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CommunityPage({ params }: Props) {
+  await connection();
   const { slug } = await params;
   const community = await getCommunityBySlug(slug);
   if (!community) notFound();

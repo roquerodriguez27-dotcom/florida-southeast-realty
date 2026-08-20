@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { connection } from "next/server";
 import { getAllListings } from "@/lib/listings";
 import { getAllCommunities } from "@/lib/communities";
 import { getGuides, getBlogPosts } from "@/lib/content";
@@ -6,6 +7,7 @@ import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  await connection();
   const [listings, communities, guides, posts] = await Promise.all([
     getAllListings(),
     getAllCommunities(),

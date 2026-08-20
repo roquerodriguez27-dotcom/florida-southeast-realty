@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllListings, getListingBySlug, searchListings } from "@/lib/listings";
+import { getListingBySlug, searchListings } from "@/lib/listings";
 import { formatFullPrice } from "@/lib/format";
 import Tideline from "@/components/Tideline";
 import PropertyGrid from "@/components/PropertyGrid";
@@ -20,11 +20,6 @@ interface Props {
 
 const idxLive = IDX_PROVIDER !== "not_connected";
 export const revalidate = 300;
-
-export async function generateStaticParams() {
-  const listings = await getAllListings();
-  return listings.map((listing) => ({ slug: listing.slug }));
-}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;

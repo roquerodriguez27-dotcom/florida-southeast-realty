@@ -20,6 +20,7 @@ const LISTING_PAGE_SIZE = 24;
 const REQUEST_TIMEOUT_MS = 10_000;
 const RESO_MAX_ATTEMPTS = 3;
 const RETRYABLE_RESO_STATUSES = new Set([429, 502, 503, 504]);
+const CURRENT_YEAR = new Date().getUTCFullYear();
 
 const RESO_SORTS: Record<ListingSort, string> = {
   newest: "ModificationTimestamp desc,ListPrice asc",
@@ -473,7 +474,10 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
   const waterfront = isWaterfront(record);
   const privatePool = hasPrivatePool(record);
   const garageSpaces = firstNumber(record, ["GarageSpaces"]);
-  const newConstruction = truthy(record.NewConstructionYN);
+  const yearBuilt = firstNumber(record, ["YearBuilt"]);
+  // BeachesMLS exposes NewConstructionYN but does not consistently populate it
+  // in replication records. A current-year build is the reliable live fallback.
+  const newConstruction = truthy(record.NewConstructionYN) || yearBuilt >= CURRENT_YEAR;
   const seniorCommunity = truthy(record.SeniorCommunityYN);
   const fireplace = truthy(record.FireplaceYN);
   const photos = photoUrls(record);
@@ -502,7 +506,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     halfBaths: halfBaths || undefined,
     sqft: firstNumber(record, ["LivingArea", "BuildingAreaTotal", "SquareFeet"]),
     lotSqft: firstNumber(record, ["LotSizeSquareFeet", "LotSqFt"]) || undefined,
-    yearBuilt: firstNumber(record, ["YearBuilt"]),
+    yearBuilt,
     waterfront,
     privatePool,
     garageSpaces: garageSpaces || undefined,
@@ -681,7 +685,7 @@ function buildResoFilter(filters: ListingFilters): string {
     Number.isFinite(filters.minGarageSpaces) ? Number(filters.minGarageSpaces) : 0,
   );
   if (minGarageSpaces > 0) conditions.push(`GarageSpaces ge ${minGarageSpaces}`);
-  if (filters.newConstructionOnly) conditions.push("NewConstructionYN eq true");
+  if (filters.newConstructionOnly) conditions.push(`YearBuilt ge ${CURRENT_YEAR}`);
   if (filters.fireplaceOnly) conditions.push("FireplaceYN eq true");
   if (filters.seniorCommunityMode === "only") conditions.push("SeniorCommunityYN eq true");
   if (filters.seniorCommunityMode === "exclude") conditions.push("SeniorCommunityYN ne true");
@@ -738,14 +742,23 @@ export async function fetchLiveListingPage(
   if (!getAccessToken()) return null;
 
   const currentPage = Math.max(1, Math.floor(page) || 1);
-  // BeachesMLS returns PoolPrivateYN in listing records but its replication
-  // endpoint currently ignores that field when it appears in `$filter`.
-  // Polygon searches also need local point-in-shape verification. Pull a wider,
-  // paginated candidate window for either case, then enforce exact matches here.
-  const exactPoolFallback = filters.privatePoolOnly === true;
-  const providerFilters = exactPoolFallback ? { ...filters, privatePoolOnly: false } : filters;
+  // BeachesMLS returns several Boolean amenities in listing records but does
+  // not consistently enforce them in `$filter`. Polygon searches also need
+  // point-in-shape verification. Pull a wider candidate window for those cases,
+  // then enforce exact matches locally.
+  const exactAmenityFallback = Boolean(
+    filters.privatePoolOnly
+      || filters.fireplaceOnly
+      || filters.seniorCommunityMode === "only",
+  );
+  const providerFilters = {
+    ...filters,
+    privatePoolOnly: false,
+    fireplaceOnly: false,
+    seniorCommunityMode: undefined,
+  };
   const exactPolygonFallback = Boolean(filters.polygon?.length);
-  const widerCandidateWindow = exactPoolFallback || exactPolygonFallback;
+  const widerCandidateWindow = exactAmenityFallback || exactPolygonFallback;
   const providerPageSize = widerCandidateWindow ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
   const payload = await resoRequest("Property", {
     "$filter": buildResoFilter(providerFilters),
@@ -776,7 +789,6 @@ export async function fetchLiveListingPage(
   const providerTotalRows = payload.count ?? ((currentPage - 1) * providerPageSize + payload.value.length);
   const locallyVerifiedBoolean = Boolean(
     filters.privatePoolOnly
-      || filters.newConstructionOnly
       || filters.fireplaceOnly
       || filters.seniorCommunityMode,
   );

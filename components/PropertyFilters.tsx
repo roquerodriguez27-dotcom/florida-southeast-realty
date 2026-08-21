@@ -5,6 +5,8 @@ import { useState, type ReactNode } from "react";
 import MultiLocationField from "@/components/MultiLocationField";
 import type { ListingFilters, ListingSort } from "@/lib/types";
 
+const CURRENT_YEAR = new Date().getUTCFullYear();
+
 interface CurrentFilters {
   locations: string[];
   q?: string;
@@ -211,7 +213,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
                 <Amenity name="pool" label="Private pool" checked={current.pool === "1"} />
                 <Amenity name="waterfront" label="Waterfront" checked={current.waterfront === "1"} />
-                <Amenity name="newConstruction" label="New construction" checked={current.newConstruction === "1"} />
+                <Amenity name="newConstruction" label={`New construction / ${CURRENT_YEAR}+`} checked={current.newConstruction === "1"} />
                 <Amenity name="fireplace" label="Fireplace" checked={current.fireplace === "1"} />
                 <Amenity name="newer" label="Built 2020+" checked={current.newer === "1"} />
                 <Amenity name="spacious" label="2,000+ sq. ft." checked={current.spacious === "1"} />

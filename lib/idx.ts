@@ -329,11 +329,19 @@ function listingFeatures(
   propertyType: PropertyType,
   waterfront: boolean,
   privatePool: boolean,
+  garageSpaces: number,
+  newConstruction: boolean,
+  seniorCommunity: boolean,
+  fireplace: boolean,
 ): string[] {
   const values = [
     propertyType,
     ...(waterfront ? ["Waterfront"] : []),
     ...(privatePool ? ["Private pool"] : []),
+    ...(garageSpaces > 0 ? [`${garageSpaces}-car garage`] : []),
+    ...(newConstruction ? ["New construction"] : []),
+    ...(seniorCommunity ? ["55+ community"] : []),
+    ...(fireplace ? ["Fireplace"] : []),
     ...flattenStrings(record.InteriorFeatures),
     ...flattenStrings(record.ExteriorFeatures),
     ...flattenStrings(record.CommunityFeatures),
@@ -419,6 +427,10 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
   );
   const waterfront = isWaterfront(record);
   const privatePool = hasPrivatePool(record);
+  const garageSpaces = firstNumber(record, ["GarageSpaces"]);
+  const newConstruction = truthy(record.NewConstructionYN);
+  const seniorCommunity = truthy(record.SeniorCommunityYN);
+  const fireplace = truthy(record.FireplaceYN);
   const photos = photoUrls(record);
   const fullBaths = firstNumber(record, ["BathroomsFull", "BathsFull"]);
   const halfBaths = firstNumber(record, ["BathroomsHalf", "BathsHalf"]);
@@ -448,12 +460,25 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     yearBuilt: firstNumber(record, ["YearBuilt"]),
     waterfront,
     privatePool,
+    garageSpaces: garageSpaces || undefined,
+    newConstruction,
+    seniorCommunity,
+    fireplace,
     propertyType,
     images: photos.length ? photos : ["/property-placeholder.svg"],
     description:
       firstString(record, ["PublicRemarks", "Remarks"]) ||
       "Contact Florida Southeast Realty for current property details.",
-    features: listingFeatures(record, propertyType, waterfront, privatePool),
+    features: listingFeatures(
+      record,
+      propertyType,
+      waterfront,
+      privatePool,
+      garageSpaces,
+      newConstruction,
+      seniorCommunity,
+      fireplace,
+    ),
     lat: firstNumber(record, ["Latitude", "Lat"]),
     lng: firstNumber(record, ["Longitude", "Lng", "Lon"]),
     mileMarker: 0,
@@ -539,6 +564,47 @@ function areaSearchCondition(value: string): string {
   return fields.map((field) => contains(field, value)).join(" or ");
 }
 
+function polygonSearchCondition(points: NonNullable<ListingFilters["polygon"]>): string | null {
+  if (points.length < 3) return null;
+  const latitudes = points.map((point) => point.lat);
+  const south = Math.min(...latitudes);
+  const north = Math.max(...latitudes);
+  if (!Number.isFinite(south) || !Number.isFinite(north) || north <= south) return null;
+
+  const bandCount = Math.min(8, Math.max(4, points.length));
+  const bandHeight = (north - south) / bandCount;
+  const rectangles: string[] = [];
+  const closed = [...points, points[0]];
+
+  for (let index = 0; index < bandCount; index += 1) {
+    const bandSouth = south + index * bandHeight;
+    const bandNorth = index === bandCount - 1 ? north : bandSouth + bandHeight;
+    const samples = [bandSouth, (bandSouth + bandNorth) / 2, bandNorth];
+    const longitudes: number[] = [];
+
+    for (const latitude of samples) {
+      for (let edge = 0; edge < closed.length - 1; edge += 1) {
+        const start = closed[edge];
+        const end = closed[edge + 1];
+        if (!start || !end || start.lat === end.lat) continue;
+        if (latitude < Math.min(start.lat, end.lat) || latitude > Math.max(start.lat, end.lat)) continue;
+        const ratio = (latitude - start.lat) / (end.lat - start.lat);
+        if (ratio < 0 || ratio > 1) continue;
+        longitudes.push(start.lng + ratio * (end.lng - start.lng));
+      }
+    }
+
+    if (longitudes.length < 2) continue;
+    const west = Math.min(...longitudes);
+    const east = Math.max(...longitudes);
+    rectangles.push(
+      `(Latitude ge ${bandSouth} and Latitude le ${bandNorth} and Longitude ge ${west} and Longitude le ${east})`,
+    );
+  }
+
+  return rectangles.length ? `(${rectangles.join(" or ")})` : null;
+}
+
 function buildResoFilter(filters: ListingFilters): string {
   const conditions = [
     `OriginatingSystemID eq ${odataString(getOriginatingSystemId())}`,
@@ -565,8 +631,27 @@ function buildResoFilter(filters: ListingFilters): string {
   if (Number.isFinite(filters.beds) && Number(filters.beds) > 0) {
     conditions.push(`BedroomsTotal ge ${Number(filters.beds)}`);
   }
+  if (Number.isFinite(filters.baths) && Number(filters.baths) > 0) {
+    conditions.push(`BathroomsTotalInteger ge ${Number(filters.baths)}`);
+  }
+  if (Number.isFinite(filters.minSqft) && Number(filters.minSqft) > 0) {
+    conditions.push(`LivingArea ge ${Number(filters.minSqft)}`);
+  }
+  if (Number.isFinite(filters.maxSqft) && Number(filters.maxSqft) > 0) {
+    conditions.push(`LivingArea le ${Number(filters.maxSqft)}`);
+  }
+  if (Number.isFinite(filters.minLotSqft) && Number(filters.minLotSqft) > 0) {
+    conditions.push(`LotSizeSquareFeet ge ${Number(filters.minLotSqft)}`);
+  }
+  if (Number.isFinite(filters.minYearBuilt) && Number(filters.minYearBuilt) > 0) {
+    conditions.push(`YearBuilt ge ${Number(filters.minYearBuilt)}`);
+  }
   if (filters.waterfrontOnly) conditions.push("WaterfrontYN eq true");
   if (filters.privatePoolOnly) conditions.push("PoolPrivateYN eq true");
+  if (filters.garageOnly) conditions.push("GarageSpaces ge 1");
+  if (filters.newConstructionOnly) conditions.push("NewConstructionYN eq true");
+  if (filters.seniorCommunityOnly) conditions.push("SeniorCommunityYN eq true");
+  if (filters.fireplaceOnly) conditions.push("FireplaceYN eq true");
 
   if (filters.propertyType) {
     const values: Partial<Record<PropertyType, string[]>> = {
@@ -589,7 +674,10 @@ function buildResoFilter(filters: ListingFilters): string {
     conditions.push(`(${contains("City", value)} or ${contains("SubdivisionName", value)})`);
   }
 
-  if (filters.bounds) {
+  const polygonCondition = filters.polygon ? polygonSearchCondition(filters.polygon) : null;
+  if (polygonCondition) {
+    conditions.push(polygonCondition);
+  } else if (filters.bounds) {
     const { north, south, east, west } = filters.bounds;
     if ([north, south, east, west].every(Number.isFinite)) {
       conditions.push(`Latitude ge ${south}`);

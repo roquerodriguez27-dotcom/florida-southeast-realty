@@ -173,16 +173,44 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.minPrice && l.price < filters.minPrice) return false;
     if (filters.maxPrice && l.price > filters.maxPrice) return false;
     if (filters.beds && l.beds < filters.beds) return false;
+    if (filters.baths && l.baths < filters.baths) return false;
+    if (filters.minSqft && l.sqft < filters.minSqft) return false;
+    if (filters.maxSqft && l.sqft > filters.maxSqft) return false;
+    if (filters.minLotSqft && (l.lotSqft ?? 0) < filters.minLotSqft) return false;
+    if (filters.minYearBuilt && l.yearBuilt < filters.minYearBuilt) return false;
     if (filters.propertyType && l.propertyType !== filters.propertyType) return false;
     if (filters.waterfrontOnly && !l.waterfront) return false;
     if (filters.privatePoolOnly && !l.privatePool) return false;
+    if (filters.garageOnly && (l.garageSpaces ?? 0) < 1) return false;
+    if (filters.newConstructionOnly && !l.newConstruction) return false;
+    if (filters.seniorCommunityOnly && !l.seniorCommunity) return false;
+    if (filters.fireplaceOnly && !l.fireplace) return false;
     if (filters.community && l.communitySlug !== filters.community) return false;
     if (filters.bounds) {
       const { north, south, east, west } = filters.bounds;
       if (l.lat > north || l.lat < south || l.lng > east || l.lng < west) return false;
     }
+    if (filters.polygon?.length && !pointInPolygon(l.lat, l.lng, filters.polygon)) return false;
     return true;
   }), filters.sort);
+}
+
+function pointInPolygon(
+  lat: number,
+  lng: number,
+  polygon: NonNullable<ListingFilters["polygon"]>,
+): boolean {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const currentPoint = polygon[index];
+    const previousPoint = polygon[previous];
+    if (!currentPoint || !previousPoint) continue;
+    const intersects = (currentPoint.lat > lat) !== (previousPoint.lat > lat)
+      && lng < (previousPoint.lng - currentPoint.lng) * (lat - currentPoint.lat)
+        / (previousPoint.lat - currentPoint.lat) + currentPoint.lng;
+    if (intersects) inside = !inside;
+  }
+  return inside;
 }
 
 export async function searchListingPage(filters: ListingFilters = {}, page = 1): Promise<ListingSearchPage> {

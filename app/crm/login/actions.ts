@@ -22,9 +22,10 @@ function authCallbackUrl(requestOrigin: string | null) {
 
 export async function sendLoginLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const allowed = (process.env.CRM_ADMIN_EMAILS ?? "roque@floridasoutheastrealty.com")
-    .split(",").map((value) => value.trim().toLowerCase());
-  if (!allowed.includes(email)) redirect("/crm/login?error=unauthorized");
+  const supabase = await createSupabaseServerClient();
+  const { data: allowed, error: allowlistError } = await supabase.rpc("crm_login_allowed", { p_email: email });
+  if (allowlistError) redirect("/crm/login?error=configuration");
+  if (allowed !== true) redirect("/crm/login?error=unauthorized");
 
   const headerStore = await headers();
   let emailRedirectTo: string;
@@ -34,10 +35,9 @@ export async function sendLoginLink(formData: FormData) {
     redirect("/crm/login?error=configuration");
   }
 
-  const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo, shouldCreateUser: false },
+    options: { emailRedirectTo, shouldCreateUser: true },
   });
   if (error) redirect("/crm/login?error=send_failed");
   redirect("/crm/login?sent=1");

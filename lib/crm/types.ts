@@ -1,5 +1,15 @@
 export const CRM_STATUSES = ["new", "contacted", "qualified", "appointment", "active", "closed", "lost"] as const;
 export type CrmStatus = (typeof CRM_STATUSES)[number];
+export type CrmRole = "broker" | "agent";
+
+export interface CrmUser {
+  email: string;
+  display_name: string;
+  role: CrmRole;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface CrmLead {
   id: number;
@@ -13,6 +23,7 @@ export interface CrmLead {
   property_interest: string | null;
   message: string | null;
   fields: Record<string, string>;
+  assigned_to: string | null;
   next_follow_up_at: string | null;
   last_contacted_at: string | null;
   created_at: string;

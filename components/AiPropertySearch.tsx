@@ -52,34 +52,34 @@ export default function AiPropertySearch() {
   }
 
   return (
-    <section id="ai-property-search" className="rounded-sm border border-tide/15 bg-tide p-5 text-sand shadow-[0_20px_60px_-35px_rgba(14,43,48,0.8)] md:p-7" aria-labelledby="ai-search-heading">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-xl">
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-brass">AI home search</p>
-          <h2 id="ai-search-heading" className="mt-2 font-display text-2xl md:text-3xl">Describe the home you want</h2>
-          <p id="ai-search-help" className="mt-2 text-sm leading-relaxed text-sand/70">
-            Use everyday language. We&apos;ll translate it into live MLS filters—no personal details needed.
-          </p>
+    <section id="ai-property-search" className="rounded-sm border border-tide/15 bg-tide p-4 text-sand shadow-[0_20px_60px_-38px_rgba(14,43,48,0.8)]" aria-labelledby="ai-search-heading">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="lg:max-w-sm">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-brass">AI home search</p>
+            <h2 id="ai-search-heading" className="font-display text-xl">Describe what you want</h2>
+          </div>
+          <p id="ai-search-help" className="mt-1 text-xs leading-relaxed text-sand/65">Everyday language becomes live MLS filters.</p>
         </div>
 
         <form onSubmit={submit} className="w-full lg:max-w-2xl">
           <label htmlFor="ai-search-prompt" className="sr-only">Describe the home you want</label>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <textarea
+            <input
               id="ai-search-prompt"
+              type="text"
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               maxLength={300}
-              rows={2}
               required
               aria-describedby="ai-search-help"
               placeholder="Example: Show me houses with private pools under $1M in Boca Raton"
-              className="min-h-14 flex-1 resize-none rounded-sm border border-white/15 bg-white px-3.5 py-3 text-base text-ink outline-none placeholder:text-ink/45 focus:border-brass focus:ring-2 focus:ring-brass/30"
+              className="min-h-11 flex-1 rounded-sm border border-white/15 bg-white px-3.5 py-2.5 text-base text-ink outline-none placeholder:text-ink/45 focus:border-brass focus:ring-2 focus:ring-brass/30"
             />
             <button
               type="submit"
               disabled={state === "searching"}
-              className="min-h-14 rounded-sm bg-hibiscus px-5 py-3 text-sm font-medium text-sand transition-colors hover:bg-hibiscus-dark disabled:cursor-wait disabled:opacity-65"
+              className="min-h-11 rounded-sm bg-hibiscus px-5 py-2.5 text-sm font-medium text-sand transition-colors hover:bg-hibiscus-dark disabled:cursor-wait disabled:opacity-65"
             >
               {state === "searching" ? "Understanding…" : "Find matching homes"}
             </button>
@@ -88,7 +88,7 @@ export default function AiPropertySearch() {
         </form>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Example searches">
+      <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Example searches">
         <span className="text-xs text-sand/50">Try:</span>
         {EXAMPLES.map((example) => (
           <button

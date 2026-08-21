@@ -30,9 +30,18 @@ interface Props {
     minPrice?: string;
     maxPrice?: string;
     beds?: string;
+    baths?: string;
+    minSqft?: string;
+    maxSqft?: string;
+    minLotSqft?: string;
+    minYearBuilt?: string;
     type?: string;
     waterfront?: string;
     pool?: string;
+    garage?: string;
+    newConstruction?: string;
+    senior?: string;
+    fireplace?: string;
     page?: string;
     north?: string;
     south?: string;
@@ -40,6 +49,7 @@ interface Props {
     west?: string;
     view?: string;
     sort?: string;
+    shape?: string;
   }>;
 }
 
@@ -74,6 +84,27 @@ function mapBounds(params: Awaited<Props["searchParams"]>) {
   if (north <= south || east <= west) return undefined;
   if (north > 90 || south < -90 || east > 180 || west < -180) return undefined;
   return { north, south, east, west };
+}
+
+function mapPolygon(value?: string): NonNullable<import("@/lib/types").ListingFilters["polygon"]> | undefined {
+  if (!value?.trim() || value.length > 1200) return undefined;
+  const points = value.split(";").slice(0, 20).map((pair) => {
+    const [rawLat, rawLng] = pair.split(",");
+    return { lat: Number(rawLat), lng: Number(rawLng) };
+  });
+  if (points.length < 3 || points.some(({ lat, lng }) => (
+    !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180
+  ))) return undefined;
+  return points;
+}
+
+function polygonBounds(points: NonNullable<import("@/lib/types").ListingFilters["polygon"]>) {
+  return {
+    north: Math.max(...points.map((point) => point.lat)),
+    south: Math.min(...points.map((point) => point.lat)),
+    east: Math.max(...points.map((point) => point.lng)),
+    west: Math.min(...points.map((point) => point.lng)),
+  };
 }
 
 function looksLikeStreetAddress(value?: string): value is string {
@@ -116,7 +147,7 @@ function pageHref(params: Awaited<Props["searchParams"]>, page: number): string 
 function withoutMapBoundsHref(params: Awaited<Props["searchParams"]>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (!value || ["north", "south", "east", "west", "page"].includes(key)) continue;
+    if (!value || ["north", "south", "east", "west", "shape", "page"].includes(key)) continue;
     for (const item of Array.isArray(value) ? value : [value]) {
       if (item) query.append(key, item);
     }
@@ -136,7 +167,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
     : propertyQuery
       ? []
       : normalizeLocations(rawQuery);
-  const bounds = mapBounds(params);
+  const polygon = mapPolygon(params.shape);
+  const bounds = polygon ? polygonBounds(polygon) : mapBounds(params);
   const sort = listingSort(params.sort);
 
   const result = await searchListingPage({
@@ -145,16 +177,29 @@ export default async function PropertiesPage({ searchParams }: Props) {
     minPrice: optionalNonNegativeNumber(params.minPrice),
     maxPrice: optionalNonNegativeNumber(params.maxPrice),
     beds: optionalPositiveInteger(params.beds),
+    baths: optionalPositiveInteger(params.baths),
+    minSqft: optionalPositiveInteger(params.minSqft),
+    maxSqft: optionalPositiveInteger(params.maxSqft),
+    minLotSqft: optionalPositiveInteger(params.minLotSqft),
+    minYearBuilt: optionalPositiveInteger(params.minYearBuilt),
     propertyType: propertyType(params.type),
     waterfrontOnly: params.waterfront === "1",
     privatePoolOnly: params.pool === "1",
+    garageOnly: params.garage === "1",
+    newConstructionOnly: params.newConstruction === "1",
+    seniorCommunityOnly: params.senior === "1",
+    fireplaceOnly: params.fireplace === "1",
     bounds,
+    polygon,
     sort,
   }, optionalPositiveInteger(params.page) ?? 1);
   const { listings } = result;
   const addressQuery = looksLikeStreetAddress(propertyQuery) ? propertyQuery : undefined;
   const hasSecondaryFilters = Boolean(
-    locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.type || params.waterfront === "1" || params.pool === "1" || bounds,
+    locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.baths
+      || params.minSqft || params.maxSqft || params.minLotSqft || params.minYearBuilt || params.type
+      || params.waterfront === "1" || params.pool === "1" || params.garage === "1"
+      || params.newConstruction === "1" || params.senior === "1" || params.fireplace === "1" || bounds,
   );
   const noCurrentAddressListing = Boolean(
     addressQuery && !hasSecondaryFilters && result.live && !result.unavailable && listings.length === 0,
@@ -175,7 +220,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
               : "South Florida home search"}
         </h1>
         <p className="text-ink/60 max-w-2xl mb-7">
-          Search current for-sale inventory across one or several cities or communities, then narrow by address, price, property type, bedrooms, waterfront status, and private pool.
+          Search current for-sale inventory across one or several areas, then narrow by price, size, property type, amenities, and map area.
           {result.live ? " Results are supplied by the live BeachesMLS feed through the RESO Web API." : " The secure RESO connection is being finalized following MLS approval."}
         </p>
 
@@ -195,38 +240,57 @@ export default async function PropertiesPage({ searchParams }: Props) {
           </div>
         )}
 
-        <div className="mb-6"><AiPropertySearch /></div>
+        <div className="mb-4"><AiPropertySearch /></div>
 
-        <div className="mb-10"><PropertyFilters current={{
+        <div className="mb-5"><PropertyFilters current={{
           locations,
           q: propertyQuery,
           minPrice: params.minPrice,
           maxPrice: params.maxPrice,
           beds: params.beds,
+          baths: params.baths,
+          minSqft: params.minSqft,
+          maxSqft: params.maxSqft,
+          minLotSqft: params.minLotSqft,
+          minYearBuilt: params.minYearBuilt,
           type: params.type,
           waterfront: params.waterfront,
           pool: params.pool,
+          garage: params.garage,
+          newConstruction: params.newConstruction,
+          senior: params.senior,
+          fireplace: params.fireplace,
           bounds,
+          shape: params.shape,
           view: params.view === "map" ? "map" : undefined,
           sort,
         }} /></div>
 
-        <div className="mb-8"><SavedSearchAlert criteria={{
+        <div className="mb-5"><SavedSearchAlert criteria={{
           locations: locations.length > 0 ? locations.join(", ") : undefined,
           q: propertyQuery,
           minPrice: params.minPrice,
           maxPrice: params.maxPrice,
           beds: params.beds,
+          baths: params.baths,
+          minSqft: params.minSqft,
+          maxSqft: params.maxSqft,
+          minLotSqft: params.minLotSqft,
+          minYearBuilt: params.minYearBuilt,
           propertyType: params.type,
           waterfrontOnly: params.waterfront === "1",
           privatePoolOnly: params.pool === "1",
+          garageOnly: params.garage === "1",
+          newConstructionOnly: params.newConstruction === "1",
+          seniorCommunityOnly: params.senior === "1",
+          fireplaceOnly: params.fireplace === "1",
           sort,
           mapArea: bounds
             ? `${bounds.south.toFixed(5)},${bounds.west.toFixed(5)} to ${bounds.north.toFixed(5)},${bounds.east.toFixed(5)}`
             : undefined,
         }} /></div>
 
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex flex-wrap gap-3">
             <a href="#property-results" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Select homes to compare</a>
             <Link href="/buyer-tools?tool=affordability" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5 transition-colors">Check affordability</Link>
@@ -253,9 +317,10 @@ export default async function PropertiesPage({ searchParams }: Props) {
               }))}
               initialView={params.view === "map" ? "map" : "list"}
               initialBounds={bounds}
+              initialShape={polygon}
               initialSort={sort}
             >
-              <PropertyGrid listings={listings} />
+              <PropertyGrid listings={listings} compact={params.view === "map"} />
             </PropertyResultsView>
             <IdxPageDisclaimer attribution={listings[0]?.idx} />
             {result.pagination.totalPages > 1 && (

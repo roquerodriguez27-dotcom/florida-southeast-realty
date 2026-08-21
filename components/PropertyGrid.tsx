@@ -1,7 +1,7 @@
 import type { Listing } from "@/lib/types";
 import PropertyCard from "./PropertyCard";
 
-export default function PropertyGrid({ listings }: { listings: Listing[] }) {
+export default function PropertyGrid({ listings, compact = false }: { listings: Listing[]; compact?: boolean }) {
   if (listings.length === 0) {
     return (
       <div className="py-20 text-center border border-dashed border-ink/20 rounded-sm">
@@ -15,7 +15,7 @@ export default function PropertyGrid({ listings }: { listings: Listing[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className={`grid grid-cols-1 gap-5 ${compact ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
       {listings.map((listing) => (
         <PropertyCard key={listing.mlsId} listing={listing} />
       ))}

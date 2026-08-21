@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireCrmUser } from "@/lib/crm/auth";
+import { requireCrmBroker, requireCrmUser } from "@/lib/crm/auth";
 import { CRM_STATUSES } from "@/lib/crm/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const idSchema = z.coerce.number().int().positive();
+const emailSchema = z.email().max(254).transform((value) => value.trim().toLowerCase());
 
 export async function updateLead(formData: FormData) {
   const user = await requireCrmUser();
@@ -18,11 +19,24 @@ export async function updateLead(formData: FormData) {
   const followUpAt = followUpValue ? new Date(followUpValue) : null;
   if (followUpAt && Number.isNaN(followUpAt.getTime())) throw new Error("Invalid follow-up date.");
   const supabase = await createSupabaseServerClient();
-  const { data: previous, error: readError } = await supabase.from("crm_leads").select("status").eq("id", id).single();
+  const { data: previous, error: readError } = await supabase.from("crm_leads").select("status,assigned_to").eq("id", id).single();
   if (readError) throw readError;
+  let assignedTo = previous.assigned_to as string | null;
+  if (user.role === "broker" && formData.has("assignedTo")) {
+    const requestedAssignee = emailSchema.parse(formData.get("assignedTo"));
+    const { data: teamMember, error: teamError } = await supabase
+      .from("crm_users")
+      .select("email")
+      .eq("email", requestedAssignee)
+      .eq("active", true)
+      .single();
+    if (teamError || !teamMember) throw new Error("The selected agent is not active.");
+    assignedTo = teamMember.email;
+  }
   const { error } = await supabase.from("crm_leads").update({
     status,
     priority,
+    assigned_to: assignedTo,
     next_follow_up_at: followUpAt?.toISOString() ?? null,
     updated_at: new Date().toISOString(),
   }).eq("id", id);
@@ -30,6 +44,15 @@ export async function updateLead(formData: FormData) {
   if (previous.status !== status) {
     const { error: activityError } = await supabase.from("crm_activities").insert({ lead_id: id, kind: "status_change", body: `Status changed from ${previous.status} to ${status}.`, created_by: user.email });
     if (activityError) throw activityError;
+  }
+  if (previous.assigned_to !== assignedTo) {
+    const { error: assignmentError } = await supabase.from("crm_activities").insert({
+      lead_id: id,
+      kind: "system",
+      body: `Lead assigned to ${assignedTo}.`,
+      created_by: user.email,
+    });
+    if (assignmentError) throw assignmentError;
   }
   revalidatePath("/crm");
 }
@@ -52,7 +75,9 @@ export async function addTask(formData: FormData) {
   const dueAt = dueValue ? new Date(dueValue) : null;
   if (dueAt && Number.isNaN(dueAt.getTime())) throw new Error("Invalid task date.");
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("crm_tasks").insert({ lead_id: leadId, title, due_at: dueAt?.toISOString() ?? null, assigned_to: user.email, created_by: user.email });
+  const { data: lead, error: leadError } = await supabase.from("crm_leads").select("assigned_to").eq("id", leadId).single();
+  if (leadError) throw leadError;
+  const { error } = await supabase.from("crm_tasks").insert({ lead_id: leadId, title, due_at: dueAt?.toISOString() ?? null, assigned_to: lead.assigned_to ?? user.email, created_by: user.email });
   if (error) throw error;
   revalidatePath("/crm");
 }
@@ -84,4 +109,32 @@ export async function signOut() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   redirect("/crm/login");
+}
+
+export async function addCrmTeamMember(formData: FormData) {
+  const broker = await requireCrmBroker();
+  const displayName = z.string().trim().min(1).max(120).parse(formData.get("displayName"));
+  const email = emailSchema.parse(formData.get("email"));
+  if (email === broker.email) throw new Error("Your broker account is already active.");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("crm_users").upsert({
+    email,
+    display_name: displayName,
+    role: "agent",
+    active: true,
+    invited_by: broker.email,
+  }, { onConflict: "email" });
+  if (error) throw error;
+  revalidatePath("/crm");
+}
+
+export async function setCrmTeamMemberActive(formData: FormData) {
+  const broker = await requireCrmBroker();
+  const email = emailSchema.parse(formData.get("email"));
+  const active = z.enum(["true", "false"]).parse(formData.get("active")) === "true";
+  if (email === broker.email) throw new Error("The signed-in broker account cannot be deactivated.");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("crm_users").update({ active }).eq("email", email).eq("role", "agent");
+  if (error) throw error;
+  revalidatePath("/crm");
 }

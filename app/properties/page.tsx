@@ -216,7 +216,9 @@ export default async function PropertiesPage({ searchParams }: Props) {
           {noCurrentAddressListing
             ? "This address is not currently listed"
             : result.live && !result.unavailable
-              ? `${result.pagination.totalRows.toLocaleString()} ${result.pagination.totalRows === 1 ? "home" : "homes"} found`
+              ? result.pagination.totalRowsExact === false
+                ? `${result.pagination.totalRows.toLocaleString()} private-pool ${result.pagination.totalRows === 1 ? "match" : "matches"} on this page`
+                : `${result.pagination.totalRows.toLocaleString()} ${result.pagination.totalRows === 1 ? "home" : "homes"} found`
               : "South Florida home search"}
         </h1>
         <p className="text-ink/60 max-w-2xl mb-7">

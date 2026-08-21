@@ -715,22 +715,32 @@ export async function fetchLiveListingPage(
   if (!getAccessToken()) return null;
 
   const currentPage = Math.max(1, Math.floor(page) || 1);
+  // BeachesMLS returns PoolPrivateYN in listing records but its replication
+  // endpoint currently ignores that field when it appears in `$filter`.
+  // Pull a wider, paginated candidate window and enforce the Boolean locally
+  // so a private-pool search never displays a non-private-pool property.
+  const exactPoolFallback = filters.privatePoolOnly === true;
+  const providerFilters = exactPoolFallback ? { ...filters, privatePoolOnly: false } : filters;
+  const providerPageSize = exactPoolFallback ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
   const payload = await resoRequest("Property", {
-    "$filter": buildResoFilter(filters),
+    "$filter": buildResoFilter(providerFilters),
     "$expand": "Media($top=24;$orderby=Order)",
-    "$top": LISTING_PAGE_SIZE,
-    "$skip": (currentPage - 1) * LISTING_PAGE_SIZE,
+    "$top": providerPageSize,
+    "$skip": (currentPage - 1) * providerPageSize,
     "$count": true,
     "$orderby": RESO_SORTS[filters.sort ?? "newest"],
   });
   const listings = payload.value
     .map((record) => normalizeListing(record, "Summary"))
     .filter((listing): listing is Listing => Boolean(listing))
+    .filter((listing) => !filters.privatePoolOnly || listing.privatePool)
     .filter((listing) => !filters.baths || listing.baths >= filters.baths)
-    .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon));
-  const totalRows = payload.count ?? ((currentPage - 1) * LISTING_PAGE_SIZE + listings.length);
+    .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon))
+    .slice(0, LISTING_PAGE_SIZE);
+  const providerTotalRows = payload.count ?? ((currentPage - 1) * providerPageSize + payload.value.length);
+  const totalRows = exactPoolFallback ? listings.length : providerTotalRows;
   const totalPages = payload.count !== undefined
-    ? Math.max(1, Math.ceil(totalRows / LISTING_PAGE_SIZE))
+    ? Math.max(1, Math.ceil(providerTotalRows / providerPageSize))
     : payload.nextLink
       ? currentPage + 1
       : currentPage;
@@ -744,6 +754,7 @@ export async function fetchLiveListingPage(
       pageSize: LISTING_PAGE_SIZE,
       totalPages,
       totalRows,
+      totalRowsExact: !exactPoolFallback,
     },
   };
 }

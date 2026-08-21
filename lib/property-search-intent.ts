@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { PropertyType } from "@/lib/types";
+import { MAX_SEARCH_LOCATIONS, SOUTH_FLORIDA_LOCATION_NAMES } from "@/lib/south-florida-locations";
 
 const SEARCH_PROPERTY_TYPES = [
   "Single Family",
@@ -13,7 +14,7 @@ const SEARCH_PROPERTY_TYPES = [
 ] as const satisfies readonly PropertyType[];
 
 export const propertySearchIntentSchema = z.object({
-  locations: z.array(z.string().min(1).max(100)).max(5)
+  locations: z.array(z.string().min(1).max(100)).max(MAX_SEARCH_LOCATIONS)
     .describe("South Florida city or community names explicitly requested by the shopper."),
   minPrice: z.number().nonnegative().nullable()
     .describe("Minimum whole-dollar listing price, or null when none was requested."),
@@ -30,51 +31,6 @@ export const propertySearchIntentSchema = z.object({
 });
 
 export type PropertySearchIntent = z.infer<typeof propertySearchIntentSchema>;
-
-const SOUTH_FLORIDA_LOCATIONS = [
-  "Lauderdale-by-the-Sea",
-  "West Palm Beach",
-  "Hallandale Beach",
-  "Fort Lauderdale",
-  "Palm Beach Gardens",
-  "Boynton Beach",
-  "Delray Beach",
-  "Deerfield Beach",
-  "Hillsboro Beach",
-  "Highland Beach",
-  "Pompano Beach",
-  "Lighthouse Point",
-  "Coconut Creek",
-  "Coral Springs",
-  "Miami Beach",
-  "Boca Raton",
-  "Palm Beach",
-  "Pembroke Pines",
-  "Cooper City",
-  "Dania Beach",
-  "Sunny Isles Beach",
-  "Bal Harbour",
-  "Bay Harbor Islands",
-  "North Miami Beach",
-  "North Miami",
-  "South Miami",
-  "Miami Shores",
-  "Coral Gables",
-  "Key Biscayne",
-  "Manalapan",
-  "Hypoluxo",
-  "Lake Worth",
-  "Wellington",
-  "Parkland",
-  "Plantation",
-  "Hollywood",
-  "Aventura",
-  "Weston",
-  "Sunrise",
-  "Tamarac",
-  "Margate",
-  "Miami",
-] as const;
 
 const PRICE_PATTERN = String.raw`\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:million|thousand|m|k)?`;
 
@@ -109,14 +65,14 @@ function uniqueLocations(values: string[]): string[] {
       .slice(0, 100);
     if (!cleaned || /^(?:south|southeast|coastal|downtown)$/i.test(cleaned)) continue;
     if (!output.some((current) => current.toLowerCase() === cleaned.toLowerCase())) output.push(cleaned);
-    if (output.length === 5) break;
+    if (output.length === MAX_SEARCH_LOCATIONS) break;
   }
   return output;
 }
 
 function extractLocations(prompt: string): string[] {
   const matches: Array<{ index: number; end: number; value: string }> = [];
-  const orderedLocations = [...SOUTH_FLORIDA_LOCATIONS].sort((left, right) => right.length - left.length);
+  const orderedLocations = [...SOUTH_FLORIDA_LOCATION_NAMES].sort((left, right) => right.length - left.length);
 
   for (const location of orderedLocations) {
     const expression = new RegExp(`\\b${escapeRegExp(location).replace(/-/g, "[-\\s]")}\\b`, "gi");

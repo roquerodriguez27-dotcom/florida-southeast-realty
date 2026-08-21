@@ -9,6 +9,8 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
   const [pendingIdx, setPendingIdx] = useState(false);
+  const [notificationConfigured, setNotificationConfigured] = useState(false);
+  const [notificationDelivered, setNotificationDelivered] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,13 +27,20 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
           honeypot: form.get("companyWebsite"), criteria,
         }),
       });
-      const result = await response.json() as { error?: string; pendingIdx?: boolean };
+      const result = await response.json() as {
+        error?: string;
+        pendingIdx?: boolean;
+        notificationConfigured?: boolean;
+        notificationDelivered?: boolean;
+      };
       if (!response.ok) {
         setState("error");
         setMessage(result.error ?? "Unable to save this alert.");
         return;
       }
       setPendingIdx(Boolean(result.pendingIdx));
+      setNotificationConfigured(Boolean(result.notificationConfigured));
+      setNotificationDelivered(Boolean(result.notificationDelivered));
       setState("saved");
     } catch {
       setState("error");
@@ -44,9 +53,16 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
       <p className="font-medium text-tide">Your search is saved.</p>
       <p className="text-sm text-ink/60 mt-1">
         {pendingIdx
-          ? "We recorded your criteria in the brokerage CRM. An agent will confirm delivery while the secure MLS connection is finalized."
-          : "We recorded your criteria against the live MLS feed. An agent will confirm your alert delivery preferences."}
+          ? "Your criteria are in the brokerage CRM. An agent will confirm delivery while the secure MLS connection is finalized."
+          : "Your criteria are in the brokerage CRM against the live MLS feed. An agent will confirm your alert delivery preferences."}
       </p>
+      {notificationDelivered ? (
+        <p className="mt-2 text-xs font-medium text-tide">A notification email was sent to the brokerage.</p>
+      ) : notificationConfigured ? (
+        <p className="mt-2 text-xs text-hibiscus">The search was saved, but the broker notification email could not be confirmed.</p>
+      ) : (
+        <p className="mt-2 text-xs text-ink/55">The brokerage can see this saved search in the CRM.</p>
+      )}
     </div>
   );
 

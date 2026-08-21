@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import ListingsMap, { type MapListing } from "@/components/ListingsMap";
-import type { ListingFilters } from "@/lib/types";
+import type { ListingFilters, ListingSort } from "@/lib/types";
 
 type MapBounds = NonNullable<ListingFilters["bounds"]>;
 
@@ -13,11 +13,13 @@ export default function PropertyResultsView({
   listings,
   initialView,
   initialBounds,
+  initialSort,
 }: {
   children: ReactNode;
   listings: MapListing[];
   initialView?: "list" | "map";
   initialBounds?: MapBounds;
+  initialSort?: ListingSort;
 }) {
   const [view, setView] = useState<"list" | "map">(initialView ?? "list");
   const pathname = usePathname();
@@ -28,6 +30,13 @@ export default function PropertyResultsView({
     && Number.isFinite(listing.lng)
     && (listing.lat !== 0 || listing.lng !== 0)
   ));
+  const requestedSort = searchParams.get("sort");
+  const selectedSort: ListingSort = requestedSort === "price-asc"
+    || requestedSort === "price-desc"
+    || requestedSort === "sqft-desc"
+    || requestedSort === "newest"
+    ? requestedSort
+    : initialSort ?? "newest";
 
   function selectView(nextView: "list" | "map") {
     setView(nextView);
@@ -43,6 +52,14 @@ export default function PropertyResultsView({
     for (const key of ["north", "south", "east", "west", "page"]) query.delete(key);
     if (view === "map") query.set("view", "map");
     else query.delete("view");
+    router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`);
+  }
+
+  function selectSort(nextSort: ListingSort) {
+    const query = new URLSearchParams(searchParams.toString());
+    query.delete("page");
+    if (nextSort === "newest") query.delete("sort");
+    else query.set("sort", nextSort);
     router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`);
   }
 
@@ -62,7 +79,22 @@ export default function PropertyResultsView({
             </button>
           ) : null}
         </div>
-        <div className="inline-grid grid-cols-2 self-start rounded-sm border border-tide/20 bg-white p-1" role="group" aria-label="Property results view">
+        <div className="flex flex-wrap items-end gap-3 self-start">
+          <label className="text-xs font-medium text-ink/60" htmlFor="property-sort">
+            Sort homes
+            <select
+              id="property-sort"
+              value={selectedSort}
+              onChange={(event) => selectSort(event.target.value as ListingSort)}
+              className="mt-1 block min-w-52 rounded-sm border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-tide"
+            >
+              <option value="newest">Newest / recently updated</option>
+              <option value="price-asc">Price: low to high</option>
+              <option value="price-desc">Price: high to low</option>
+              <option value="sqft-desc">Square footage: largest first</option>
+            </select>
+          </label>
+          <div className="inline-grid grid-cols-2 rounded-sm border border-tide/20 bg-white p-1" role="group" aria-label="Property results view">
           <button
             type="button"
             aria-pressed={view === "list"}
@@ -79,6 +111,7 @@ export default function PropertyResultsView({
           >
             Map
           </button>
+          </div>
         </div>
       </div>
 

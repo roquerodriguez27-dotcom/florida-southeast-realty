@@ -25,9 +25,16 @@ interface LeadFormProps {
 
 type Status = "idle" | "submitting" | "success" | "not_configured" | "error";
 
+interface DeliveryReceipt {
+  stored: boolean;
+  notificationConfigured: boolean;
+  notificationDelivered: boolean;
+}
+
 export default function LeadForm({ formName, fields, submitLabel, successMessage, hiddenContext }: LeadFormProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [validationError, setValidationError] = useState("");
+  const [receipt, setReceipt] = useState<DeliveryReceipt | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -68,7 +75,12 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
         body: JSON.stringify({ formName, honeypot, fields: values }),
       });
       const data = await res.json();
-      if (data.delivered) {
+      if (data.delivered && data.stored) {
+        setReceipt({
+          stored: true,
+          notificationConfigured: data.notificationConfigured === true,
+          notificationDelivered: data.notificationDelivered === true,
+        });
         setStatus("success");
       } else if (data.reason === "not_configured") {
         setStatus("not_configured");
@@ -87,6 +99,16 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
       <div className="bg-seagrass/10 border border-seagrass/30 rounded-sm p-8 text-center" role="status">
         <p className="font-display text-2xl text-tide">Request received.</p>
         <p className="text-sm text-ink/70 mt-2 max-w-md mx-auto">{successMessage}</p>
+        {receipt?.stored ? (
+          <p className="mt-3 text-sm font-medium text-tide">Saved securely to the Florida Southeast Realty CRM.</p>
+        ) : null}
+        {receipt?.notificationDelivered ? (
+          <p className="mt-1 text-xs text-ink/60">A notification email was sent to the brokerage.</p>
+        ) : receipt?.notificationConfigured ? (
+          <p className="mt-2 text-xs text-hibiscus">The CRM saved your request, but the broker notification email could not be confirmed. For an urgent request, please call or text {SITE.phoneDisplay}.</p>
+        ) : (
+          <p className="mt-2 text-xs text-ink/55">The brokerage can see this request in the CRM. For an urgent request, please call or text {SITE.phoneDisplay}.</p>
+        )}
       </div>
     );
   }

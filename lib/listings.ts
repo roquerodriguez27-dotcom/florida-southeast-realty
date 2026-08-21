@@ -1,4 +1,4 @@
-import type { Listing, ListingFilters, ListingSearchPage } from "./types";
+import type { Listing, ListingFilters, ListingSearchPage, ListingSort } from "./types";
 import { fetchLiveListingBySlug, fetchLiveListingPage } from "./idx";
 
 const img = (id: string) =>
@@ -140,8 +140,18 @@ export async function getListingBySlug(slug: string): Promise<Listing | undefine
   return canUseSampleListings() ? LISTINGS.find((listing) => listing.slug === slug) : undefined;
 }
 
+function sortSampleListings(listings: Listing[], sort: ListingSort = "newest"): Listing[] {
+  return [...listings].sort((left, right) => {
+    if (sort === "price-asc") return left.price - right.price;
+    if (sort === "price-desc") return right.price - left.price;
+    if (sort === "sqft-desc") return right.sqft - left.sqft || left.price - right.price;
+    return Date.parse(right.listingUpdatedAt ?? "") - Date.parse(left.listingUpdatedAt ?? "")
+      || left.price - right.price;
+  });
+}
+
 function filterSampleListings(filters: ListingFilters): Listing[] {
-  return LISTINGS.filter((l) => {
+  return sortSampleListings(LISTINGS.filter((l) => {
     if (filters.locations?.length) {
       const matchesLocation = filters.locations.some((location) => {
         const value = location.toLowerCase();
@@ -172,7 +182,7 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
       if (l.lat > north || l.lat < south || l.lng > east || l.lng < west) return false;
     }
     return true;
-  });
+  }), filters.sort);
 }
 
 export async function searchListingPage(filters: ListingFilters = {}, page = 1): Promise<ListingSearchPage> {

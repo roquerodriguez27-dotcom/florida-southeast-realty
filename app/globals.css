@@ -85,8 +85,7 @@ input.price-field-input:focus-visible {
 }
 
 .price-field:focus-within {
-  outline: 2px solid var(--color-hibiscus);
-  outline-offset: 3px;
+  border-color: var(--color-tide);
 }
 
 .listing-map-marker {

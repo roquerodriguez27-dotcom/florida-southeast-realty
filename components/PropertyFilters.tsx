@@ -1,5 +1,5 @@
 import MultiLocationField from "@/components/MultiLocationField";
-import type { ListingFilters } from "@/lib/types";
+import type { ListingFilters, ListingSort } from "@/lib/types";
 
 export default function PropertyFilters({
   current,
@@ -15,6 +15,7 @@ export default function PropertyFilters({
     pool?: string;
     bounds?: NonNullable<ListingFilters["bounds"]>;
     view?: "map";
+    sort?: ListingSort;
   };
 }) {
   return (
@@ -32,6 +33,7 @@ export default function PropertyFilters({
         </>
       ) : null}
       {current.view ? <input type="hidden" name="view" value={current.view} /> : null}
+      {current.sort && current.sort !== "newest" ? <input type="hidden" name="sort" value={current.sort} /> : null}
       <div className="col-span-2 md:col-span-3">
         <label htmlFor="f-location" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Cities / communities

@@ -10,7 +10,8 @@ import { searchListingPage } from "@/lib/listings";
 import { IDX_PROVIDER } from "@/lib/idx";
 import SavedSearchAlert from "@/components/SavedSearchAlert";
 import { IdxPageDisclaimer } from "@/components/IdxAttribution";
-import type { PropertyType } from "@/lib/types";
+import type { ListingSort, PropertyType } from "@/lib/types";
+import { MAX_SEARCH_LOCATIONS } from "@/lib/south-florida-locations";
 
 const idxLive = IDX_PROVIDER !== "not_connected";
 
@@ -38,13 +39,19 @@ interface Props {
     east?: string;
     west?: string;
     view?: string;
+    sort?: string;
   }>;
 }
 
 const PROPERTY_TYPES: PropertyType[] = ["Single Family", "Condo", "Townhome", "Estate", "Multi-Family", "Land", "Commercial", "Other"];
+const LISTING_SORTS: ListingSort[] = ["newest", "price-asc", "price-desc", "sqft-desc"];
 
 function propertyType(value?: string): PropertyType | undefined {
   return PROPERTY_TYPES.includes(value as PropertyType) ? value as PropertyType : undefined;
+}
+
+function listingSort(value?: string): ListingSort {
+  return LISTING_SORTS.includes(value as ListingSort) ? value as ListingSort : "newest";
 }
 
 function optionalNonNegativeNumber(value?: string): number | undefined {
@@ -88,7 +95,7 @@ function normalizeLocations(value?: string | string[]): string[] {
       const location = part.trim().slice(0, 100);
       if (!location || locations.some((current) => current.toLowerCase() === location.toLowerCase())) continue;
       locations.push(location);
-      if (locations.length === 5) return locations;
+      if (locations.length === MAX_SEARCH_LOCATIONS) return locations;
     }
   }
   return locations;
@@ -130,6 +137,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
       ? []
       : normalizeLocations(rawQuery);
   const bounds = mapBounds(params);
+  const sort = listingSort(params.sort);
 
   const result = await searchListingPage({
     q: propertyQuery,
@@ -141,6 +149,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
     waterfrontOnly: params.waterfront === "1",
     privatePoolOnly: params.pool === "1",
     bounds,
+    sort,
   }, optionalPositiveInteger(params.page) ?? 1);
   const { listings } = result;
   const addressQuery = looksLikeStreetAddress(propertyQuery) ? propertyQuery : undefined;
@@ -199,6 +208,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
           pool: params.pool,
           bounds,
           view: params.view === "map" ? "map" : undefined,
+          sort,
         }} /></div>
 
         <div className="mb-8"><SavedSearchAlert criteria={{
@@ -210,6 +220,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
           propertyType: params.type,
           waterfrontOnly: params.waterfront === "1",
           privatePoolOnly: params.pool === "1",
+          sort,
           mapArea: bounds
             ? `${bounds.south.toFixed(5)},${bounds.west.toFixed(5)} to ${bounds.north.toFixed(5)},${bounds.east.toFixed(5)}`
             : undefined,
@@ -242,6 +253,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
               }))}
               initialView={params.view === "map" ? "map" : "list"}
               initialBounds={bounds}
+              initialSort={sort}
             >
               <PropertyGrid listings={listings} />
             </PropertyResultsView>

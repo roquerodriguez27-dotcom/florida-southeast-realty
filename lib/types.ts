@@ -1,5 +1,7 @@
 export type ListingStatus = "Active" | "Pending" | "Sold" | "Coming Soon";
 
+export type ListingSort = "newest" | "price-asc" | "price-desc" | "sqft-desc";
+
 export type PropertyType =
   | "Single Family"
   | "Condo"
@@ -69,6 +71,7 @@ export interface ListingFilters {
   propertyType?: PropertyType;
   waterfrontOnly?: boolean;
   privatePoolOnly?: boolean;
+  sort?: ListingSort;
   community?: string;
   bounds?: {
     north: number;

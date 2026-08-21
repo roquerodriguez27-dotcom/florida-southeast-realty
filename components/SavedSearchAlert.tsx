@@ -67,10 +67,10 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   );
 
   return (
-    <div className="border border-brass/30 bg-brass/10 rounded-sm p-5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div><p className="font-display text-xl text-ink">Get alerts for this search</p><p className="text-sm text-ink/60 mt-1">New matches, price changes, and homes returning to market.</p></div>
-        <button type="button" onClick={() => setOpen((value) => !value)} className="bg-tide text-sand px-5 py-3 rounded-sm font-medium">{open ? "Close" : "Save search"}</button>
+    <div className="border border-brass/30 bg-brass/10 rounded-sm p-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="font-display text-lg text-ink">Save this search</p><p className="text-xs text-ink/60">Get new matches and price changes.</p></div>
+        <button type="button" onClick={() => setOpen((value) => !value)} className="bg-tide text-sand px-4 py-2 rounded-sm text-sm font-medium">{open ? "Close" : "Set up alerts"}</button>
       </div>
       {open && <form onSubmit={submit} className="mt-5 grid sm:grid-cols-2 gap-4">
         <div className="hidden" aria-hidden="true"><label>Company website<input name="companyWebsite" tabIndex={-1} autoComplete="off" /></label></div>

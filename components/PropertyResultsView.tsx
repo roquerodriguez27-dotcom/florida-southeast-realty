@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import ListingsMap, { type MapListing } from "@/components/ListingsMap";
 import type { ListingFilters, ListingSort } from "@/lib/types";
@@ -13,15 +13,18 @@ export default function PropertyResultsView({
   listings,
   initialView,
   initialBounds,
+  initialShape,
   initialSort,
 }: {
   children: ReactNode;
   listings: MapListing[];
   initialView?: "list" | "map";
   initialBounds?: MapBounds;
+  initialShape?: NonNullable<ListingFilters["polygon"]>;
   initialSort?: ListingSort;
 }) {
   const [view, setView] = useState<"list" | "map">(initialView ?? "list");
+  const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,15 +47,15 @@ export default function PropertyResultsView({
     if (nextView === "map") query.set("view", "map");
     else query.delete("view");
     const target = `${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`;
-    router.replace(target, { scroll: false });
+    startTransition(() => router.replace(target, { scroll: false }));
   }
 
   function clearMapArea() {
     const query = new URLSearchParams(searchParams.toString());
-    for (const key of ["north", "south", "east", "west", "page"]) query.delete(key);
+    for (const key of ["north", "south", "east", "west", "shape", "page"]) query.delete(key);
     if (view === "map") query.set("view", "map");
     else query.delete("view");
-    router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`);
+    startTransition(() => router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`));
   }
 
   function selectSort(nextSort: ListingSort) {
@@ -60,11 +63,11 @@ export default function PropertyResultsView({
     query.delete("page");
     if (nextSort === "newest") query.delete("sort");
     else query.set("sort", nextSort);
-    router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`);
+    startTransition(() => router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`));
   }
 
   return (
-    <div>
+    <div aria-busy={isPending}>
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <p className="text-sm font-medium text-ink">Choose how to browse</p>
@@ -75,7 +78,7 @@ export default function PropertyResultsView({
           </p>
           {initialBounds ? (
             <button type="button" onClick={clearMapArea} className="mt-1 text-xs font-medium text-hibiscus underline underline-offset-4">
-              Map-area filter active · Clear area
+              {initialShape ? "Drawn-area filter active" : "Map-area filter active"} · Clear area
             </button>
           ) : null}
         </div>
@@ -118,7 +121,14 @@ export default function PropertyResultsView({
       {view === "list" ? children : null}
       {view === "map" ? (
         mappableListings.length > 0 ? (
-          <ListingsMap listings={mappableListings} initialBounds={initialBounds} />
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,.8fr)] xl:items-start">
+            <div className="xl:sticky xl:top-28">
+              <ListingsMap listings={mappableListings} initialBounds={initialBounds} initialShape={initialShape} />
+            </div>
+            <div className="xl:max-h-[76vh] xl:overflow-y-auto xl:pr-1" aria-label="Homes in the current map area">
+              {children}
+            </div>
+          </div>
         ) : (
           <div className="rounded-sm border border-dashed border-ink/20 bg-white p-10 text-center">
             <p className="font-display text-xl text-ink">These results do not include map coordinates.</p>

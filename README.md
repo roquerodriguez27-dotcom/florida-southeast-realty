@@ -8,7 +8,7 @@ Production-oriented Next.js 16 website for Florida Southeast Realty, Inc. The si
 - Palm Beach and Broward community guides with official Census and National Weather Service context.
 - Buyer calculators for affordability, monthly ownership cost, and property comparison.
 - Lead capture for contact, valuation, seller, buyer, and calculator-review requests.
-- Private `/crm` workspace with Supabase passwordless authentication, lead stages, notes, tasks, follow-up dates, submitted form details, and saved-search criteria.
+- Private `/crm` workspace with Supabase passwordless authentication, broker/agent roles, lead assignment, lead stages, notes, tasks, follow-up dates, submitted form details, and saved-search criteria.
 - SEO foundations: canonical metadata, structured data, Open Graph image, manifest, robots rules, sitemap, and optional GA4/Search Console configuration.
 - BeachesMLS integration through the FBS RESO Web API, including live server-side OData search, pagination, listing detail retrieval, expanded media, IDX attribution, and a secret-free `/api/idx/health` check.
 - Production-safe listing behavior: demonstration inventory is disabled unless explicitly enabled outside production, and listing URLs stay out of the production sitemap until a RESO token is configured.
@@ -34,7 +34,7 @@ npm run build
 See `.env.example` for the supported variable names.
 
 - A Supabase public URL/key powers broker authentication and validated, write-only lead capture; authenticated RLS policies protect every CRM read and update.
-- `CRM_ADMIN_EMAILS` controls which authenticated email addresses may open `/crm`.
+- The broker manages authorized agent emails inside `/crm`; database Row Level Security limits each agent to leads assigned to that exact email.
 - Resend or a webhook can provide immediate lead notifications in addition to CRM storage.
 - GA4 and Google Search Console values are optional.
 - `RESO_ACCESS_TOKEN` is the preferred server-only BeachesMLS credential. The existing `SPARK_ACCESS_TOKEN` and `IDX_PROVIDER_API_KEY` names remain supported so credentials can be migrated without downtime. `RESO_API_BASE_URL` should remain `https://replication.sparkapi.com/Version/3/Reso/OData`, and `IDX_ORIGINATING_SYSTEM_ID=M00000170` keeps public results scoped to the approved BeachesMLS system.

@@ -48,6 +48,10 @@ export interface Listing {
   yearBuilt: number;
   waterfront: boolean;
   privatePool: boolean;
+  garageSpaces?: number;
+  newConstruction?: boolean;
+  seniorCommunity?: boolean;
+  fireplace?: boolean;
   propertyType: PropertyType;
   images: string[];
   description: string;
@@ -68,9 +72,15 @@ export interface ListingFilters {
   minPrice?: number;
   maxPrice?: number;
   beds?: number;
+  baths?: number;
+  minSqft?: number;
+  maxSqft?: number;
+  minLotSqft?: number;
+  minYearBuilt?: number;
   propertyType?: PropertyType;
   waterfrontOnly?: boolean;
   privatePoolOnly?: boolean;
+  garageOnly?: boolean;
   sort?: ListingSort;
   community?: string;
   bounds?: {
@@ -79,6 +89,10 @@ export interface ListingFilters {
     east: number;
     west: number;
   };
+  polygon?: Array<{
+    lat: number;
+    lng: number;
+  }>;
 }
 
 export interface ListingSearchPage {

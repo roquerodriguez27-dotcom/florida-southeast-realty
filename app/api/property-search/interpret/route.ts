@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       ].join(" "),
       prompt: `Search request as JSON string: ${JSON.stringify(prompt)}`,
       maxOutputTokens: 250,
-      reasoning: "minimal",
+      reasoning: "none",
       maxRetries: 0,
       timeout: 8_000,
     });

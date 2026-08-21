@@ -33,7 +33,7 @@ npm run build
 
 See `.env.example` for the supported variable names.
 
-- Supabase public URL/key plus a server-only secret key power CRM storage and broker authentication.
+- A Supabase public URL/key powers broker authentication and validated, write-only lead capture; authenticated RLS policies protect every CRM read and update.
 - `CRM_ADMIN_EMAILS` controls which authenticated email addresses may open `/crm`.
 - Resend or a webhook can provide immediate lead notifications in addition to CRM storage.
 - GA4 and Google Search Console values are optional.
@@ -42,7 +42,7 @@ See `.env.example` for the supported variable names.
 ## Current launch dependencies
 
 1. Add the approved access token to the Vercel Preview and Production environments, then confirm `/api/idx/health` reports `provider: "reso"`, `connected: true`, and `idxRoleVerified: true`.
-2. Production environment-variable review, including the Supabase server secret and CRM admin allowlist.
+2. Production environment-variable review, including the Supabase public key and CRM admin allowlist.
 3. A verified Resend sender or CRM webhook if immediate lead and saved-search notifications are desired.
 4. Final legal review of privacy, terms, fair-housing, MLS/IDX, and advertised-fee language.
 5. Final domain/DNS and production deployment verification.

@@ -104,6 +104,7 @@ export interface ListingSearchPage {
     pageSize: number;
     totalPages: number;
     totalRows: number;
+    totalRowsExact?: boolean;
   };
 }
 

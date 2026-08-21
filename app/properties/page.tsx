@@ -39,6 +39,11 @@ interface Props {
     waterfront?: string;
     pool?: string;
     garage?: string;
+    garageSpaces?: string;
+    newConstruction?: string;
+    senior?: string;
+    fireplace?: string;
+    maxDom?: string;
     newer?: string;
     spacious?: string;
     largeLot?: string;
@@ -62,6 +67,10 @@ function propertyType(value?: string): PropertyType | undefined {
 
 function listingSort(value?: string): ListingSort {
   return LISTING_SORTS.includes(value as ListingSort) ? value as ListingSort : "newest";
+}
+
+function seniorCommunityMode(value?: string): "exclude" | "only" | undefined {
+  return value === "exclude" || value === "only" ? value : undefined;
 }
 
 function optionalNonNegativeNumber(value?: string): number | undefined {
@@ -173,6 +182,9 @@ export default async function PropertiesPage({ searchParams }: Props) {
   const minSqft = Math.max(optionalPositiveInteger(params.minSqft) ?? 0, params.spacious === "1" ? 2_000 : 0) || undefined;
   const minLotSqft = Math.max(optionalPositiveInteger(params.minLotSqft) ?? 0, params.largeLot === "1" ? 10_000 : 0) || undefined;
   const minYearBuilt = Math.max(optionalPositiveInteger(params.minYearBuilt) ?? 0, params.newer === "1" ? 2_020 : 0) || undefined;
+  const minGarageSpaces = Math.max(optionalPositiveInteger(params.garageSpaces) ?? 0, params.garage === "1" ? 1 : 0) || undefined;
+  const maxDaysOnMarket = optionalPositiveInteger(params.maxDom);
+  const selectedSeniorCommunityMode = seniorCommunityMode(params.senior);
 
   const result = await searchListingPage({
     q: propertyQuery,
@@ -189,6 +201,11 @@ export default async function PropertiesPage({ searchParams }: Props) {
     waterfrontOnly: params.waterfront === "1",
     privatePoolOnly: params.pool === "1",
     garageOnly: params.garage === "1",
+    minGarageSpaces,
+    newConstructionOnly: params.newConstruction === "1",
+    seniorCommunityMode: selectedSeniorCommunityMode,
+    fireplaceOnly: params.fireplace === "1",
+    maxDaysOnMarket,
     bounds,
     polygon,
     sort,
@@ -199,6 +216,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
     locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.baths
       || params.minSqft || params.maxSqft || params.minLotSqft || params.minYearBuilt || params.type
       || params.waterfront === "1" || params.pool === "1" || params.garage === "1"
+      || params.garageSpaces || params.newConstruction === "1" || selectedSeniorCommunityMode
+      || params.fireplace === "1" || params.maxDom
       || params.newer === "1" || params.spacious === "1" || params.largeLot === "1" || bounds,
   );
   const noCurrentAddressListing = Boolean(
@@ -217,7 +236,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
             ? "This address is not currently listed"
             : result.live && !result.unavailable
               ? result.pagination.totalRowsExact === false
-                ? `${result.pagination.totalRows.toLocaleString()} private-pool ${result.pagination.totalRows === 1 ? "match" : "matches"} on this page`
+                ? `${result.pagination.totalRows.toLocaleString()} exact ${result.pagination.totalRows === 1 ? "match" : "matches"} on this page`
                 : `${result.pagination.totalRows.toLocaleString()} ${result.pagination.totalRows === 1 ? "home" : "homes"} found`
               : "South Florida home search"}
         </h1>
@@ -259,6 +278,11 @@ export default async function PropertiesPage({ searchParams }: Props) {
           waterfront: params.waterfront,
           pool: params.pool,
           garage: params.garage,
+          garageSpaces: params.garageSpaces,
+          newConstruction: params.newConstruction,
+          senior: params.senior,
+          fireplace: params.fireplace,
+          maxDom: params.maxDom,
           newer: params.newer,
           spacious: params.spacious,
           largeLot: params.largeLot,
@@ -282,7 +306,11 @@ export default async function PropertiesPage({ searchParams }: Props) {
           propertyType: params.type,
           waterfrontOnly: params.waterfront === "1",
           privatePoolOnly: params.pool === "1",
-          garageOnly: params.garage === "1",
+          minGarageSpaces: minGarageSpaces ? String(minGarageSpaces) : undefined,
+          newConstructionOnly: params.newConstruction === "1",
+          seniorCommunity: selectedSeniorCommunityMode,
+          fireplaceOnly: params.fireplace === "1",
+          maxDaysOnMarket: maxDaysOnMarket ? String(maxDaysOnMarket) : undefined,
           sort,
           mapArea: bounds
             ? `${bounds.south.toFixed(5)},${bounds.west.toFixed(5)} to ${bounds.north.toFixed(5)},${bounds.east.toFixed(5)}`

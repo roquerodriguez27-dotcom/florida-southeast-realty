@@ -6,7 +6,7 @@ import { useState } from "react";
 const EXAMPLES = [
   "Show me houses with private pools",
   "3-bedroom condos in Boca Raton under $1 million",
-  "Waterfront homes in Delray Beach between $800k and $1.5M",
+  "New construction in Delray Beach with a 2-car garage",
 ] as const;
 
 interface SearchResponse {

@@ -182,6 +182,12 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.waterfrontOnly && !l.waterfront) return false;
     if (filters.privatePoolOnly && !l.privatePool) return false;
     if (filters.garageOnly && (l.garageSpaces ?? 0) < 1) return false;
+    if (filters.minGarageSpaces && (l.garageSpaces ?? 0) < filters.minGarageSpaces) return false;
+    if (filters.newConstructionOnly && l.newConstruction !== true) return false;
+    if (filters.fireplaceOnly && l.fireplace !== true) return false;
+    if (filters.seniorCommunityMode === "only" && l.seniorCommunity !== true) return false;
+    if (filters.seniorCommunityMode === "exclude" && l.seniorCommunity === true) return false;
+    if (filters.maxDaysOnMarket && l.daysOnMarket > filters.maxDaysOnMarket) return false;
     if (filters.community && l.communitySlug !== filters.community) return false;
     if (filters.bounds) {
       const { north, south, east, west } = filters.bounds;

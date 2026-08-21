@@ -83,6 +83,11 @@ export interface ListingFilters {
   waterfrontOnly?: boolean;
   privatePoolOnly?: boolean;
   garageOnly?: boolean;
+  minGarageSpaces?: number;
+  newConstructionOnly?: boolean;
+  seniorCommunityMode?: "exclude" | "only";
+  fireplaceOnly?: boolean;
+  maxDaysOnMarket?: number;
   sort?: ListingSort;
   community?: string;
   bounds?: {

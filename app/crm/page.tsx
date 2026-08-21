@@ -1,13 +1,13 @@
 import { addNote, addTask, completeTask, signOut, updateLead } from "./actions";
 import { requireCrmUser } from "@/lib/crm/auth";
 import { CRM_STATUSES, type CrmLead } from "@/lib/crm/types";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Broker CRM | Florida Southeast Realty", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 interface Activity { id: number; lead_id: number; kind: string; body: string; created_at: string }
-interface Task { id: number; lead_id: number | null; title: string; due_at: string | null; completed_at: string | null }
+interface Task { id: number; lead_id: number | null; title: string; due_at: string | null; completed_at: string | null; automation_key?: string | null }
 interface SavedSearch {
   id: string;
   criteria: Record<string, string | boolean | number | null>;
@@ -19,6 +19,7 @@ interface SavedSearch {
 
 function label(value: string) { return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function shortDate(value: string | null) { return value ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value)) : "—"; }
+function isOverdue(value: string | null) { return Boolean(value && new Date(value).getTime() < Date.now()); }
 function detailValue(value: unknown) {
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value === null || value === undefined || value === "") return "Any";
@@ -30,27 +31,36 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
   const params = await searchParams;
   const selectedStatus = CRM_STATUSES.includes(params.status as (typeof CRM_STATUSES)[number]) ? params.status : "all";
   const query = (params.q ?? "").trim();
-  const supabase = createSupabaseAdminClient();
+  const supabase = await createSupabaseServerClient();
 
   let leadsQuery = supabase.from("crm_leads").select("*").order("created_at", { ascending: false }).limit(200);
   if (selectedStatus !== "all") leadsQuery = leadsQuery.eq("status", selectedStatus);
   if (query) leadsQuery = leadsQuery.or(`full_name.ilike.%${query.replaceAll(",", "") }%,email.ilike.%${query.replaceAll(",", "") }%,phone.ilike.%${query.replaceAll(",", "") }%`);
 
-  const [{ data: leadsData, error: leadsError }, { data: taskData }, { data: countsData }] = await Promise.all([
+  const [leadsResult, tasksResult, countsResult] = await Promise.all([
     leadsQuery,
     supabase.from("crm_tasks").select("*").is("completed_at", null).order("due_at", { ascending: true, nullsFirst: false }).limit(50),
     supabase.from("crm_leads").select("status"),
   ]);
-  if (leadsError) throw leadsError;
+  if (leadsResult.error) throw leadsResult.error;
+  if (tasksResult.error) throw tasksResult.error;
+  if (countsResult.error) throw countsResult.error;
+  const leadsData = leadsResult.data;
+  const taskData = tasksResult.data;
+  const countsData = countsResult.data;
   const leads = (leadsData ?? []) as CrmLead[];
   const selectedLead = leads.find((lead) => String(lead.id) === params.lead) ?? leads[0] ?? null;
   const leadIds = selectedLead ? [selectedLead.id] : [];
-  const [{ data: activitiesData }, { data: savedSearchData }] = leadIds.length
+  const [activitiesResult, savedSearchResult] = leadIds.length
     ? await Promise.all([
         supabase.from("crm_activities").select("*").eq("lead_id", selectedLead!.id).order("created_at", { ascending: false }).limit(50),
         supabase.from("saved_searches").select("id,criteria,frequency,status,sms_consent_at,created_at").eq("lead_id", selectedLead!.id).order("created_at", { ascending: false }).limit(20),
       ])
-    : [{ data: [] }, { data: [] }];
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (activitiesResult.error) throw activitiesResult.error;
+  if (savedSearchResult.error) throw savedSearchResult.error;
+  const activitiesData = activitiesResult.data;
+  const savedSearchData = savedSearchResult.data;
   const activities = (activitiesData ?? []) as Activity[];
   const savedSearches = (savedSearchData ?? []) as SavedSearch[];
   const tasks = (taskData ?? []) as Task[];
@@ -98,7 +108,7 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
             </> : <div className="h-full flex items-center justify-center text-ink/50">New website leads will appear here automatically.</div>}
           </section>
 
-          <aside className="bg-white border border-ink/10 rounded-sm p-5"><h2 className="font-display text-2xl text-tide">Follow-ups</h2><div className="mt-4 space-y-3">{tasks.map((task) => <div key={task.id} className="border border-ink/10 rounded-sm p-3"><p className="text-sm font-medium">{task.title}</p><p className="text-xs text-ink/45 mt-1">{shortDate(task.due_at)}</p><form action={completeTask} className="mt-2"><input type="hidden" name="taskId" value={task.id}/><button className="text-xs text-seagrass underline">Mark complete</button></form></div>)}{!tasks.length && <p className="text-sm text-ink/50">No open follow-ups.</p>}</div></aside>
+          <aside className="bg-white border border-ink/10 rounded-sm p-5"><h2 className="font-display text-2xl text-tide">Follow-ups</h2><div className="mt-4 space-y-3">{tasks.map((task) => <div key={task.id} className={`border rounded-sm p-3 ${isOverdue(task.due_at) ? "border-hibiscus/40 bg-hibiscus/5" : "border-ink/10"}`}><div className="flex items-start justify-between gap-2"><p className="text-sm font-medium">{task.title}</p>{task.automation_key && <span className="text-[9px] uppercase tracking-wide text-tide bg-tide/10 rounded-sm px-1.5 py-1">Auto</span>}</div><p className={`text-xs mt-1 ${isOverdue(task.due_at) ? "text-hibiscus font-medium" : "text-ink/45"}`}>{isOverdue(task.due_at) ? "Overdue · " : ""}{shortDate(task.due_at)}</p><div className="mt-2 flex items-center gap-3">{task.lead_id && <a href={`/crm?lead=${task.lead_id}`} className="text-xs text-tide underline">Open lead</a>}<form action={completeTask}><input type="hidden" name="taskId" value={task.id}/><button className="text-xs text-seagrass underline">Mark complete</button></form></div></div>)}{!tasks.length && <p className="text-sm text-ink/50">No open follow-ups.</p>}</div></aside>
         </section>
       </div>
     </main>

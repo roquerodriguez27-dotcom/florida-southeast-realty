@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { readSameOriginJson } from "@/lib/api/request";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { z } from "zod";
 import { checkIdxConnection } from "@/lib/idx";
 
@@ -33,48 +33,18 @@ export async function POST(request: Request) {
   try {
     const idxConnection = await checkIdxConnection();
     const idxActive = idxConnection.connected && idxConnection.idxRoleVerified !== false;
-    const supabase = createSupabaseAdminClient();
-    const { data: existingLead } = await supabase.from("crm_leads").select("id").eq("email", email).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    let leadId = existingLead?.id ?? null;
-
-    if (!leadId) {
-      const { data: newLead, error: leadError } = await supabase.from("crm_leads").insert({
-        full_name: fullName,
-        email,
-        phone: phone || null,
-        source: "saved-search",
-        form_name: "saved-search-alert",
-        property_interest: "Saved property search alerts",
-        message: `Requested ${frequency} property alerts.`,
-        consent: true,
-        fields: { criteria, frequency, smsConsent },
-      }).select("id").single();
-      if (leadError) throw leadError;
-      leadId = newLead.id;
-    }
-
-    const { error } = await supabase.from("saved_searches").insert({
-      lead_id: leadId,
-      full_name: fullName,
-      email,
-      phone: phone || null,
-      criteria,
-      frequency,
-      sms_consent_at: smsConsent ? new Date().toISOString() : null,
-      status: idxActive ? "active" : "pending_idx",
+    const supabase = createSupabasePublicClient();
+    const { data: pendingIdx, error } = await supabase.rpc("capture_saved_search", {
+      p_full_name: fullName,
+      p_email: email,
+      p_phone: phone || null,
+      p_frequency: frequency,
+      p_sms_consent: smsConsent,
+      p_criteria: criteria,
+      p_idx_active: idxActive,
     });
     if (error) throw error;
-
-    await supabase.from("crm_activities").insert({
-      lead_id: leadId,
-      kind: "system",
-      body: idxActive
-        ? `Saved a ${frequency} property alert against the live MLS feed.`
-        : `Saved a ${frequency} property alert pending the live MLS connection.`,
-      created_by: "website",
-    });
-
-    return NextResponse.json({ saved: true, pendingIdx: !idxActive });
+    return NextResponse.json({ saved: true, pendingIdx: pendingIdx === true });
   } catch (error) {
     console.error("Saved-search creation failed", error);
     return NextResponse.json({ error: "We could not save this alert right now. Please try again or contact us." }, { status: 503 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { readSameOriginJson } from "@/lib/api/request";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { z } from "zod";
 
 /**
@@ -59,29 +59,31 @@ export async function POST(req: Request) {
   let stored = false;
   try {
     const fields = payload.fields;
-    const supabase = createSupabaseAdminClient();
-    const { error } = await supabase.from("crm_leads").insert({
-      full_name: first(fields, ["name", "full_name", "first_name"]) ?? "Website visitor",
-      email: first(fields, ["email"]),
-      phone: first(fields, ["phone", "telephone"]),
-      form_name: payload.formName,
-      source: "website",
-      property_interest: first(fields, [
+    const supabase = createSupabasePublicClient();
+    const { data, error } = await supabase.rpc("capture_crm_lead", {
+      p_full_name: first(fields, ["name", "full_name", "first_name"]) ?? "Website visitor",
+      p_email: first(fields, ["email"]),
+      p_phone: first(fields, ["phone", "telephone"]),
+      p_form_name: payload.formName,
+      p_property_interest: first(fields, [
         "property",
         "property_address",
         "address",
+        "listingAddress",
+        "listing_address",
         "criteria",
         "community",
         "areas",
         "location",
+        "interest",
         "scenario",
       ]),
-      message: first(fields, ["message", "comments", "notes", "goals", "criteria", "scenario"]),
-      consent: fields.contact_consent === "yes",
-      fields,
+      p_message: first(fields, ["message", "comments", "notes", "goals", "criteria", "scenario"]),
+      p_fields: fields,
+      p_consent: fields.contact_consent === "yes",
     });
     if (error) throw error;
-    stored = true;
+    stored = data === true;
   } catch (error) {
     console.error("[lead:crm_storage_error]", error);
   }

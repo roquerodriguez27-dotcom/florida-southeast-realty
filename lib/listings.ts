@@ -182,9 +182,6 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.waterfrontOnly && !l.waterfront) return false;
     if (filters.privatePoolOnly && !l.privatePool) return false;
     if (filters.garageOnly && (l.garageSpaces ?? 0) < 1) return false;
-    if (filters.newConstructionOnly && !l.newConstruction) return false;
-    if (filters.seniorCommunityOnly && !l.seniorCommunity) return false;
-    if (filters.fireplaceOnly && !l.fireplace) return false;
     if (filters.community && l.communitySlug !== filters.community) return false;
     if (filters.bounds) {
       const { north, south, east, west } = filters.bounds;

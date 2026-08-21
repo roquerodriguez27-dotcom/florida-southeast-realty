@@ -39,9 +39,9 @@ interface Props {
     waterfront?: string;
     pool?: string;
     garage?: string;
-    newConstruction?: string;
-    senior?: string;
-    fireplace?: string;
+    newer?: string;
+    spacious?: string;
+    largeLot?: string;
     page?: string;
     north?: string;
     south?: string;
@@ -170,6 +170,9 @@ export default async function PropertiesPage({ searchParams }: Props) {
   const polygon = mapPolygon(params.shape);
   const bounds = polygon ? polygonBounds(polygon) : mapBounds(params);
   const sort = listingSort(params.sort);
+  const minSqft = Math.max(optionalPositiveInteger(params.minSqft) ?? 0, params.spacious === "1" ? 2_000 : 0) || undefined;
+  const minLotSqft = Math.max(optionalPositiveInteger(params.minLotSqft) ?? 0, params.largeLot === "1" ? 10_000 : 0) || undefined;
+  const minYearBuilt = Math.max(optionalPositiveInteger(params.minYearBuilt) ?? 0, params.newer === "1" ? 2_020 : 0) || undefined;
 
   const result = await searchListingPage({
     q: propertyQuery,
@@ -178,17 +181,14 @@ export default async function PropertiesPage({ searchParams }: Props) {
     maxPrice: optionalNonNegativeNumber(params.maxPrice),
     beds: optionalPositiveInteger(params.beds),
     baths: optionalPositiveInteger(params.baths),
-    minSqft: optionalPositiveInteger(params.minSqft),
+    minSqft,
     maxSqft: optionalPositiveInteger(params.maxSqft),
-    minLotSqft: optionalPositiveInteger(params.minLotSqft),
-    minYearBuilt: optionalPositiveInteger(params.minYearBuilt),
+    minLotSqft,
+    minYearBuilt,
     propertyType: propertyType(params.type),
     waterfrontOnly: params.waterfront === "1",
     privatePoolOnly: params.pool === "1",
     garageOnly: params.garage === "1",
-    newConstructionOnly: params.newConstruction === "1",
-    seniorCommunityOnly: params.senior === "1",
-    fireplaceOnly: params.fireplace === "1",
     bounds,
     polygon,
     sort,
@@ -199,7 +199,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
     locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.baths
       || params.minSqft || params.maxSqft || params.minLotSqft || params.minYearBuilt || params.type
       || params.waterfront === "1" || params.pool === "1" || params.garage === "1"
-      || params.newConstruction === "1" || params.senior === "1" || params.fireplace === "1" || bounds,
+      || params.newer === "1" || params.spacious === "1" || params.largeLot === "1" || bounds,
   );
   const noCurrentAddressListing = Boolean(
     addressQuery && !hasSecondaryFilters && result.live && !result.unavailable && listings.length === 0,
@@ -257,9 +257,9 @@ export default async function PropertiesPage({ searchParams }: Props) {
           waterfront: params.waterfront,
           pool: params.pool,
           garage: params.garage,
-          newConstruction: params.newConstruction,
-          senior: params.senior,
-          fireplace: params.fireplace,
+          newer: params.newer,
+          spacious: params.spacious,
+          largeLot: params.largeLot,
           bounds,
           shape: params.shape,
           view: params.view === "map" ? "map" : undefined,
@@ -273,17 +273,14 @@ export default async function PropertiesPage({ searchParams }: Props) {
           maxPrice: params.maxPrice,
           beds: params.beds,
           baths: params.baths,
-          minSqft: params.minSqft,
+          minSqft: minSqft ? String(minSqft) : undefined,
           maxSqft: params.maxSqft,
-          minLotSqft: params.minLotSqft,
-          minYearBuilt: params.minYearBuilt,
+          minLotSqft: minLotSqft ? String(minLotSqft) : undefined,
+          minYearBuilt: minYearBuilt ? String(minYearBuilt) : undefined,
           propertyType: params.type,
           waterfrontOnly: params.waterfront === "1",
           privatePoolOnly: params.pool === "1",
           garageOnly: params.garage === "1",
-          newConstructionOnly: params.newConstruction === "1",
-          seniorCommunityOnly: params.senior === "1",
-          fireplaceOnly: params.fireplace === "1",
           sort,
           mapArea: bounds
             ? `${bounds.south.toFixed(5)},${bounds.west.toFixed(5)} to ${bounds.north.toFixed(5)},${bounds.east.toFixed(5)}`

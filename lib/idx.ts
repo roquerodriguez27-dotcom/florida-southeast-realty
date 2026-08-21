@@ -608,6 +608,24 @@ function polygonSearchCondition(points: NonNullable<ListingFilters["polygon"]>):
   return rectangles.length ? `(${rectangles.join(" or ")})` : null;
 }
 
+function pointInPolygon(
+  lat: number,
+  lng: number,
+  polygon: NonNullable<ListingFilters["polygon"]>,
+): boolean {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const currentPoint = polygon[index];
+    const previousPoint = polygon[previous];
+    if (!currentPoint || !previousPoint) continue;
+    const intersects = (currentPoint.lat > lat) !== (previousPoint.lat > lat)
+      && lng < (previousPoint.lng - currentPoint.lng) * (lat - currentPoint.lat)
+        / (previousPoint.lat - currentPoint.lat) + currentPoint.lng;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
 function buildResoFilter(filters: ListingFilters): string {
   const conditions = [
     `OriginatingSystemID eq ${odataString(getOriginatingSystemId())}`,
@@ -635,7 +653,7 @@ function buildResoFilter(filters: ListingFilters): string {
     conditions.push(`BedroomsTotal ge ${Number(filters.beds)}`);
   }
   if (Number.isFinite(filters.baths) && Number(filters.baths) > 0) {
-    conditions.push(`BathroomsTotalInteger ge ${Number(filters.baths)}`);
+    conditions.push(`BathroomsFull ge ${Number(filters.baths)}`);
   }
   if (Number.isFinite(filters.minSqft) && Number(filters.minSqft) > 0) {
     conditions.push(`LivingArea ge ${Number(filters.minSqft)}`);
@@ -652,9 +670,6 @@ function buildResoFilter(filters: ListingFilters): string {
   if (filters.waterfrontOnly) conditions.push("WaterfrontYN eq true");
   if (filters.privatePoolOnly) conditions.push("PoolPrivateYN eq true");
   if (filters.garageOnly) conditions.push("GarageSpaces ge 1");
-  if (filters.newConstructionOnly) conditions.push("NewConstructionYN eq true");
-  if (filters.seniorCommunityOnly) conditions.push("SeniorCommunityYN eq true");
-  if (filters.fireplaceOnly) conditions.push("FireplaceYN eq true");
 
   if (filters.propertyType) {
     const values: Partial<Record<PropertyType, string[]>> = {
@@ -710,7 +725,9 @@ export async function fetchLiveListingPage(
   });
   const listings = payload.value
     .map((record) => normalizeListing(record, "Summary"))
-    .filter((listing): listing is Listing => Boolean(listing));
+    .filter((listing): listing is Listing => Boolean(listing))
+    .filter((listing) => !filters.baths || listing.baths >= filters.baths)
+    .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon));
   const totalRows = payload.count ?? ((currentPage - 1) * LISTING_PAGE_SIZE + listings.length);
   const totalPages = payload.count !== undefined
     ? Math.max(1, Math.ceil(totalRows / LISTING_PAGE_SIZE))
@@ -733,55 +750,6 @@ export async function fetchLiveListingPage(
 
 export async function fetchLiveListings(): Promise<Listing[] | null> {
   return (await fetchLiveListingPage())?.listings ?? null;
-}
-
-export async function runPreviewIdxFilterDiagnostics() {
-  if (process.env.VERCEL_ENV !== "preview") return null;
-
-  const baseFilter = buildResoFilter({});
-  const base = await resoRequest("Property", {
-    "$filter": baseFilter,
-    "$top": 1,
-    "$count": true,
-  }, 0, false);
-  const sample = asObject(base.value[0]);
-  const relevantFields = Object.keys(sample)
-    .filter((key) => /bath|senior|adult|fireplace|construction|garage/i.test(key))
-    .sort();
-  const candidates: Record<string, string> = {
-    bathroomsTotalInteger: "BathroomsTotalInteger ge 3",
-    bathroomsTotalDecimal: "BathroomsTotalDecimal ge 3",
-    bathroomsFull: "BathroomsFull ge 3",
-    fireplaceYn: "FireplaceYN eq true",
-    fireplacesTotal: "FireplacesTotal ge 1",
-    seniorCommunityYn: "SeniorCommunityYN eq true",
-    adultCommunityYn: "AdultCommunityYN eq true",
-    newConstructionYn: "NewConstructionYN eq true",
-    recentYearBuilt: `YearBuilt ge ${new Date().getUTCFullYear() - 1}`,
-    flattenedPolygon: "(Latitude ge 26.36 and Latitude le 26.40 and Longitude ge -80.20 and Longitude le -80.14 or Latitude ge 26.40 and Latitude le 26.44 and Longitude ge -80.18 and Longitude le -80.12)",
-  };
-
-  const results = await Promise.all(Object.entries(candidates).map(async ([name, condition]) => {
-    try {
-      const payload = await resoRequest("Property", {
-        "$filter": `${baseFilter} and ${condition}`,
-        "$top": 5,
-        "$count": true,
-      }, 0, false);
-      return {
-        name,
-        count: payload.count,
-        sampleValues: payload.value.slice(0, 5).map((value) => {
-          const record = asObject(value);
-          return Object.fromEntries(relevantFields.map((key) => [key, record[key]]));
-        }),
-      };
-    } catch {
-      return { name, error: "request_failed" };
-    }
-  }));
-
-  return { baseCount: base.count, relevantFields, results };
 }
 
 export async function fetchLiveListingBySlug(slug: string): Promise<Listing | null> {

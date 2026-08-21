@@ -20,9 +20,9 @@ interface CurrentFilters {
   waterfront?: string;
   pool?: string;
   garage?: string;
-  newConstruction?: string;
-  senior?: string;
-  fireplace?: string;
+  newer?: string;
+  spacious?: string;
+  largeLot?: string;
   bounds?: NonNullable<ListingFilters["bounds"]>;
   shape?: string;
   view?: "map";
@@ -90,9 +90,9 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
     current.waterfront,
     current.pool,
     current.garage,
-    current.newConstruction,
-    current.senior,
-    current.fireplace,
+    current.newer,
+    current.spacious,
+    current.largeLot,
   ].filter(Boolean).length;
   const [showMore, setShowMore] = useState(advancedCount > 0);
   const priceLabel = [compactPrice(current.minPrice), compactPrice(current.maxPrice)].filter(Boolean).join(" – ");
@@ -181,15 +181,15 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
             </section>
 
             <section>
-              <h2 className="text-sm font-semibold text-ink">Amenities & lifestyle</h2>
-              <p className="mt-1 text-xs text-ink/50">These filters use the live MLS fields supplied by BeachesMLS.</p>
+              <h2 className="text-sm font-semibold text-ink">Popular features &amp; size</h2>
+              <p className="mt-1 text-xs text-ink/50">Quick filters use live, reliably searchable BeachesMLS fields.</p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
                 <Amenity name="pool" label="Private pool" checked={current.pool === "1"} />
                 <Amenity name="waterfront" label="Waterfront" checked={current.waterfront === "1"} />
                 <Amenity name="garage" label="Garage" checked={current.garage === "1"} />
-                <Amenity name="newConstruction" label="New construction" checked={current.newConstruction === "1"} />
-                <Amenity name="senior" label="55+ community" checked={current.senior === "1"} />
-                <Amenity name="fireplace" label="Fireplace" checked={current.fireplace === "1"} />
+                <Amenity name="newer" label="Built 2020+" checked={current.newer === "1"} />
+                <Amenity name="spacious" label="2,000+ sq. ft." checked={current.spacious === "1"} />
+                <Amenity name="largeLot" label="10,000+ sq. ft. lot" checked={current.largeLot === "1"} />
               </div>
             </section>
           </div>

@@ -597,8 +597,11 @@ function polygonSearchCondition(points: NonNullable<ListingFilters["polygon"]>):
     if (longitudes.length < 2) continue;
     const west = Math.min(...longitudes);
     const east = Math.max(...longitudes);
+    // FBS RESO allows at most two nested filter levels. The outer union below
+    // provides the grouping; `and` binds more tightly than `or`, so each band
+    // does not need another pair of parentheses.
     rectangles.push(
-      `(Latitude ge ${bandSouth} and Latitude le ${bandNorth} and Longitude ge ${west} and Longitude le ${east})`,
+      `Latitude ge ${bandSouth} and Latitude le ${bandNorth} and Longitude ge ${west} and Longitude le ${east}`,
     );
   }
 
@@ -730,6 +733,55 @@ export async function fetchLiveListingPage(
 
 export async function fetchLiveListings(): Promise<Listing[] | null> {
   return (await fetchLiveListingPage())?.listings ?? null;
+}
+
+export async function runPreviewIdxFilterDiagnostics() {
+  if (process.env.VERCEL_ENV !== "preview") return null;
+
+  const baseFilter = buildResoFilter({});
+  const base = await resoRequest("Property", {
+    "$filter": baseFilter,
+    "$top": 1,
+    "$count": true,
+  }, 0, false);
+  const sample = asObject(base.value[0]);
+  const relevantFields = Object.keys(sample)
+    .filter((key) => /bath|senior|adult|fireplace|construction|garage/i.test(key))
+    .sort();
+  const candidates: Record<string, string> = {
+    bathroomsTotalInteger: "BathroomsTotalInteger ge 3",
+    bathroomsTotalDecimal: "BathroomsTotalDecimal ge 3",
+    bathroomsFull: "BathroomsFull ge 3",
+    fireplaceYn: "FireplaceYN eq true",
+    fireplacesTotal: "FireplacesTotal ge 1",
+    seniorCommunityYn: "SeniorCommunityYN eq true",
+    adultCommunityYn: "AdultCommunityYN eq true",
+    newConstructionYn: "NewConstructionYN eq true",
+    recentYearBuilt: `YearBuilt ge ${new Date().getUTCFullYear() - 1}`,
+    flattenedPolygon: "(Latitude ge 26.36 and Latitude le 26.40 and Longitude ge -80.20 and Longitude le -80.14 or Latitude ge 26.40 and Latitude le 26.44 and Longitude ge -80.18 and Longitude le -80.12)",
+  };
+
+  const results = await Promise.all(Object.entries(candidates).map(async ([name, condition]) => {
+    try {
+      const payload = await resoRequest("Property", {
+        "$filter": `${baseFilter} and ${condition}`,
+        "$top": 5,
+        "$count": true,
+      }, 0, false);
+      return {
+        name,
+        count: payload.count,
+        sampleValues: payload.value.slice(0, 5).map((value) => {
+          const record = asObject(value);
+          return Object.fromEntries(relevantFields.map((key) => [key, record[key]]));
+        }),
+      };
+    } catch {
+      return { name, error: "request_failed" };
+    }
+  }));
+
+  return { baseCount: base.count, relevantFields, results };
 }
 
 export async function fetchLiveListingBySlug(slug: string): Promise<Listing | null> {

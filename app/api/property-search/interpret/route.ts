@@ -17,7 +17,7 @@ const requestSchema = z.object({
   prompt: z.string().trim().min(3).max(300),
 });
 
-const DEFAULT_MODEL = "openai/gpt-5.6-luna";
+const DEFAULT_MODEL = "openai/gpt-5-mini";
 
 function gatewayIsAvailable(): boolean {
   return Boolean(
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       ].join(" "),
       prompt: `Search request as JSON string: ${JSON.stringify(prompt)}`,
       maxOutputTokens: 250,
-      reasoning: "none",
+      reasoning: "minimal",
       maxRetries: 0,
       timeout: 8_000,
     });
@@ -74,6 +74,9 @@ export async function POST(request: Request) {
   } catch (error) {
     console.warn("AI property-search interpretation fell back to the local parser.", {
       error: error instanceof Error ? error.name : "unknown",
+      message: error instanceof Error ? error.message.slice(0, 240) : "Unknown Gateway error.",
+      statusCode: error && typeof error === "object" && "statusCode" in error ? error.statusCode : undefined,
+      generationId: error && typeof error === "object" && "generationId" in error ? error.generationId : undefined,
     });
     return responseFor(fallbackIntent, "quick");
   }

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function SearchPanel() {
   return (
     <form
@@ -24,7 +26,7 @@ export default function SearchPanel() {
         <label htmlFor="minPrice" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Min Price
         </label>
-        <div className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+        <div className="price-field flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
           <span className="pl-2.5 text-ink/45">$</span>
           <input
             id="minPrice"
@@ -35,7 +37,7 @@ export default function SearchPanel() {
             inputMode="numeric"
             placeholder="Any"
             autoComplete="off"
-            className="w-full min-w-0 bg-transparent px-2 py-2.5 text-base md:text-sm text-ink outline-none"
+            className="price-field-input w-full min-w-0 bg-transparent px-2 py-2.5 text-base md:text-sm text-ink outline-none"
           />
         </div>
       </div>
@@ -44,7 +46,7 @@ export default function SearchPanel() {
         <label htmlFor="maxPrice" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Max Price
         </label>
-        <div className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+        <div className="price-field flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
           <span className="pl-2.5 text-ink/45">$</span>
           <input
             id="maxPrice"
@@ -55,7 +57,7 @@ export default function SearchPanel() {
             inputMode="numeric"
             placeholder="Any"
             autoComplete="off"
-            className="w-full min-w-0 bg-transparent px-2 py-2.5 text-base md:text-sm text-ink outline-none"
+            className="price-field-input w-full min-w-0 bg-transparent px-2 py-2.5 text-base md:text-sm text-ink outline-none"
           />
         </div>
       </div>
@@ -85,6 +87,13 @@ export default function SearchPanel() {
       >
         Search Homes
       </button>
+
+      <Link
+        href="/properties#ai-property-search"
+        className="col-span-2 text-center text-xs font-medium text-tide underline decoration-tide/30 underline-offset-4 hover:decoration-tide md:col-span-6"
+      >
+        Or describe your ideal home in plain English →
+      </Link>
     </form>
   );
 }

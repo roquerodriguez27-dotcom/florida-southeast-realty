@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getListingBySlug, searchListings } from "@/lib/listings";
@@ -15,6 +14,7 @@ import { serializeJsonLd } from "@/lib/seo/json-ld";
 import IdxAttribution from "@/components/IdxAttribution";
 import CompareToggle from "@/components/CompareToggle";
 import { savedComparisonListing } from "@/lib/comparison";
+import PropertyGallery from "@/components/PropertyGallery";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -75,16 +75,7 @@ export default async function ListingPage({ params }: Props) {
     <div className="pt-16 pb-20">
       {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-1 h-[46vh] md:h-[64vh] bg-keystone-dim">
-        <div className="relative md:col-span-2 md:row-span-2">
-          <Image src={listing.images[0]} alt={listing.address} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" priority />
-        </div>
-        {listing.images.slice(1, 5).map((src, index) => (
-          <div key={src} className="relative hidden md:block">
-            <Image src={src} alt={`${listing.address} image ${index + 2}`} fill sizes="25vw" className="object-cover" />
-          </div>
-        ))}
-      </div>
+      <PropertyGallery images={listing.images} address={listing.address} />
 
       {!isLiveListing && <div className="container-fsre mt-6"><SampleDataNotice variant="listings" /></div>}
 

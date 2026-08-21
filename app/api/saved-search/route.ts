@@ -3,8 +3,9 @@ import { readSameOriginJson } from "@/lib/api/request";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { z } from "zod";
 import { checkIdxConnection } from "@/lib/idx";
+import { sendBrokerNotification } from "@/lib/broker-notification";
 
-const criteriaValueSchema = z.union([z.string().trim().max(300), z.boolean()]);
+const criteriaValueSchema = z.union([z.string().trim().max(2000), z.boolean()]);
 const savedSearchSchema = z.object({
   fullName: z.string().trim().min(1).max(120),
   email: z.email().max(254).transform((value) => value.toLowerCase()),
@@ -44,7 +45,26 @@ export async function POST(request: Request) {
       p_idx_active: idxActive,
     });
     if (error) throw error;
-    return NextResponse.json({ saved: true, pendingIdx: pendingIdx === true });
+    const notification = await sendBrokerNotification({
+      kind: "saved-search",
+      title: "New saved property search",
+      replyTo: email,
+      fields: {
+        fullName,
+        email,
+        phone,
+        frequency,
+        smsConsent,
+        ...Object.fromEntries(Object.entries(criteria).map(([key, value]) => [`criteria_${key}`, value])),
+      },
+    });
+    return NextResponse.json({
+      saved: true,
+      stored: true,
+      pendingIdx: pendingIdx === true,
+      notificationConfigured: notification.configured,
+      notificationDelivered: notification.delivered,
+    });
   } catch (error) {
     console.error("Saved-search creation failed", error);
     return NextResponse.json({ error: "We could not save this alert right now. Please try again or contact us." }, { status: 503 });

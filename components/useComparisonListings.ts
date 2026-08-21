@@ -17,6 +17,7 @@ function isSavedListing(value: unknown): value is SavedComparisonListing {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<SavedComparisonListing>;
   return typeof item.slug === "string"
+    && (item.image === undefined || typeof item.image === "string")
     && typeof item.mlsId === "string"
     && typeof item.address === "string"
     && typeof item.city === "string"

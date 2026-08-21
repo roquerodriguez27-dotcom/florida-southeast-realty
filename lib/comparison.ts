@@ -4,6 +4,7 @@ export const MAX_COMPARE_LISTINGS = 3;
 
 export interface SavedComparisonListing {
   slug: string;
+  image?: string;
   mlsId: string;
   address: string;
   city: string;
@@ -21,6 +22,7 @@ export interface SavedComparisonListing {
 export function savedComparisonListing(listing: Listing): SavedComparisonListing {
   return {
     slug: listing.slug,
+    image: listing.images[0],
     mlsId: listing.mlsId,
     address: listing.address,
     city: listing.city,

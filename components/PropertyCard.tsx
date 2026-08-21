@@ -35,6 +35,9 @@ export default function PropertyCard({ listing }: { listing: Listing }) {
               Waterfront
             </span>
           )}
+          <span className="absolute bottom-3 right-3 rounded-full bg-tide/90 px-2.5 py-1 text-[11px] font-medium text-sand shadow">
+            {listing.images.length} {listing.images.length === 1 ? "photo" : "photos"}
+          </span>
         </div>
 
         <div className="p-4">
@@ -50,6 +53,9 @@ export default function PropertyCard({ listing }: { listing: Listing }) {
             <span>{listing.baths} ba</span>
             {listing.sqft > 0 && <span>{listing.sqft.toLocaleString()} sqft</span>}
           </div>
+          <p className="mt-3 text-sm font-medium text-tide underline decoration-tide/30 underline-offset-4 group-hover:decoration-tide">
+            View photos &amp; property details →
+          </p>
           <IdxAttribution attribution={listing.idx} compact />
         </div>
       </Link>

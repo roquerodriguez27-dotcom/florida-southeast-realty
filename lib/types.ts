@@ -1,5 +1,7 @@
 export type ListingStatus = "Active" | "Pending" | "Sold" | "Coming Soon";
 
+export type ListingSort = "newest" | "price-asc" | "price-desc" | "sqft-desc";
+
 export type PropertyType =
   | "Single Family"
   | "Condo"
@@ -45,6 +47,7 @@ export interface Listing {
   lotSqft?: number;
   yearBuilt: number;
   waterfront: boolean;
+  privatePool: boolean;
   propertyType: PropertyType;
   images: string[];
   description: string;
@@ -67,7 +70,15 @@ export interface ListingFilters {
   beds?: number;
   propertyType?: PropertyType;
   waterfrontOnly?: boolean;
+  privatePoolOnly?: boolean;
+  sort?: ListingSort;
   community?: string;
+  bounds?: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
 }
 
 export interface ListingSearchPage {

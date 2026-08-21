@@ -2,13 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PropertyFilters from "@/components/PropertyFilters";
 import PropertyGrid from "@/components/PropertyGrid";
+import PropertyResultsView from "@/components/PropertyResultsView";
+import AiPropertySearch from "@/components/AiPropertySearch";
 import SampleDataNotice from "@/components/SampleDataNotice";
 import LeadForm from "@/components/LeadForm";
 import { searchListingPage } from "@/lib/listings";
 import { IDX_PROVIDER } from "@/lib/idx";
 import SavedSearchAlert from "@/components/SavedSearchAlert";
 import { IdxPageDisclaimer } from "@/components/IdxAttribution";
-import type { PropertyType } from "@/lib/types";
+import type { ListingSort, PropertyType } from "@/lib/types";
+import { MAX_SEARCH_LOCATIONS } from "@/lib/south-florida-locations";
 
 const idxLive = IDX_PROVIDER !== "not_connected";
 
@@ -29,14 +32,26 @@ interface Props {
     beds?: string;
     type?: string;
     waterfront?: string;
+    pool?: string;
     page?: string;
+    north?: string;
+    south?: string;
+    east?: string;
+    west?: string;
+    view?: string;
+    sort?: string;
   }>;
 }
 
 const PROPERTY_TYPES: PropertyType[] = ["Single Family", "Condo", "Townhome", "Estate", "Multi-Family", "Land", "Commercial", "Other"];
+const LISTING_SORTS: ListingSort[] = ["newest", "price-asc", "price-desc", "sqft-desc"];
 
 function propertyType(value?: string): PropertyType | undefined {
   return PROPERTY_TYPES.includes(value as PropertyType) ? value as PropertyType : undefined;
+}
+
+function listingSort(value?: string): ListingSort {
+  return LISTING_SORTS.includes(value as ListingSort) ? value as ListingSort : "newest";
 }
 
 function optionalNonNegativeNumber(value?: string): number | undefined {
@@ -48,6 +63,17 @@ function optionalNonNegativeNumber(value?: string): number | undefined {
 function optionalPositiveInteger(value?: string): number | undefined {
   const parsed = optionalNonNegativeNumber(value);
   return parsed !== undefined && parsed > 0 ? Math.floor(parsed) : undefined;
+}
+
+function mapBounds(params: Awaited<Props["searchParams"]>) {
+  const north = Number(params.north);
+  const south = Number(params.south);
+  const east = Number(params.east);
+  const west = Number(params.west);
+  if (![north, south, east, west].every(Number.isFinite)) return undefined;
+  if (north <= south || east <= west) return undefined;
+  if (north > 90 || south < -90 || east > 180 || west < -180) return undefined;
+  return { north, south, east, west };
 }
 
 function looksLikeStreetAddress(value?: string): value is string {
@@ -69,7 +95,7 @@ function normalizeLocations(value?: string | string[]): string[] {
       const location = part.trim().slice(0, 100);
       if (!location || locations.some((current) => current.toLowerCase() === location.toLowerCase())) continue;
       locations.push(location);
-      if (locations.length === 5) return locations;
+      if (locations.length === MAX_SEARCH_LOCATIONS) return locations;
     }
   }
   return locations;
@@ -87,6 +113,17 @@ function pageHref(params: Awaited<Props["searchParams"]>, page: number): string 
   return `/properties?${query.toString()}`;
 }
 
+function withoutMapBoundsHref(params: Awaited<Props["searchParams"]>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (!value || ["north", "south", "east", "west", "page"].includes(key)) continue;
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item) query.append(key, item);
+    }
+  }
+  return `/properties${query.size ? `?${query.toString()}` : ""}#property-results`;
+}
+
 export default async function PropertiesPage({ searchParams }: Props) {
   const params = await searchParams;
   const rawQuery = params.q?.trim().slice(0, 200) || undefined;
@@ -99,6 +136,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
     : propertyQuery
       ? []
       : normalizeLocations(rawQuery);
+  const bounds = mapBounds(params);
+  const sort = listingSort(params.sort);
 
   const result = await searchListingPage({
     q: propertyQuery,
@@ -108,11 +147,14 @@ export default async function PropertiesPage({ searchParams }: Props) {
     beds: optionalPositiveInteger(params.beds),
     propertyType: propertyType(params.type),
     waterfrontOnly: params.waterfront === "1",
+    privatePoolOnly: params.pool === "1",
+    bounds,
+    sort,
   }, optionalPositiveInteger(params.page) ?? 1);
   const { listings } = result;
   const addressQuery = looksLikeStreetAddress(propertyQuery) ? propertyQuery : undefined;
   const hasSecondaryFilters = Boolean(
-    locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.type || params.waterfront === "1",
+    locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.type || params.waterfront === "1" || params.pool === "1" || bounds,
   );
   const noCurrentAddressListing = Boolean(
     addressQuery && !hasSecondaryFilters && result.live && !result.unavailable && listings.length === 0,
@@ -133,7 +175,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
               : "South Florida home search"}
         </h1>
         <p className="text-ink/60 max-w-2xl mb-7">
-          Search current for-sale inventory across one or several cities or communities, then narrow by address, price, property type, bedrooms, and waterfront status.
+          Search current for-sale inventory across one or several cities or communities, then narrow by address, price, property type, bedrooms, waterfront status, and private pool.
           {result.live ? " Results are supplied by the live BeachesMLS feed through the RESO Web API." : " The secure RESO connection is being finalized following MLS approval."}
         </p>
 
@@ -153,6 +195,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
           </div>
         )}
 
+        <div className="mb-6"><AiPropertySearch /></div>
+
         <div className="mb-10"><PropertyFilters current={{
           locations,
           q: propertyQuery,
@@ -161,6 +205,10 @@ export default async function PropertiesPage({ searchParams }: Props) {
           beds: params.beds,
           type: params.type,
           waterfront: params.waterfront,
+          pool: params.pool,
+          bounds,
+          view: params.view === "map" ? "map" : undefined,
+          sort,
         }} /></div>
 
         <div className="mb-8"><SavedSearchAlert criteria={{
@@ -171,6 +219,11 @@ export default async function PropertiesPage({ searchParams }: Props) {
           beds: params.beds,
           propertyType: params.type,
           waterfrontOnly: params.waterfront === "1",
+          privatePoolOnly: params.pool === "1",
+          sort,
+          mapArea: bounds
+            ? `${bounds.south.toFixed(5)},${bounds.west.toFixed(5)} to ${bounds.north.toFixed(5)},${bounds.east.toFixed(5)}`
+            : undefined,
         }} /></div>
 
         <div className="mb-8">
@@ -188,7 +241,22 @@ export default async function PropertiesPage({ searchParams }: Props) {
 
         {listings.length > 0 ? (
           <section id="property-results" className="scroll-mt-32" aria-label="Property search results">
-            <PropertyGrid listings={listings} />
+            <PropertyResultsView
+              listings={listings.map(({ slug, address, city, price, lat, lng, status }) => ({
+                slug,
+                address,
+                city,
+                price,
+                lat,
+                lng,
+                status,
+              }))}
+              initialView={params.view === "map" ? "map" : "list"}
+              initialBounds={bounds}
+              initialSort={sort}
+            >
+              <PropertyGrid listings={listings} />
+            </PropertyResultsView>
             <IdxPageDisclaimer attribution={listings[0]?.idx} />
             {result.pagination.totalPages > 1 && (
               <nav className="mt-8 flex items-center justify-between gap-4" aria-label="Listing results pages">
@@ -216,7 +284,10 @@ export default async function PropertiesPage({ searchParams }: Props) {
             <p className="text-sm text-ink/65 mt-2 max-w-2xl">
               No matching homes are available in this search right now. Florida Southeast Realty can refine the criteria or watch for new inventory.
             </p>
-            <Link href="/contact" className="inline-block mt-5 bg-hibiscus text-sand font-medium px-5 py-3 rounded-sm">Start a property search</Link>
+            <div className="mt-5 flex flex-wrap gap-3">
+              {bounds ? <Link href={withoutMapBoundsHref(params)} className="inline-block border border-tide/25 text-tide font-medium px-5 py-3 rounded-sm">Clear map area</Link> : null}
+              <Link href="/contact" className="inline-block bg-hibiscus text-sand font-medium px-5 py-3 rounded-sm">Start a property search</Link>
+            </div>
           </div>
         )}
 

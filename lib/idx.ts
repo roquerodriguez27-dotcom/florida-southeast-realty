@@ -6,6 +6,7 @@ import type {
   Listing,
   ListingFilters,
   ListingSearchPage,
+  ListingSort,
   ListingStatus,
   PropertyType,
 } from "./types";
@@ -17,6 +18,13 @@ const DEFAULT_MLS_DISCLAIMER =
   "© 2026 Beaches MLS. All Rights Reserved. This information is for your personal, non-commercial use and may not be used for any purpose other than to identify prospective properties you may be interested in purchasing. Display of MLS data is usually deemed reliable but is NOT guaranteed accurate by the MLS. Buyers are responsible for verifying the accuracy of all information and should investigate the data themselves or retain appropriate professionals. Information from sources other than the Listing Agent may have been included in the MLS data. Unless otherwise specified in writing, Broker/Agent has not and will not verify any information obtained from other sources. The Broker/Agent providing the information contained herein may or may not have been the Listing and/or Selling Agent.";
 const LISTING_PAGE_SIZE = 24;
 const REQUEST_TIMEOUT_MS = 10_000;
+
+const RESO_SORTS: Record<ListingSort, string> = {
+  newest: "ModificationTimestamp desc,ListPrice asc",
+  "price-asc": "ListPrice asc,ModificationTimestamp desc",
+  "price-desc": "ListPrice desc,ModificationTimestamp desc",
+  "sqft-desc": "LivingArea desc,ListPrice asc",
+};
 
 type JsonObject = Record<string, unknown>;
 
@@ -312,10 +320,20 @@ function isWaterfront(record: JsonObject): boolean {
   return Boolean(features && !["no", "none", "false"].includes(features));
 }
 
-function listingFeatures(record: JsonObject, propertyType: PropertyType, waterfront: boolean): string[] {
+function hasPrivatePool(record: JsonObject): boolean {
+  return truthy(record.PoolPrivateYN);
+}
+
+function listingFeatures(
+  record: JsonObject,
+  propertyType: PropertyType,
+  waterfront: boolean,
+  privatePool: boolean,
+): string[] {
   const values = [
     propertyType,
     ...(waterfront ? ["Waterfront"] : []),
+    ...(privatePool ? ["Private pool"] : []),
     ...flattenStrings(record.InteriorFeatures),
     ...flattenStrings(record.ExteriorFeatures),
     ...flattenStrings(record.CommunityFeatures),
@@ -400,6 +418,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     firstString(record, ["PropertyType"]),
   );
   const waterfront = isWaterfront(record);
+  const privatePool = hasPrivatePool(record);
   const photos = photoUrls(record);
   const fullBaths = firstNumber(record, ["BathroomsFull", "BathsFull"]);
   const halfBaths = firstNumber(record, ["BathroomsHalf", "BathsHalf"]);
@@ -428,12 +447,13 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     lotSqft: firstNumber(record, ["LotSizeSquareFeet", "LotSqFt"]) || undefined,
     yearBuilt: firstNumber(record, ["YearBuilt"]),
     waterfront,
+    privatePool,
     propertyType,
     images: photos.length ? photos : ["/property-placeholder.svg"],
     description:
       firstString(record, ["PublicRemarks", "Remarks"]) ||
       "Contact Florida Southeast Realty for current property details.",
-    features: listingFeatures(record, propertyType, waterfront),
+    features: listingFeatures(record, propertyType, waterfront, privatePool),
     lat: firstNumber(record, ["Latitude", "Lat"]),
     lng: firstNumber(record, ["Longitude", "Lng", "Lon"]),
     mileMarker: 0,
@@ -532,7 +552,7 @@ function buildResoFilter(filters: ListingFilters): string {
   const locations = filters.locations
     ?.map((location) => location.trim().slice(0, 100))
     .filter(Boolean)
-    .slice(0, 5) ?? [];
+    .slice(0, 20) ?? [];
   if (locations.length > 0) {
     conditions.push(`(${locations.map(areaSearchCondition).join(" or ")})`);
   }
@@ -546,6 +566,7 @@ function buildResoFilter(filters: ListingFilters): string {
     conditions.push(`BedroomsTotal ge ${Number(filters.beds)}`);
   }
   if (filters.waterfrontOnly) conditions.push("WaterfrontYN eq true");
+  if (filters.privatePoolOnly) conditions.push("PoolPrivateYN eq true");
 
   if (filters.propertyType) {
     const values: Partial<Record<PropertyType, string[]>> = {
@@ -568,6 +589,16 @@ function buildResoFilter(filters: ListingFilters): string {
     conditions.push(`(${contains("City", value)} or ${contains("SubdivisionName", value)})`);
   }
 
+  if (filters.bounds) {
+    const { north, south, east, west } = filters.bounds;
+    if ([north, south, east, west].every(Number.isFinite)) {
+      conditions.push(`Latitude ge ${south}`);
+      conditions.push(`Latitude le ${north}`);
+      conditions.push(`Longitude ge ${west}`);
+      conditions.push(`Longitude le ${east}`);
+    }
+  }
+
   return conditions.join(" and ");
 }
 
@@ -584,7 +615,7 @@ export async function fetchLiveListingPage(
     "$top": LISTING_PAGE_SIZE,
     "$skip": (currentPage - 1) * LISTING_PAGE_SIZE,
     "$count": true,
-    "$orderby": "ListPrice desc",
+    "$orderby": RESO_SORTS[filters.sort ?? "newest"],
   });
   const listings = payload.value
     .map((record) => normalizeListing(record, "Summary"))
@@ -619,9 +650,21 @@ export async function fetchLiveListingBySlug(slug: string): Promise<Listing | nu
   if (!listingKey) return null;
 
   const escapedKey = listingKey.replace(/'/g, "''");
-  const payload = await resoRequest(`Property('${escapedKey}')`, {
-    "$expand": "Media($top=24;$orderby=Order)",
-  });
+  let payload: ResoPayload;
+  try {
+    payload = await resoRequest(`Property('${escapedKey}')`, {
+      "$expand": "Media($top=24;$orderby=Order)",
+    }, 300, false);
+  } catch {
+    // A listing can move between provider partitions while the cached search
+    // result is still visible. Retrying through the collection endpoint keeps
+    // a valid card from becoming a transient 404.
+    payload = await resoRequest("Property", {
+      "$filter": `OriginatingSystemID eq ${odataString(getOriginatingSystemId())} and (ListingKey eq ${odataString(listingKey)} or ListingId eq ${odataString(listingKey)})`,
+      "$expand": "Media($top=24;$orderby=Order)",
+      "$top": 1,
+    });
+  }
   return normalizeListing(payload.value[0], "Detail");
 }
 

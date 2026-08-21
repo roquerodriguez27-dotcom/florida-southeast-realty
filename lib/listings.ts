@@ -1,4 +1,4 @@
-import type { Listing, ListingFilters, ListingSearchPage } from "./types";
+import type { Listing, ListingFilters, ListingSearchPage, ListingSort } from "./types";
 import { fetchLiveListingBySlug, fetchLiveListingPage } from "./idx";
 
 const img = (id: string) =>
@@ -27,6 +27,7 @@ export const LISTINGS: Listing[] = [
     lotSqft: 8100,
     yearBuilt: 2021,
     waterfront: true,
+    privatePool: true,
     propertyType: "Estate",
     images: [img("photo-1613977257363-707ba9348227"), img("photo-1600596542815-ffad4c1539a9"), img("photo-1600607687939-ce8a6c25118c")],
     description: "Demonstration listing used to test the design before the live MLS feed is connected.",
@@ -52,6 +53,7 @@ export const LISTINGS: Listing[] = [
     sqft: 2640,
     yearBuilt: 2019,
     waterfront: true,
+    privatePool: false,
     propertyType: "Condo",
     images: [img("photo-1512917774080-9991f1c4c750"), img("photo-1512918728675-ed5a9ecdebfd"), img("photo-1502672260266-1c1ef2d93688")],
     description: "Demonstration listing used to test search, cards, and property-page layouts before live IDX activation.",
@@ -78,6 +80,7 @@ export const LISTINGS: Listing[] = [
     lotSqft: 9500,
     yearBuilt: 1962,
     waterfront: false,
+    privatePool: false,
     propertyType: "Single Family",
     images: [img("photo-1568605114967-8130f3a36994"), img("photo-1600585154340-be6161a56a0c"), img("photo-1600566753086-00f18fb6b3ea")],
     description: "Demonstration listing used to test the preview experience before live IDX activation.",
@@ -105,6 +108,7 @@ export const LISTINGS: Listing[] = [
     lotSqft: 12000,
     yearBuilt: 2016,
     waterfront: false,
+    privatePool: true,
     propertyType: "Single Family",
     images: [img("photo-1600047509807-ba8f99d2cdde"), img("photo-1600210492486-724fe5c67fb0"), img("photo-1600585152915-d208bec867a1")],
     description: "Demonstration listing used to test the Boca Raton search experience before live MLS data is connected.",
@@ -136,8 +140,18 @@ export async function getListingBySlug(slug: string): Promise<Listing | undefine
   return canUseSampleListings() ? LISTINGS.find((listing) => listing.slug === slug) : undefined;
 }
 
+function sortSampleListings(listings: Listing[], sort: ListingSort = "newest"): Listing[] {
+  return [...listings].sort((left, right) => {
+    if (sort === "price-asc") return left.price - right.price;
+    if (sort === "price-desc") return right.price - left.price;
+    if (sort === "sqft-desc") return right.sqft - left.sqft || left.price - right.price;
+    return Date.parse(right.listingUpdatedAt ?? "") - Date.parse(left.listingUpdatedAt ?? "")
+      || left.price - right.price;
+  });
+}
+
 function filterSampleListings(filters: ListingFilters): Listing[] {
-  return LISTINGS.filter((l) => {
+  return sortSampleListings(LISTINGS.filter((l) => {
     if (filters.locations?.length) {
       const matchesLocation = filters.locations.some((location) => {
         const value = location.toLowerCase();
@@ -161,9 +175,14 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.beds && l.beds < filters.beds) return false;
     if (filters.propertyType && l.propertyType !== filters.propertyType) return false;
     if (filters.waterfrontOnly && !l.waterfront) return false;
+    if (filters.privatePoolOnly && !l.privatePool) return false;
     if (filters.community && l.communitySlug !== filters.community) return false;
+    if (filters.bounds) {
+      const { north, south, east, west } = filters.bounds;
+      if (l.lat > north || l.lat < south || l.lng > east || l.lng < west) return false;
+    }
     return true;
-  });
+  }), filters.sort);
 }
 
 export async function searchListingPage(filters: ListingFilters = {}, page = 1): Promise<ListingSearchPage> {

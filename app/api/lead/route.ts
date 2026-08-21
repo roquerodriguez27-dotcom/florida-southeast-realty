@@ -1,23 +1,19 @@
 import { NextResponse } from "next/server";
 import { readSameOriginJson } from "@/lib/api/request";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
+import { sendBrokerNotification } from "@/lib/broker-notification";
 import { z } from "zod";
 
 /**
  * Lead delivery seam
  * ---------------------------------------------------------------
- * This route does NOT pretend to deliver leads when nothing is
- * configured. It reports back { delivered: false, reason: "not_configured" }
- * so the calling form can tell the visitor the truth and offer a
- * phone/email fallback.
+ * Every valid inquiry is first written to the private Supabase CRM.
+ * Broker email delivery is then attempted separately so the response can
+ * report CRM storage and notification delivery truthfully.
  *
- * To go live, set ONE of:
- *   LEAD_WEBHOOK_URL     — POSTs the lead JSON to your CRM's inbound
- *                           webhook (HubSpot, Follow Up Boss, a Zapier/
- *                           Make catch hook, etc).
- *   RESEND_API_KEY        — sends a transactional email via Resend.
- *   RESEND_TO_EMAIL        Also requires RESEND_FROM_EMAIL and
- *   RESEND_FROM_EMAIL      RESEND_TO_EMAIL (where leads land).
+ * RESEND_API_KEY and RESEND_FROM_EMAIL enable broker notification emails.
+ * RESEND_TO_EMAIL defaults to the brokerage email in site-config. An optional
+ * LEAD_WEBHOOK_URL may also mirror the inquiry to another authorized system.
  *
  * Add real reCAPTCHA/hCaptcha verification here before going live —
  * the honeypot field below only filters unsophisticated bots.
@@ -32,6 +28,27 @@ const leadSchema = z.object({
 function first(fields: Record<string, string>, names: string[]) {
   for (const name of names) if (fields[name]?.trim()) return fields[name].trim();
   return null;
+}
+
+async function sendLeadWebhook(formName: string, fields: Record<string, string>) {
+  const webhookUrl = process.env.LEAD_WEBHOOK_URL?.trim();
+  if (!webhookUrl) return { configured: false, delivered: false };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ form: formName, ...fields, receivedAt: new Date().toISOString() }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) throw new Error(`Webhook responded ${response.status}`);
+    return { configured: true, delivered: true };
+  } catch (error) {
+    console.error("[lead:webhook-delivery-error]", {
+      error: error instanceof Error ? error.name : "unknown",
+    });
+    return { configured: true, delivered: false };
+  }
 }
 
 export async function POST(req: Request) {
@@ -49,7 +66,7 @@ export async function POST(req: Request) {
 
   // Honeypot: real visitors never fill this hidden field.
   if (payload.honeypot) {
-    return NextResponse.json({ delivered: false, reason: "spam" });
+    return NextResponse.json({ delivered: true, stored: false, reason: "spam" });
   }
 
   if (payload.fields.contact_consent !== "yes") {
@@ -88,42 +105,27 @@ export async function POST(req: Request) {
     console.error("[lead:crm_storage_error]", error);
   }
 
-  const webhookUrl = process.env.LEAD_WEBHOOK_URL;
-  const resendKey = process.env.RESEND_API_KEY;
-  const resendTo = process.env.RESEND_TO_EMAIL;
-  const resendFrom = process.env.RESEND_FROM_EMAIL;
-
-  if (!webhookUrl && !(resendKey && resendTo && resendFrom)) {
-    if (stored) return NextResponse.json({ delivered: true, stored: true });
-    console.info("[lead:not_configured]", payload.formName, payload.fields);
-    return NextResponse.json({ delivered: false, reason: "not_configured" });
+  if (!stored) {
+    return NextResponse.json({ delivered: false, stored: false, reason: "crm_storage_error" }, { status: 503 });
   }
 
-  try {
-    if (webhookUrl) {
-      const res = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form: payload.formName, ...payload.fields, receivedAt: new Date().toISOString() }),
-      });
-      if (!res.ok) throw new Error(`Webhook responded ${res.status}`);
-    } else if (resendKey && resendTo && resendFrom) {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: resendFrom,
-          to: resendTo,
-          subject: `New ${payload.formName} lead — Florida Southeast Realty`,
-          text: Object.entries(payload.fields).map(([k, v]) => `${k}: ${v}`).join("\n"),
-        }),
-      });
-      if (!res.ok) throw new Error(`Resend responded ${res.status}`);
-    }
-    return NextResponse.json({ delivered: true, stored });
-  } catch (err) {
-    console.error("[lead:delivery_error]", err);
-    if (stored) return NextResponse.json({ delivered: true, stored: true, notificationDelivered: false });
-    return NextResponse.json({ delivered: false, reason: "error" }, { status: 502 });
-  }
+  const email = first(payload.fields, ["email"]);
+  const [notification, webhook] = await Promise.all([
+    sendBrokerNotification({
+      kind: "lead",
+      title: `New ${payload.formName} website inquiry`,
+      fields: payload.fields,
+      replyTo: email,
+    }),
+    sendLeadWebhook(payload.formName, payload.fields),
+  ]);
+
+  return NextResponse.json({
+    delivered: true,
+    stored: true,
+    destination: "crm",
+    notificationConfigured: notification.configured,
+    notificationDelivered: notification.delivered,
+    webhookDelivered: webhook.delivered,
+  });
 }

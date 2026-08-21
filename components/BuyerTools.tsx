@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import LeadForm from "@/components/LeadForm";
 import {
@@ -25,6 +26,7 @@ interface BuyerToolsProps {
 interface ComparisonHome {
   id: string;
   sourceSlug?: string;
+  image?: string;
   address: string;
   price: string;
   beds: string;
@@ -71,6 +73,7 @@ function comparisonHomeFromSavedListing(listing: SavedComparisonListing, index: 
   return {
     id: `home-${index}`,
     sourceSlug: listing.slug,
+    image: listing.image,
     address: comparisonAddress(listing),
     price: String(listing.price),
     beds: String(listing.beds),
@@ -107,7 +110,7 @@ function ComparisonField({
   return (
     <label className="block">
       <span className="block text-[10px] font-mono uppercase tracking-wide text-ink/50 mb-1">{label}</span>
-      <span className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+      <span className="price-field flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
         {prefix && <span className="pl-2.5 text-ink/45">{prefix}</span>}
         <input
           type={type}
@@ -117,7 +120,7 @@ function ComparisonField({
           inputMode={type === "number" ? "decimal" : undefined}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full min-w-0 bg-transparent px-2.5 py-2 text-sm outline-none"
+          className="price-field-input w-full min-w-0 bg-transparent px-2.5 py-2 text-sm outline-none"
         />
       </span>
     </label>
@@ -146,7 +149,7 @@ function Input({ label, value, onChange, prefix, suffix, step = 1, min = 0 }: {
   return (
     <label className="block">
       <span className="block text-[11px] font-mono uppercase tracking-wide text-ink/55 mb-1">{label}</span>
-      <span className="flex items-center bg-white border border-ink/15 rounded-sm focus-within:border-tide">
+      <span className="price-field flex items-center bg-white border border-ink/15 rounded-sm focus-within:border-tide">
         {prefix && <span className="pl-3 text-ink/45">{prefix}</span>}
         <input
           type="number"
@@ -165,7 +168,7 @@ function Input({ label, value, onChange, prefix, suffix, step = 1, min = 0 }: {
             }
           }}
           onFocus={(event) => event.currentTarget.select()}
-          className="w-full min-w-0 bg-transparent px-2.5 py-2.5 outline-none tabular-nums"
+          className="price-field-input w-full min-w-0 bg-transparent px-2.5 py-2.5 outline-none tabular-nums"
         />
         {suffix && <span className="pr-3 text-ink/45 text-sm">{suffix}</span>}
       </span>
@@ -417,73 +420,84 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
               </div>
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-4 mt-6">
-              {comparisonHomes.map((home, index) => {
-                const showEntryForm = Boolean(home.sourceSlug || home.address.trim() || manualEntrySlots[index]);
-                if (!showEntryForm) {
-                  return (
-                    <section key={home.id} className="flex min-h-56 flex-col rounded-sm border border-dashed border-ink/20 bg-keystone/20 p-5">
-                      <p className="font-mono text-[10px] uppercase tracking-widest text-hibiscus">Home {index + 1}</p>
-                      <h3 className="font-display text-xl text-ink mt-4">Choose another home</h3>
-                      <p className="mt-2 text-sm leading-relaxed text-ink/55">Return to the listings and check “Compare this home.” It will fill this space automatically.</p>
-                      <div className="mt-auto pt-5 space-y-2">
-                        <Link href="/properties" className="block rounded-sm bg-tide px-4 py-2.5 text-center text-sm font-medium text-sand">Browse listings</Link>
-                        <button
-                          type="button"
-                          onClick={() => setManualEntrySlots((current) => current.map((value, homeIndex) => homeIndex === index ? true : value))}
-                          className="w-full px-3 py-2 text-sm text-tide underline underline-offset-4"
-                        >
-                          Enter an off-market home instead
-                        </button>
-                      </div>
-                    </section>
-                  );
-                }
-
-                return (
-                  <fieldset key={home.id} className="border border-ink/10 rounded-sm bg-keystone/35 p-4">
-                    <legend className="sr-only">Home {index + 1}</legend>
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                      <div>
+            <p className="mt-5 text-xs font-medium text-tide lg:hidden">Swipe left or right to keep the homes lined up side by side.</p>
+            <div className="-mx-5 mt-3 overflow-x-auto px-5 pb-3 md:-mx-7 md:px-7 lg:mx-0 lg:mt-6 lg:overflow-visible lg:px-0">
+              <div className="grid snap-x snap-mandatory grid-flow-col auto-cols-[minmax(17rem,84vw)] gap-4 lg:grid-flow-row lg:grid-cols-3 lg:auto-cols-auto">
+                {comparisonHomes.map((home, index) => {
+                  const showEntryForm = Boolean(home.sourceSlug || home.address.trim() || manualEntrySlots[index]);
+                  if (!showEntryForm) {
+                    return (
+                      <section key={home.id} className="flex min-h-56 snap-start flex-col rounded-sm border border-dashed border-ink/20 bg-keystone/20 p-5">
                         <p className="font-mono text-[10px] uppercase tracking-widest text-hibiscus">Home {index + 1}</p>
-                        {home.sourceSlug ? <Link href={`/properties/${home.sourceSlug}`} className="text-xs text-tide underline">View loaded MLS listing</Link> : <p className="text-xs text-ink/50">Manual / off-market entry</p>}
+                        <h3 className="font-display text-xl text-ink mt-4">Choose another home</h3>
+                        <p className="mt-2 text-sm leading-relaxed text-ink/55">Return to the listings and check “Compare this home.” It will fill this space automatically.</p>
+                        <div className="mt-auto pt-5 space-y-2">
+                          <Link href="/properties" className="block rounded-sm bg-tide px-4 py-2.5 text-center text-sm font-medium text-sand">Browse listings</Link>
+                          <button
+                            type="button"
+                            onClick={() => setManualEntrySlots((current) => current.map((value, homeIndex) => homeIndex === index ? true : value))}
+                            className="w-full px-3 py-2 text-sm text-tide underline underline-offset-4"
+                          >
+                            Enter an off-market home instead
+                          </button>
+                        </div>
+                      </section>
+                    );
+                  }
+
+                  return (
+                    <fieldset key={home.id} className="snap-start border border-ink/10 rounded-sm bg-keystone/35 p-4">
+                      <legend className="sr-only">Home {index + 1}</legend>
+                      {home.image ? (
+                        <div className="relative mb-4 aspect-[16/9] overflow-hidden rounded-sm bg-ink/10">
+                          <Image src={home.image} alt={home.address} fill sizes="(max-width: 1024px) 84vw, 33vw" className="object-cover" />
+                        </div>
+                      ) : null}
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-hibiscus">Home {index + 1}</p>
+                          {home.sourceSlug ? <Link href={`/properties/${home.sourceSlug}`} className="text-xs text-tide underline">View loaded MLS listing</Link> : <p className="text-xs text-ink/50">Manual / off-market entry</p>}
+                        </div>
+                        <button type="button" onClick={() => clearComparisonHome(index)} className="text-xs text-ink/55 underline hover:text-hibiscus">Clear</button>
                       </div>
-                      <button type="button" onClick={() => clearComparisonHome(index)} className="text-xs text-ink/55 underline hover:text-hibiscus">Clear</button>
-                    </div>
-                    <div className="space-y-3">
-                      <ComparisonField label="Address or MLS number" value={home.address} onChange={(value) => updateComparisonHome(index, "address", value)} placeholder="123 Main St or MLS R12345678" />
-                      <div className="grid grid-cols-2 gap-3">
-                        <ComparisonField label="Price" value={home.price} onChange={(value) => updateComparisonHome(index, "price", value)} type="number" prefix="$" step="1" />
-                        <ComparisonField label="Living area" value={home.sqft} onChange={(value) => updateComparisonHome(index, "sqft", value)} type="number" placeholder="Sq. ft." step="1" />
-                        <ComparisonField label="Bedrooms" value={home.beds} onChange={(value) => updateComparisonHome(index, "beds", value)} type="number" step="1" />
-                        <ComparisonField label="Bathrooms" value={home.baths} onChange={(value) => updateComparisonHome(index, "baths", value)} type="number" step="0.5" />
-                        <ComparisonField label="Year built" value={home.yearBuilt} onChange={(value) => updateComparisonHome(index, "yearBuilt", value)} type="number" step="1" />
-                        <ComparisonField label="HOA / month" value={home.hoa} onChange={(value) => updateComparisonHome(index, "hoa", value)} type="number" prefix="$" step="1" />
+                      <div className="space-y-3">
+                        <ComparisonField label="Address or MLS number" value={home.address} onChange={(value) => updateComparisonHome(index, "address", value)} placeholder="123 Main St or MLS R12345678" />
+                        <div className="grid grid-cols-2 gap-3">
+                          <ComparisonField label="Price" value={home.price} onChange={(value) => updateComparisonHome(index, "price", value)} type="number" prefix="$" step="1" />
+                          <ComparisonField label="Living area" value={home.sqft} onChange={(value) => updateComparisonHome(index, "sqft", value)} type="number" placeholder="Sq. ft." step="1" />
+                          <ComparisonField label="Bedrooms" value={home.beds} onChange={(value) => updateComparisonHome(index, "beds", value)} type="number" step="1" />
+                          <ComparisonField label="Bathrooms" value={home.baths} onChange={(value) => updateComparisonHome(index, "baths", value)} type="number" step="0.5" />
+                          <ComparisonField label="Year built" value={home.yearBuilt} onChange={(value) => updateComparisonHome(index, "yearBuilt", value)} type="number" step="1" />
+                          <ComparisonField label="HOA / month" value={home.hoa} onChange={(value) => updateComparisonHome(index, "hoa", value)} type="number" prefix="$" step="1" />
+                        </div>
+                        <ComparisonField label="Notes" value={home.notes} onChange={(value) => updateComparisonHome(index, "notes", value)} placeholder="Pool, waterfront, repairs, deal breakers…" />
                       </div>
-                      <ComparisonField label="Notes" value={home.notes} onChange={(value) => updateComparisonHome(index, "notes", value)} placeholder="Pool, waterfront, repairs, deal breakers…" />
-                    </div>
-                  </fieldset>
-                );
-              })}
+                    </fieldset>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           {enteredHomes.length > 0 ? (
-            <div className="mt-5 overflow-x-auto border border-ink/10 rounded-sm bg-white">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead><tr className="bg-tide text-sand"><th className="text-left p-4 font-medium">Comparison</th>{enteredHomes.map((home) => <th key={home.id} className="text-left p-4 font-medium">{home.address}</th>)}</tr></thead>
-                <tbody className="divide-y divide-ink/10">
-                  {[
-                    ["Price", (home: ComparisonHome) => positiveNumber(home.price) ? money.format(positiveNumber(home.price)) : "Not entered"],
-                    ["Price per sq. ft.", (home: ComparisonHome) => positiveNumber(home.price) && positiveNumber(home.sqft) ? money.format(positiveNumber(home.price) / positiveNumber(home.sqft)) : "Not entered"],
-                    ["Bedrooms / bathrooms", (home: ComparisonHome) => home.beds || home.baths ? `${home.beds || "—"} / ${home.baths || "—"}` : "Not entered"],
-                    ["Living area", (home: ComparisonHome) => positiveNumber(home.sqft) ? `${positiveNumber(home.sqft).toLocaleString()} sq. ft.` : "Not entered"],
-                    ["HOA / month", (home: ComparisonHome) => positiveNumber(home.hoa) ? money.format(positiveNumber(home.hoa)) : "$0 or not entered"],
-                    ["Year built", (home: ComparisonHome) => home.yearBuilt || "Not entered"],
-                    ["Notes", (home: ComparisonHome) => home.notes || "None entered"],
-                  ].map(([label, getValue]) => <tr key={label as string}><th className="text-left p-4 font-medium text-ink/60 bg-keystone/50">{label as string}</th>{enteredHomes.map((home) => <td key={home.id} className="p-4">{(getValue as (item: ComparisonHome) => string)(home)}</td>)}</tr>)}
-                </tbody>
-              </table>
+            <div className="mt-5">
+              <p className="mb-2 text-xs font-medium text-tide lg:hidden">Swipe the table left or right to compare each home across the same row.</p>
+              <div className="overflow-x-auto rounded-sm border border-ink/10 bg-white" tabIndex={0} aria-label="Side-by-side property comparison table">
+                <table className="w-full min-w-max table-fixed text-sm">
+                  <thead><tr className="bg-tide text-sand"><th className="sticky left-0 z-20 w-36 min-w-36 bg-tide p-4 text-left font-medium">Comparison</th>{enteredHomes.map((home) => <th key={home.id} className="w-64 min-w-64 p-4 text-left font-medium">{home.address}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-ink/10">
+                    {[
+                      ["Price", (home: ComparisonHome) => positiveNumber(home.price) ? money.format(positiveNumber(home.price)) : "Not entered"],
+                      ["Price per sq. ft.", (home: ComparisonHome) => positiveNumber(home.price) && positiveNumber(home.sqft) ? money.format(positiveNumber(home.price) / positiveNumber(home.sqft)) : "Not entered"],
+                      ["Bedrooms / bathrooms", (home: ComparisonHome) => home.beds || home.baths ? `${home.beds || "—"} / ${home.baths || "—"}` : "Not entered"],
+                      ["Living area", (home: ComparisonHome) => positiveNumber(home.sqft) ? `${positiveNumber(home.sqft).toLocaleString()} sq. ft.` : "Not entered"],
+                      ["HOA / month", (home: ComparisonHome) => positiveNumber(home.hoa) ? money.format(positiveNumber(home.hoa)) : "$0 or not entered"],
+                      ["Year built", (home: ComparisonHome) => home.yearBuilt || "Not entered"],
+                      ["Notes", (home: ComparisonHome) => home.notes || "None entered"],
+                    ].map(([label, getValue]) => <tr key={label as string}><th className="sticky left-0 z-10 w-36 min-w-36 bg-keystone p-4 text-left font-medium text-ink/60">{label as string}</th>{enteredHomes.map((home) => <td key={home.id} className="w-64 min-w-64 p-4 align-top">{(getValue as (item: ComparisonHome) => string)(home)}</td>)}</tr>)}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="mt-5 p-8 border border-dashed border-ink/20 text-center text-ink/55">

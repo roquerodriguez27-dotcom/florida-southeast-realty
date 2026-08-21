@@ -80,6 +80,43 @@ select:focus-visible {
   border-radius: 2px;
 }
 
+input.price-field-input:focus-visible {
+  outline: none;
+}
+
+.price-field:focus-within {
+  border-color: var(--color-tide);
+}
+
+.listing-map-marker {
+  background: transparent;
+  border: 0;
+}
+
+.listing-map-marker span {
+  display: block;
+  width: max-content;
+  max-width: 86px;
+  overflow: hidden;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(247, 245, 238, 0.8);
+  border-radius: 999px;
+  background: var(--color-tide);
+  color: var(--color-sand);
+  box-shadow: 0 4px 14px rgba(14, 43, 48, 0.28);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaflet-container {
+  z-index: 0;
+  font-family: var(--font-sans);
+}
+
 /* iOS Safari auto-zooms focused controls below 16px. Keep mobile forms at 16px. */
 @media (max-width: 767px) {
   input,

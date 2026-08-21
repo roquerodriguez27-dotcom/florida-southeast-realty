@@ -53,6 +53,8 @@ export interface Listing {
   seniorCommunity?: boolean;
   fireplace?: boolean;
   propertyType: PropertyType;
+  /** True when the MLS broad property type identifies a lease or rental listing. */
+  forLease?: boolean;
   images: string[];
   description: string;
   features: string[];

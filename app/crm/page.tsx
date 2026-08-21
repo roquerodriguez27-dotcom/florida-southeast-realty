@@ -3,7 +3,7 @@ import { requireCrmUser } from "@/lib/crm/auth";
 import { CRM_STATUSES, type CrmLead, type CrmUser } from "@/lib/crm/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export const metadata = { title: "Broker CRM | Florida Southeast Realty", robots: { index: false, follow: false } };
+export const metadata = { title: "Broker CRM", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 interface Activity { id: number; lead_id: number; kind: string; body: string; created_at: string }

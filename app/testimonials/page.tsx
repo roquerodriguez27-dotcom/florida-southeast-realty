@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CLIENT_REVIEWS } from "@/lib/testimonials";
 
 export const metadata: Metadata = {
-  title: "Client Reviews | Florida Southeast Realty",
+  title: "Client Reviews",
   description:
     "Read verified client comments about working with Roque Rodriguez and Florida Southeast Realty on real estate transactions and searches.",
   alternates: { canonical: "/testimonials" },

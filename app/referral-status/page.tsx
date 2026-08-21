@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SITE } from "@/lib/site-config";
 
 export const metadata: Metadata = {
-  title: "Florida Real Estate Referral Status | Florida Southeast Realty",
+  title: "Florida Real Estate Referral Status",
   description:
     "Florida real estate licensees interested in a referral-only relationship can contact Florida Southeast Realty to discuss current availability, requirements, fees, and referral terms.",
   alternates: { canonical: "/referral-status" },

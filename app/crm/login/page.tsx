@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { sendLoginLink } from "./actions";
 
-export const metadata = { title: "CRM Login | Florida Southeast Realty", robots: { index: false, follow: false } };
+export const metadata = { title: "CRM Login", robots: { index: false, follow: false } };
 
 function errorMessage(error: string | string[] | undefined) {
   const code = Array.isArray(error) ? error[0] : error;

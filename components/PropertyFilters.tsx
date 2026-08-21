@@ -20,6 +20,7 @@ export default function PropertyFilters({
 }) {
   return (
     <form
+      key={JSON.stringify(current)}
       action="/properties"
       method="get"
       className="bg-white border border-ink/10 rounded-sm p-4 md:p-5 grid grid-cols-2 md:grid-cols-6 gap-3 items-end"

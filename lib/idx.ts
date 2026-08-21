@@ -570,6 +570,11 @@ function contains(field: string, value: string): string {
   return `contains(${field},${odataString(value)})`;
 }
 
+function postalCode(value: string): string | null {
+  const trimmed = value.trim();
+  return /^(?:33|34)\d{3}(?:-\d{4})?$/.test(trimmed) ? trimmed.slice(0, 5) : null;
+}
+
 const STREET_SUFFIXES = new Set([
   "avenue", "ave", "boulevard", "blvd", "circle", "cir", "court", "ct",
   "drive", "dr", "highway", "hwy", "lane", "ln", "loop", "parkway", "pkwy",
@@ -598,6 +603,9 @@ function streetAddressTokens(value: string): string[] | null {
 }
 
 function locationSearchCondition(value: string): string {
+  const exactPostalCode = postalCode(value);
+  if (exactPostalCode) return `PostalCode eq ${odataString(exactPostalCode)}`;
+
   const addressTokens = streetAddressTokens(value);
   if (addressTokens) {
     return `(${addressTokens.map((token) => contains("UnparsedAddress", token)).join(" and ")})`;
@@ -608,6 +616,9 @@ function locationSearchCondition(value: string): string {
 }
 
 function areaSearchCondition(value: string): string {
+  const exactPostalCode = postalCode(value);
+  if (exactPostalCode) return `PostalCode eq ${odataString(exactPostalCode)}`;
+
   const fields = ["City", "PostalCode", "SubdivisionName"];
   // Keep the individual area terms ungrouped so the combined multi-area
   // expression stays within FBS RESO's two-level nesting limit.

@@ -15,7 +15,7 @@ const SEARCH_PROPERTY_TYPES = [
 
 export const propertySearchIntentSchema = z.object({
   locations: z.array(z.string().min(1).max(100)).max(MAX_SEARCH_LOCATIONS)
-    .describe("South Florida city or community names explicitly requested by the shopper."),
+    .describe("South Florida city names, community names, or five-digit ZIP codes explicitly requested by the shopper."),
   minPrice: z.number().nonnegative().nullable()
     .describe("Minimum whole-dollar listing price, or null when none was requested."),
   maxPrice: z.number().nonnegative().nullable()
@@ -51,6 +51,7 @@ export const propertySearchIntentSchema = z.object({
 export type PropertySearchIntent = z.infer<typeof propertySearchIntentSchema>;
 
 const PRICE_PATTERN = String.raw`\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:million|thousand|m|k)?`;
+const SOUTH_FLORIDA_POSTAL_CODE = /^(?:33|34)\d{3}(?:-\d{4})?$/;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -81,11 +82,12 @@ function followedByLivingAreaUnit(prompt: string, match: RegExpMatchArray): bool
 function uniqueLocations(values: string[]): string[] {
   const output: string[] = [];
   for (const value of values) {
-    const cleaned = value
+    let cleaned = value
       .replace(/\b(?:Florida|FL)\b\.?/gi, "")
       .replace(/\s+/g, " ")
       .replace(/^[\s,.-]+|[\s,.-]+$/g, "")
       .slice(0, 100);
+    if (SOUTH_FLORIDA_POSTAL_CODE.test(cleaned)) cleaned = cleaned.slice(0, 5);
     if (!cleaned || /^(?:south|southeast|coastal|downtown)$/i.test(cleaned)) continue;
     if (!output.some((current) => current.toLowerCase() === cleaned.toLowerCase())) output.push(cleaned);
     if (output.length === MAX_SEARCH_LOCATIONS) break;
@@ -105,6 +107,13 @@ function extractLocations(prompt: string): string[] {
       if (matches.some((current) => index < current.end && end > current.index)) continue;
       matches.push({ index, end, value: location });
     }
+  }
+
+  for (const match of prompt.matchAll(/\b(?:33|34)\d{3}(?:-\d{4})?\b/g)) {
+    const index = match.index ?? 0;
+    const end = index + match[0].length;
+    if (matches.some((current) => index < current.end && end > current.index)) continue;
+    matches.push({ index, end, value: match[0].slice(0, 5) });
   }
 
   if (matches.length > 0) {

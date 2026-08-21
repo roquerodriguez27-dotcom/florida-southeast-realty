@@ -91,19 +91,6 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
     );
   }
 
-  if (status === "not_configured") {
-    return (
-      <div className="bg-brass/10 border border-brass/30 rounded-sm p-8 text-center" role="status">
-        <p className="font-display text-2xl text-tide">Please contact us directly.</p>
-        <p className="text-sm text-ink/70 mt-2 max-w-md mx-auto">
-          Online delivery is not connected in this environment, so your form was not sent. Call{" "}
-          <a href={SITE.phoneHref} className="text-tide underline">{SITE.phoneDisplay}</a> or email{" "}
-          <a href={`mailto:${SITE.email}`} className="text-tide underline">{SITE.email}</a>.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <form onSubmit={handleSubmit} className="bg-white border border-ink/10 rounded-sm p-6 md:p-8 space-y-4" noValidate>
       <div className="hidden" aria-hidden="true">
@@ -175,10 +162,15 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
       </label>
 
       {validationError && <p className="text-sm text-hibiscus" role="alert">{validationError}</p>}
-      {status === "error" && (
-        <p className="text-sm text-hibiscus" role="alert">
-          Something went wrong sending this. Please call <a href={SITE.phoneHref} className="underline">{SITE.phoneDisplay}</a> instead.
-        </p>
+      {(status === "not_configured" || status === "error") && (
+        <div className="rounded-sm border border-hibiscus/25 bg-hibiscus/5 p-3 text-sm text-ink/75" role="alert">
+          <p className="font-medium text-hibiscus">We couldn&apos;t send this online.</p>
+          <p className="mt-1">
+            Your answers are still here, so you can try again—or call/text{" "}
+            <a href={SITE.phoneHref} className="font-medium text-tide underline">{SITE.phoneDisplay}</a> or email{" "}
+            <a href={`mailto:${SITE.email}`} className="font-medium text-tide underline">{SITE.email}</a>.
+          </p>
+        </div>
       )}
 
       <button
@@ -186,7 +178,11 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
         disabled={status === "submitting"}
         className="w-full bg-hibiscus hover:bg-hibiscus-dark disabled:opacity-60 text-sand font-medium text-sm rounded-sm px-4 py-3 transition-colors"
       >
-        {status === "submitting" ? "Sending…" : submitLabel}
+        {status === "submitting"
+          ? "Sending…"
+          : status === "not_configured" || status === "error"
+            ? "Try Sending Again"
+            : submitLabel}
       </button>
     </form>
   );

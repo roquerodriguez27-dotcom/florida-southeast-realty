@@ -1,4 +1,5 @@
 import MultiLocationField from "@/components/MultiLocationField";
+import type { ListingFilters } from "@/lib/types";
 
 export default function PropertyFilters({
   current,
@@ -11,6 +12,9 @@ export default function PropertyFilters({
     beds?: string;
     type?: string;
     waterfront?: string;
+    pool?: string;
+    bounds?: NonNullable<ListingFilters["bounds"]>;
+    view?: "map";
   };
 }) {
   return (
@@ -19,6 +23,15 @@ export default function PropertyFilters({
       method="get"
       className="bg-white border border-ink/10 rounded-sm p-4 md:p-5 grid grid-cols-2 md:grid-cols-6 gap-3 items-end"
     >
+      {current.bounds ? (
+        <>
+          <input type="hidden" name="north" value={current.bounds.north} />
+          <input type="hidden" name="south" value={current.bounds.south} />
+          <input type="hidden" name="east" value={current.bounds.east} />
+          <input type="hidden" name="west" value={current.bounds.west} />
+        </>
+      ) : null}
+      {current.view ? <input type="hidden" name="view" value={current.view} /> : null}
       <div className="col-span-2 md:col-span-3">
         <label htmlFor="f-location" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Cities / communities
@@ -44,7 +57,7 @@ export default function PropertyFilters({
         <label htmlFor="f-min" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Min Price
         </label>
-        <div className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+        <div className="price-field flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
           <span className="pl-2.5 text-ink/45">$</span>
           <input
             id="f-min"
@@ -56,7 +69,7 @@ export default function PropertyFilters({
             inputMode="numeric"
             placeholder="Any"
             autoComplete="off"
-            className="w-full min-w-0 bg-transparent px-2 py-2 text-sm outline-none"
+            className="price-field-input w-full min-w-0 bg-transparent px-2 py-2 text-sm outline-none"
           />
         </div>
       </div>
@@ -65,7 +78,7 @@ export default function PropertyFilters({
         <label htmlFor="f-max" className="block text-[11px] font-mono uppercase tracking-wide text-ink/50 mb-1">
           Max Price
         </label>
-        <div className="flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
+        <div className="price-field flex items-center border border-ink/15 rounded-sm bg-white focus-within:border-tide">
           <span className="pl-2.5 text-ink/45">$</span>
           <input
             id="f-max"
@@ -77,7 +90,7 @@ export default function PropertyFilters({
             inputMode="numeric"
             placeholder="Any"
             autoComplete="off"
-            className="w-full min-w-0 bg-transparent px-2 py-2 text-sm outline-none"
+            className="price-field-input w-full min-w-0 bg-transparent px-2 py-2 text-sm outline-none"
           />
         </div>
       </div>
@@ -117,6 +130,17 @@ export default function PropertyFilters({
           className="h-4 w-4 accent-hibiscus"
         />
         Waterfront only
+      </label>
+
+      <label className="col-span-2 md:col-span-2 flex items-center gap-2 text-sm text-ink/70 py-2">
+        <input
+          type="checkbox"
+          name="pool"
+          value="1"
+          defaultChecked={current.pool === "1"}
+          className="h-4 w-4 accent-hibiscus"
+        />
+        Private pool only
       </label>
 
       <button

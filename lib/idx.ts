@@ -312,10 +312,20 @@ function isWaterfront(record: JsonObject): boolean {
   return Boolean(features && !["no", "none", "false"].includes(features));
 }
 
-function listingFeatures(record: JsonObject, propertyType: PropertyType, waterfront: boolean): string[] {
+function hasPrivatePool(record: JsonObject): boolean {
+  return truthy(record.PoolPrivateYN);
+}
+
+function listingFeatures(
+  record: JsonObject,
+  propertyType: PropertyType,
+  waterfront: boolean,
+  privatePool: boolean,
+): string[] {
   const values = [
     propertyType,
     ...(waterfront ? ["Waterfront"] : []),
+    ...(privatePool ? ["Private pool"] : []),
     ...flattenStrings(record.InteriorFeatures),
     ...flattenStrings(record.ExteriorFeatures),
     ...flattenStrings(record.CommunityFeatures),
@@ -400,6 +410,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     firstString(record, ["PropertyType"]),
   );
   const waterfront = isWaterfront(record);
+  const privatePool = hasPrivatePool(record);
   const photos = photoUrls(record);
   const fullBaths = firstNumber(record, ["BathroomsFull", "BathsFull"]);
   const halfBaths = firstNumber(record, ["BathroomsHalf", "BathsHalf"]);
@@ -428,12 +439,13 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     lotSqft: firstNumber(record, ["LotSizeSquareFeet", "LotSqFt"]) || undefined,
     yearBuilt: firstNumber(record, ["YearBuilt"]),
     waterfront,
+    privatePool,
     propertyType,
     images: photos.length ? photos : ["/property-placeholder.svg"],
     description:
       firstString(record, ["PublicRemarks", "Remarks"]) ||
       "Contact Florida Southeast Realty for current property details.",
-    features: listingFeatures(record, propertyType, waterfront),
+    features: listingFeatures(record, propertyType, waterfront, privatePool),
     lat: firstNumber(record, ["Latitude", "Lat"]),
     lng: firstNumber(record, ["Longitude", "Lng", "Lon"]),
     mileMarker: 0,
@@ -546,6 +558,7 @@ function buildResoFilter(filters: ListingFilters): string {
     conditions.push(`BedroomsTotal ge ${Number(filters.beds)}`);
   }
   if (filters.waterfrontOnly) conditions.push("WaterfrontYN eq true");
+  if (filters.privatePoolOnly) conditions.push("PoolPrivateYN eq true");
 
   if (filters.propertyType) {
     const values: Partial<Record<PropertyType, string[]>> = {
@@ -566,6 +579,16 @@ function buildResoFilter(filters: ListingFilters): string {
   if (filters.community) {
     const value = communityName(filters.community).slice(0, 100);
     conditions.push(`(${contains("City", value)} or ${contains("SubdivisionName", value)})`);
+  }
+
+  if (filters.bounds) {
+    const { north, south, east, west } = filters.bounds;
+    if ([north, south, east, west].every(Number.isFinite)) {
+      conditions.push(`Latitude ge ${south}`);
+      conditions.push(`Latitude le ${north}`);
+      conditions.push(`Longitude ge ${west}`);
+      conditions.push(`Longitude le ${east}`);
+    }
   }
 
   return conditions.join(" and ");
@@ -619,9 +642,21 @@ export async function fetchLiveListingBySlug(slug: string): Promise<Listing | nu
   if (!listingKey) return null;
 
   const escapedKey = listingKey.replace(/'/g, "''");
-  const payload = await resoRequest(`Property('${escapedKey}')`, {
-    "$expand": "Media($top=24;$orderby=Order)",
-  });
+  let payload: ResoPayload;
+  try {
+    payload = await resoRequest(`Property('${escapedKey}')`, {
+      "$expand": "Media($top=24;$orderby=Order)",
+    }, 300, false);
+  } catch {
+    // A listing can move between provider partitions while the cached search
+    // result is still visible. Retrying through the collection endpoint keeps
+    // a valid card from becoming a transient 404.
+    payload = await resoRequest("Property", {
+      "$filter": `OriginatingSystemID eq ${odataString(getOriginatingSystemId())} and (ListingKey eq ${odataString(listingKey)} or ListingId eq ${odataString(listingKey)})`,
+      "$expand": "Media($top=24;$orderby=Order)",
+      "$top": 1,
+    });
+  }
   return normalizeListing(payload.value[0], "Detail");
 }
 

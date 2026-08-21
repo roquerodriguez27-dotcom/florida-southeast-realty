@@ -421,10 +421,10 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     firstString(record, ["UnitNumber"]),
   ].filter(Boolean).join(" ") || `MLS listing ${firstString(record, ["ListingId"]) || listingKey}`;
   const community = firstString(record, ["SubdivisionName", "Neighborhood"]) || city;
-  const propertyType = normalizePropertyType(
-    firstString(record, ["PropertySubType"]),
-    firstString(record, ["PropertyType"]),
-  );
+  const propertySubType = firstString(record, ["PropertySubType"]);
+  const broadPropertyType = firstString(record, ["PropertyType"]);
+  const propertyType = normalizePropertyType(propertySubType, broadPropertyType);
+  const forLease = /\b(?:lease|rental)\b/i.test(`${broadPropertyType} ${propertySubType}`);
   const waterfront = isWaterfront(record);
   const privatePool = hasPrivatePool(record);
   const garageSpaces = firstNumber(record, ["GarageSpaces"]);
@@ -465,6 +465,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     seniorCommunity,
     fireplace,
     propertyType,
+    forLease,
     images: photos.length ? photos : ["/property-placeholder.svg"],
     description:
       firstString(record, ["PublicRemarks", "Remarks"]) ||
@@ -630,6 +631,8 @@ function buildResoFilter(filters: ListingFilters): string {
   const conditions = [
     `OriginatingSystemID eq ${odataString(getOriginatingSystemId())}`,
     "(StandardStatus eq 'Active' or StandardStatus eq 'Coming Soon' or StandardStatus eq 'Active Under Contract')",
+    "PropertyType ne 'Residential Lease'",
+    "PropertyType ne 'Commercial Lease'",
   ];
 
   if (filters.q?.trim()) {
@@ -733,6 +736,7 @@ export async function fetchLiveListingPage(
   const listings = payload.value
     .map((record) => normalizeListing(record, "Summary"))
     .filter((listing): listing is Listing => Boolean(listing))
+    .filter((listing) => !listing.forLease)
     .filter((listing) => !filters.privatePoolOnly || listing.privatePool)
     .filter((listing) => !filters.baths || listing.baths >= filters.baths)
     .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon))

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import MultiLocationField from "@/components/MultiLocationField";
 import type { ListingAmenity, ListingFilters, ListingSort } from "@/lib/types";
+
+type QuickFilterId = "price" | "beds-baths" | "home-type";
 
 interface CurrentFilters {
   locations: string[];
@@ -51,17 +53,71 @@ function compactPrice(value?: string) {
   return `$${amount.toLocaleString()}`;
 }
 
-function FilterMenu({ label, value, children }: { label: string; value?: string; children: ReactNode }) {
+function FilterMenu({
+  id,
+  label,
+  value,
+  open,
+  onToggle,
+  onClose,
+  children,
+}: {
+  id: QuickFilterId;
+  label: string;
+  value?: string;
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelId = `property-filter-${id}`;
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) onClose();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      onClose();
+      buttonRef.current?.focus();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
+
   return (
-    <details className="group relative">
-      <summary className={`flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm border px-3 py-2 text-sm font-medium transition-colors [&::-webkit-details-marker]:hidden ${value ? "border-tide bg-tide/5 text-tide" : "border-ink/15 bg-white text-ink/75 hover:border-tide/30"}`}>
+    <div ref={rootRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={onToggle}
+        className={`flex min-h-11 items-center gap-2 rounded-sm border px-3 py-2 text-sm font-medium transition-colors ${value ? "border-tide bg-tide/5 text-tide" : "border-ink/15 bg-white text-ink/75 hover:border-tide/30"}`}
+      >
         <span>{value || label}</span>
-        <span aria-hidden className="text-xs opacity-50 transition-transform group-open:rotate-180">⌄</span>
-      </summary>
-      <div className="absolute left-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-sm border border-ink/10 bg-white p-4 shadow-xl sm:left-auto sm:right-0">
+        <span aria-hidden className={`text-xs opacity-50 transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
+      </button>
+      <div
+        id={panelId}
+        role="group"
+        aria-label={`${label} filters`}
+        hidden={!open}
+        className="absolute left-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-sm border border-ink/10 bg-white p-4 shadow-xl sm:left-auto sm:right-0"
+      >
         {children}
       </div>
-    </details>
+    </div>
   );
 }
 
@@ -197,9 +253,20 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
     current.maxDom,
   ].filter(Boolean).length;
   const [showMore, setShowMore] = useState(advancedCount > 0);
+  const [openQuickFilter, setOpenQuickFilter] = useState<QuickFilterId | null>(null);
   const priceLabel = [compactPrice(current.minPrice), compactPrice(current.maxPrice)].filter(Boolean).join(" – ");
   const bedBathLabel = [current.beds ? `${current.beds}+ bd` : "", current.baths ? `${current.baths}+ ba` : ""].filter(Boolean).join(" · ");
   const garageSpaces = current.garageSpaces || (current.garage === "1" ? "1" : "");
+  const closeQuickFilter = useCallback(() => setOpenQuickFilter(null), []);
+  const toggleQuickFilter = useCallback((filter: QuickFilterId) => {
+    setShowMore(false);
+    setOpenQuickFilter((open) => open === filter ? null : filter);
+  }, []);
+
+  function toggleMoreFilters() {
+    closeQuickFilter();
+    setShowMore((open) => !open);
+  }
 
   return (
     <form
@@ -227,7 +294,14 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
         </div>
 
         <div className="flex flex-wrap items-center gap-2 xl:pb-[1px]">
-          <FilterMenu label="Price" value={priceLabel}>
+          <FilterMenu
+            id="price"
+            label="Price"
+            value={priceLabel}
+            open={openQuickFilter === "price"}
+            onToggle={() => toggleQuickFilter("price")}
+            onClose={closeQuickFilter}
+          >
             <p className="mb-3 text-sm font-semibold text-ink">Price range</p>
             <div className="grid grid-cols-2 gap-3">
               <NumberField id="f-min" name="minPrice" label="Minimum" value={current.minPrice} placeholder="Any" />
@@ -235,7 +309,14 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
             </div>
           </FilterMenu>
 
-          <FilterMenu label="Beds & baths" value={bedBathLabel}>
+          <FilterMenu
+            id="beds-baths"
+            label="Beds & baths"
+            value={bedBathLabel}
+            open={openQuickFilter === "beds-baths"}
+            onToggle={() => toggleQuickFilter("beds-baths")}
+            onClose={closeQuickFilter}
+          >
             <div className="grid grid-cols-2 gap-3">
               <label className="text-xs font-medium text-ink/60" htmlFor="f-beds">Bedrooms
                 <select id="f-beds" name="beds" defaultValue={current.beds ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
@@ -250,16 +331,23 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
             </div>
           </FilterMenu>
 
-          <FilterMenu label="Home type" value={current.type}>
+          <FilterMenu
+            id="home-type"
+            label="Home type"
+            value={current.type}
+            open={openQuickFilter === "home-type"}
+            onToggle={() => toggleQuickFilter("home-type")}
+            onClose={closeQuickFilter}
+          >
             <label className="text-xs font-medium text-ink/60" htmlFor="f-type">Property type
-              <select id="f-type" name="type" defaultValue={current.type ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
+              <select id="f-type" name="type" defaultValue={current.type ?? ""} onChange={closeQuickFilter} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
                 <option value="">Any home type</option>
                 <option value="Single Family">Single Family</option><option value="Condo">Condo</option><option value="Townhome">Townhome</option><option value="Estate">Estate</option><option value="Multi-Family">Multi-Family</option><option value="Land">Land</option><option value="Commercial">Commercial</option>
               </select>
             </label>
           </FilterMenu>
 
-          <button type="button" aria-expanded={showMore} onClick={() => setShowMore((open) => !open)} className={`min-h-11 rounded-sm border px-3 py-2 text-sm font-medium ${showMore || advancedCount ? "border-tide bg-tide/5 text-tide" : "border-ink/15 bg-white text-ink/75 hover:border-tide/30"}`}>
+          <button type="button" aria-expanded={showMore} onClick={toggleMoreFilters} className={`min-h-11 rounded-sm border px-3 py-2 text-sm font-medium ${showMore || advancedCount ? "border-tide bg-tide/5 text-tide" : "border-ink/15 bg-white text-ink/75 hover:border-tide/30"}`}>
             More filters{advancedCount ? ` (${advancedCount})` : ""}
           </button>
           <button type="submit" className="min-h-11 rounded-sm bg-hibiscus px-5 py-2 text-sm font-semibold text-sand transition-colors hover:bg-hibiscus-dark">Search homes</button>

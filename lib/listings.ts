@@ -29,6 +29,8 @@ export const LISTINGS: Listing[] = [
     yearBuilt: 2021,
     waterfront: true,
     privatePool: true,
+    seniorCommunity: false,
+    association: false,
     propertyType: "Estate",
     images: [img("photo-1613977257363-707ba9348227"), img("photo-1600596542815-ffad4c1539a9"), img("photo-1600607687939-ce8a6c25118c")],
     description: "Demonstration listing used to test the design before the live MLS feed is connected.",
@@ -55,6 +57,8 @@ export const LISTINGS: Listing[] = [
     yearBuilt: 2019,
     waterfront: true,
     privatePool: false,
+    seniorCommunity: false,
+    association: true,
     propertyType: "Condo",
     images: [img("photo-1512917774080-9991f1c4c750"), img("photo-1512918728675-ed5a9ecdebfd"), img("photo-1502672260266-1c1ef2d93688")],
     description: "Demonstration listing used to test search, cards, and property-page layouts before live IDX activation.",
@@ -82,6 +86,8 @@ export const LISTINGS: Listing[] = [
     yearBuilt: 1962,
     waterfront: false,
     privatePool: false,
+    seniorCommunity: false,
+    association: false,
     propertyType: "Single Family",
     images: [img("photo-1568605114967-8130f3a36994"), img("photo-1600585154340-be6161a56a0c"), img("photo-1600566753086-00f18fb6b3ea")],
     description: "Demonstration listing used to test the preview experience before live IDX activation.",
@@ -110,6 +116,8 @@ export const LISTINGS: Listing[] = [
     yearBuilt: 2016,
     waterfront: false,
     privatePool: true,
+    seniorCommunity: true,
+    association: true,
     propertyType: "Single Family",
     images: [img("photo-1600047509807-ba8f99d2cdde"), img("photo-1600210492486-724fe5c67fb0"), img("photo-1600585152915-d208bec867a1")],
     description: "Demonstration listing used to test the Boca Raton search experience before live MLS data is connected.",
@@ -196,7 +204,8 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.fireplaceOnly && l.fireplace !== true) return false;
     if (filters.amenities?.some((amenity) => !l.amenities?.includes(amenity))) return false;
     if (filters.seniorCommunityMode === "only" && l.seniorCommunity !== true) return false;
-    if (filters.seniorCommunityMode === "exclude" && l.seniorCommunity === true) return false;
+    if (filters.seniorCommunityMode === "exclude" && l.seniorCommunity !== false) return false;
+    if (filters.noHoaOnly && l.association !== false) return false;
     if (filters.maxDaysOnMarket && l.daysOnMarket > filters.maxDaysOnMarket) return false;
     if (filters.community && l.communitySlug !== filters.community) return false;
     if (filters.bounds) {

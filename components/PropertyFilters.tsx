@@ -28,6 +28,7 @@ interface CurrentFilters {
   garageSpaces?: string;
   newConstruction?: string;
   senior?: string;
+  noHoa?: string;
   fireplace?: string;
   amenities: ListingAmenity[];
   maxDom?: string;
@@ -88,6 +89,29 @@ function Amenity({ name, label, checked, value = "1" }: { name: string; label: s
   );
 }
 
+function SeniorCommunityOption({
+  value,
+  label,
+  checked,
+}: {
+  value: "" | "only" | "exclude";
+  label: string;
+  checked: boolean;
+}) {
+  return (
+    <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-sm border border-ink/10 bg-white px-3 py-2 text-sm text-ink/75 hover:border-tide/25">
+      <input
+        type="radio"
+        name="senior"
+        value={value}
+        defaultChecked={checked}
+        className="h-4 w-4 accent-hibiscus"
+      />
+      {label}
+    </label>
+  );
+}
+
 function basicFiltersHref(current: CurrentFilters): string {
   const query = new URLSearchParams();
   for (const location of current.locations) query.append("location", location);
@@ -127,6 +151,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
     current.garageSpaces || current.garage,
     current.newConstruction,
     current.senior,
+    current.noHoa,
     current.fireplace,
     ...current.amenities,
     current.maxDom,
@@ -231,11 +256,6 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
                     <option value="">Any</option><option value="1">Listed today</option><option value="7">7 days or less</option><option value="14">14 days or less</option><option value="30">30 days or less</option><option value="60">60 days or less</option><option value="90">90 days or less</option>
                   </select>
                 </label>
-                <label className="text-xs font-medium text-ink/60" htmlFor="f-senior">55+ communities
-                  <select id="f-senior" name="senior" defaultValue={current.senior ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
-                    <option value="">Include all</option><option value="exclude">Exclude 55+</option><option value="only">55+ only</option>
-                  </select>
-                </label>
               </div>
             </section>
 
@@ -257,7 +277,21 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
             </section>
 
             <section className="p-4 md:p-5">
-              <h3 className="text-sm font-semibold text-ink">Property features</h3>
+              <h3 className="text-sm font-semibold text-ink">Community preferences</h3>
+              <fieldset className="mt-3">
+                <legend className="text-xs font-medium text-ink/60">55+ communities</legend>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                  <SeniorCommunityOption value="" label="No preference" checked={!current.senior} />
+                  <SeniorCommunityOption value="only" label="55+ only" checked={current.senior === "only"} />
+                  <SeniorCommunityOption value="exclude" label="Exclude 55+" checked={current.senior === "exclude"} />
+                </div>
+              </fieldset>
+              <div className="mt-2">
+                <Amenity name="noHoa" label="No HOA / association" checked={current.noHoa === "1"} />
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-ink/50">“No HOA” includes only listings explicitly marked as having no association in BeachesMLS.</p>
+
+              <h3 className="mt-6 text-sm font-semibold text-ink">Property features</h3>
               <p className="mt-1 text-xs text-ink/50">Matched against fields supplied by BeachesMLS.</p>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <Amenity name="pool" label="Private pool" checked={current.pool === "1"} />

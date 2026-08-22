@@ -67,6 +67,8 @@ export interface Listing {
   garageSpaces?: number;
   newConstruction?: boolean;
   seniorCommunity?: boolean;
+  /** Whether the MLS explicitly identifies a homeowner association. */
+  association?: boolean;
   fireplace?: boolean;
   /** Normalized amenity tags derived from MLS property and association fields. */
   amenities?: ListingAmenity[];
@@ -107,6 +109,7 @@ export interface ListingFilters {
   minGarageSpaces?: number;
   newConstructionOnly?: boolean;
   seniorCommunityMode?: "exclude" | "only";
+  noHoaOnly?: boolean;
   fireplaceOnly?: boolean;
   amenities?: ListingAmenity[];
   maxDaysOnMarket?: number;

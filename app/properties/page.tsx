@@ -45,6 +45,7 @@ interface Props {
     garageSpaces?: string;
     newConstruction?: string;
     senior?: string;
+    noHoa?: string;
     fireplace?: string;
     amenity?: string | string[];
     maxDom?: string;
@@ -200,6 +201,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
   const minGarageSpaces = Math.max(optionalPositiveInteger(params.garageSpaces) ?? 0, params.garage === "1" ? 1 : 0) || undefined;
   const maxDaysOnMarket = optionalPositiveInteger(params.maxDom);
   const selectedSeniorCommunityMode = seniorCommunityMode(params.senior);
+  const noHoaOnly = params.noHoa === "1";
   const selectedListingStatus = listingStatusMode(params.listingStatus);
   const selectedAmenities = listingAmenities(params.amenity);
 
@@ -224,6 +226,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
     minGarageSpaces,
     newConstructionOnly: params.newConstruction === "1",
     seniorCommunityMode: selectedSeniorCommunityMode,
+    noHoaOnly,
     fireplaceOnly: params.fireplace === "1",
     amenities: selectedAmenities,
     maxDaysOnMarket,
@@ -239,6 +242,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
       || params.minYearBuilt || params.maxYearBuilt || selectedListingStatus || params.type
       || params.waterfront === "1" || params.pool === "1" || params.garage === "1"
       || params.garageSpaces || params.newConstruction === "1" || selectedSeniorCommunityMode
+      || noHoaOnly
       || params.fireplace === "1" || selectedAmenities.length > 0 || params.maxDom
       || params.newer === "1" || params.spacious === "1" || params.largeLot === "1" || bounds,
   );
@@ -305,7 +309,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
           garage: params.garage,
           garageSpaces: params.garageSpaces,
           newConstruction: params.newConstruction,
-          senior: params.senior,
+          senior: selectedSeniorCommunityMode,
+          noHoa: noHoaOnly ? "1" : undefined,
           fireplace: params.fireplace,
           amenities: selectedAmenities,
           maxDom: params.maxDom,
@@ -335,6 +340,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
           minGarageSpaces: minGarageSpaces ? String(minGarageSpaces) : undefined,
           newConstructionOnly: params.newConstruction === "1",
           seniorCommunity: selectedSeniorCommunityMode,
+          noHoaOnly,
           fireplaceOnly: params.fireplace === "1",
           amenities: selectedAmenities.length > 0 ? selectedAmenities.join(", ") : undefined,
           maxDaysOnMarket: maxDaysOnMarket ? String(maxDaysOnMarket) : undefined,

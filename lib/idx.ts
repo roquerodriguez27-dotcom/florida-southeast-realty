@@ -84,10 +84,20 @@ function firstNumber(object: JsonObject, keys: string[]): number {
   return 0;
 }
 
-function truthy(value: unknown): boolean {
+function booleanValue(value: unknown): boolean | undefined {
   if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "string") return ["true", "yes", "y", "1"].includes(value.toLowerCase());
+  if (typeof value === "number" && Number.isFinite(value)) return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "y", "1"].includes(normalized)) return true;
+    if (["false", "no", "n", "0"].includes(normalized)) return false;
+  }
+  return undefined;
+}
+
+function truthy(value: unknown): boolean {
+  const boolean = booleanValue(value);
+  if (boolean !== undefined) return boolean;
   return Array.isArray(value) && value.length > 0;
 }
 
@@ -536,7 +546,8 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
   // BeachesMLS exposes NewConstructionYN but does not consistently populate it
   // in replication records. A current-year build is the reliable live fallback.
   const newConstruction = truthy(record.NewConstructionYN) || yearBuilt >= CURRENT_YEAR;
-  const seniorCommunity = truthy(record.SeniorCommunityYN);
+  const seniorCommunity = booleanValue(record.SeniorCommunityYN);
+  const association = booleanValue(record.AssociationYN);
   const fireplace = truthy(record.FireplaceYN);
   const amenities = listingAmenities(record);
   const photos = photoUrls(record);
@@ -571,6 +582,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     garageSpaces: garageSpaces || undefined,
     newConstruction,
     seniorCommunity,
+    association,
     fireplace,
     amenities,
     propertyType,
@@ -586,7 +598,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
       privatePool,
       garageSpaces,
       newConstruction,
-      seniorCommunity,
+      seniorCommunity === true,
       fireplace,
     ),
     lat: firstNumber(record, ["Latitude", "Lat"]),
@@ -775,7 +787,8 @@ function buildResoFilter(filters: ListingFilters): string {
   if (filters.newConstructionOnly) conditions.push(`YearBuilt ge ${CURRENT_YEAR}`);
   if (filters.fireplaceOnly) conditions.push("FireplaceYN eq true");
   if (filters.seniorCommunityMode === "only") conditions.push("SeniorCommunityYN eq true");
-  if (filters.seniorCommunityMode === "exclude") conditions.push("SeniorCommunityYN ne true");
+  if (filters.seniorCommunityMode === "exclude") conditions.push("SeniorCommunityYN eq false");
+  if (filters.noHoaOnly) conditions.push("AssociationYN eq false");
 
   if (filters.propertyType) {
     const values: Partial<Record<PropertyType, string[]>> = {
@@ -872,7 +885,8 @@ export async function fetchLiveListingPage(
     .filter((listing) => !filters.fireplaceOnly || listing.fireplace === true)
     .filter((listing) => !filters.amenities?.some((amenity) => !listing.amenities?.includes(amenity)))
     .filter((listing) => filters.seniorCommunityMode !== "only" || listing.seniorCommunity === true)
-    .filter((listing) => filters.seniorCommunityMode !== "exclude" || listing.seniorCommunity !== true)
+    .filter((listing) => filters.seniorCommunityMode !== "exclude" || listing.seniorCommunity === false)
+    .filter((listing) => !filters.noHoaOnly || listing.association === false)
     .filter((listing) => !filters.maxDaysOnMarket || listing.daysOnMarket <= filters.maxDaysOnMarket)
     .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon))
     .slice(0, LISTING_PAGE_SIZE);

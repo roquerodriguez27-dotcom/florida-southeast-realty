@@ -42,6 +42,8 @@ export const propertySearchIntentSchema = z.object({
     .describe("True only when the shopper explicitly asks for new construction."),
   seniorCommunityMode: z.enum(["exclude", "only"]).nullable()
     .describe("Whether to exclude age-restricted communities or show only 55+ communities; null means include all."),
+  noHoaOnly: z.boolean()
+    .describe("True only when the shopper explicitly asks for no HOA or no homeowner association."),
   fireplaceOnly: z.boolean()
     .describe("True only when the shopper explicitly asks for a fireplace."),
   maxDaysOnMarket: z.number().int().min(1).max(3650).nullable()
@@ -219,6 +221,7 @@ export function parsePropertySearchIntent(prompt: string): PropertySearchIntent 
     minGarageSpaces: garageMatch ? Number(garageMatch[1]) : /\b(?:with\s+(?:a\s+)?garage|garage\s+(?:home|house|condo))\b/i.test(safePrompt) ? 1 : null,
     newConstructionOnly: /\b(?:new construction|new build|newly built)\b/i.test(safePrompt),
     seniorCommunityMode: excludesSeniorCommunity ? "exclude" : requestsSeniorCommunity ? "only" : null,
+    noHoaOnly: /\b(?:no|without)\s+(?:an?\s+)?(?:hoa|homeowners? association|homeowners['’]? association)\b/i.test(safePrompt),
     fireplaceOnly: !rejectsFireplace && /\bfireplaces?\b/i.test(safePrompt),
     maxDaysOnMarket: daysOnMarketMatch ? Number(daysOnMarketMatch[1]) : null,
   });
@@ -273,6 +276,7 @@ export function normalizePropertySearchIntent(intent: PropertySearchIntent): Pro
     seniorCommunityMode: intent.seniorCommunityMode === "exclude" || intent.seniorCommunityMode === "only"
       ? intent.seniorCommunityMode
       : null,
+    noHoaOnly: intent.noHoaOnly === true,
     fireplaceOnly: intent.fireplaceOnly === true,
     maxDaysOnMarket: Number.isFinite(intent.maxDaysOnMarket) && Number(intent.maxDaysOnMarket) > 0
       ? Math.min(3650, Math.floor(Number(intent.maxDaysOnMarket)))
@@ -299,6 +303,7 @@ export function mergePropertySearchIntents(
     minGarageSpaces: aiIntent.minGarageSpaces ?? fallbackIntent.minGarageSpaces,
     newConstructionOnly: aiIntent.newConstructionOnly || fallbackIntent.newConstructionOnly,
     seniorCommunityMode: aiIntent.seniorCommunityMode ?? fallbackIntent.seniorCommunityMode,
+    noHoaOnly: aiIntent.noHoaOnly || fallbackIntent.noHoaOnly,
     fireplaceOnly: aiIntent.fireplaceOnly || fallbackIntent.fireplaceOnly,
     maxDaysOnMarket: aiIntent.maxDaysOnMarket ?? fallbackIntent.maxDaysOnMarket,
   });
@@ -320,6 +325,7 @@ export function propertySearchUrl(intent: PropertySearchIntent): string {
   if (intent.minGarageSpaces) query.set("garageSpaces", String(intent.minGarageSpaces));
   if (intent.newConstructionOnly) query.set("newConstruction", "1");
   if (intent.seniorCommunityMode) query.set("senior", intent.seniorCommunityMode);
+  if (intent.noHoaOnly) query.set("noHoa", "1");
   if (intent.fireplaceOnly) query.set("fireplace", "1");
   if (intent.maxDaysOnMarket) query.set("maxDom", String(intent.maxDaysOnMarket));
   return `/properties${query.size ? `?${query.toString()}` : ""}#property-results`;

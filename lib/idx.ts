@@ -445,6 +445,45 @@ function includesFeature(values: string[], terms: string[]): boolean {
   return values.some((value) => terms.some((term) => value.includes(term)));
 }
 
+const ARCHITECTURE_TERMS: Record<NonNullable<ListingFilters["architecturalStyle"]>, string[]> = {
+  ranch: ["ranch"],
+  contemporary: ["contemporary"],
+  mediterranean: ["mediterranean"],
+  modern: ["modern"],
+  traditional: ["traditional"],
+};
+
+const VIEW_TERMS: Record<NonNullable<ListingFilters["viewType"]>, string[]> = {
+  water: ["water", "ocean", "intracoastal", "canal", "lake", "river", "bay"],
+  golf: ["golf"],
+  garden: ["garden"],
+  pool: ["pool"],
+  city: ["city", "skyline"],
+};
+
+const COOLING_TERMS: Record<NonNullable<ListingFilters["coolingType"]>, string[]> = {
+  "central-air": ["central air", "central cooling"],
+  "ceiling-fans": ["ceiling fan"],
+  "wall-window": ["wall unit", "window unit", "wall window"],
+};
+
+const HEATING_TERMS: Record<NonNullable<ListingFilters["heatingType"]>, string[]> = {
+  central: ["central"],
+  electric: ["electric"],
+  "heat-pump": ["heat pump"],
+  gas: ["gas", "natural gas", "propane"],
+};
+
+function matchesStructuredValues(
+  values: string[] | undefined,
+  selected: string | undefined,
+  terms: Record<string, string[]>,
+): boolean {
+  if (!selected) return true;
+  const selectedTerms = terms[selected];
+  return Boolean(selectedTerms && values && includesFeature(values, selectedTerms));
+}
+
 function listingAmenities(record: JsonObject): ListingAmenity[] {
   const generalValues = normalizedFeatureValues(record, [
     "InteriorFeatures",
@@ -607,6 +646,13 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
   const fullBaths = firstNumber(record, ["BathroomsFull", "BathsFull"]);
   const halfBaths = firstNumber(record, ["BathroomsHalf", "BathsHalf"]);
   const totalBaths = firstNumber(record, ["BathroomsTotalInteger", "BathroomsTotal", "BathsTotal"]);
+  const price = firstNumber(record, ["ListPrice", "CurrentPrice", "OriginalListPrice"]);
+  const originalListPrice = optionalNumber(record, ["OriginalListPrice"]);
+  const annualTaxes = optionalNumber(record, ["TaxAnnualAmount"]);
+  const architecturalStyles = normalizedFeatureValues(record, ["ArchitecturalStyle"]);
+  const views = normalizedFeatureValues(record, ["View", "WaterfrontFeatures"]);
+  const cooling = normalizedFeatureValues(record, ["Cooling"]);
+  const heating = normalizedFeatureValues(record, ["Heating"]);
   const listingUpdatedAt = firstString(record, [
     "ModificationTimestamp",
     "ListingUpdateTimestamp",
@@ -618,7 +664,8 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     listingKey,
     slug: `${slugify(address)}--${encodeListingKey(listingKey)}`,
     status: normalizeStatus(firstString(record, ["StandardStatus", "MlsStatus"])),
-    price: firstNumber(record, ["ListPrice", "CurrentPrice", "OriginalListPrice"]),
+    price,
+    originalListPrice: originalListPrice && originalListPrice >= price ? originalListPrice : undefined,
     address,
     community,
     communitySlug: slugify(community),
@@ -637,7 +684,12 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     seniorCommunity,
     association,
     associationFeeMonthly,
+    annualTaxes: annualTaxes && annualTaxes >= 0 ? annualTaxes : undefined,
     fireplace,
+    architecturalStyles,
+    views,
+    cooling,
+    heating,
     amenities,
     propertyType,
     forLease,
@@ -906,6 +958,12 @@ export async function fetchLiveListingPage(
       || filters.newConstructionOnly
       || filters.seniorCommunityMode === "only"
       || filters.maxHoaMonthly
+      || filters.priceReducedOnly
+      || filters.maxAnnualTaxes
+      || filters.architecturalStyle
+      || filters.viewType
+      || filters.coolingType
+      || filters.heatingType
       || filters.amenities?.length,
   );
   const providerFilters = {
@@ -915,6 +973,12 @@ export async function fetchLiveListingPage(
     newConstructionOnly: false,
     seniorCommunityMode: undefined,
     maxHoaMonthly: undefined,
+    priceReducedOnly: undefined,
+    maxAnnualTaxes: undefined,
+    architecturalStyle: undefined,
+    viewType: undefined,
+    coolingType: undefined,
+    heatingType: undefined,
     amenities: undefined,
   };
   const exactPolygonFallback = Boolean(filters.polygon?.length);
@@ -953,6 +1017,28 @@ export async function fetchLiveListingPage(
         && listing.associationFeeMonthly <= filters.maxHoaMonthly
       )
     ))
+    .filter((listing) => (
+      !filters.priceReducedOnly
+      || (
+        listing.originalListPrice !== undefined
+        && listing.originalListPrice > listing.price
+      )
+    ))
+    .filter((listing) => (
+      !filters.maxAnnualTaxes
+      || (
+        listing.annualTaxes !== undefined
+        && listing.annualTaxes <= filters.maxAnnualTaxes
+      )
+    ))
+    .filter((listing) => matchesStructuredValues(
+      listing.architecturalStyles,
+      filters.architecturalStyle,
+      ARCHITECTURE_TERMS,
+    ))
+    .filter((listing) => matchesStructuredValues(listing.views, filters.viewType, VIEW_TERMS))
+    .filter((listing) => matchesStructuredValues(listing.cooling, filters.coolingType, COOLING_TERMS))
+    .filter((listing) => matchesStructuredValues(listing.heating, filters.heatingType, HEATING_TERMS))
     .filter((listing) => !filters.maxDaysOnMarket || listing.daysOnMarket <= filters.maxDaysOnMarket)
     .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon))
     .slice(0, LISTING_PAGE_SIZE);
@@ -963,6 +1049,12 @@ export async function fetchLiveListingPage(
       || filters.newConstructionOnly
       || filters.seniorCommunityMode
       || filters.maxHoaMonthly
+      || filters.priceReducedOnly
+      || filters.maxAnnualTaxes
+      || filters.architecturalStyle
+      || filters.viewType
+      || filters.coolingType
+      || filters.heatingType
       || filters.amenities?.length,
   );
   const totalRowsExact = !exactPolygonFallback && !locallyVerifiedBoolean;

@@ -16,6 +16,7 @@ export const LISTINGS: Listing[] = [
     slug: "demo-waterfront-home-lauderdale-by-the-sea",
     status: "Active",
     price: 4250000,
+    originalListPrice: 4500000,
     address: "Demonstration Waterfront Home",
     community: "Lauderdale-by-the-Sea",
     communitySlug: "lauderdale-by-the-sea",
@@ -32,6 +33,11 @@ export const LISTINGS: Listing[] = [
     seniorCommunity: false,
     association: false,
     associationFeeMonthly: 0,
+    annualTaxes: 42000,
+    architecturalStyles: ["modern"],
+    views: ["ocean", "water"],
+    cooling: ["central air"],
+    heating: ["electric"],
     propertyType: "Estate",
     images: [img("photo-1613977257363-707ba9348227"), img("photo-1600596542815-ffad4c1539a9"), img("photo-1600607687939-ce8a6c25118c")],
     description: "Demonstration listing used to test the design before the live MLS feed is connected.",
@@ -47,6 +53,7 @@ export const LISTINGS: Listing[] = [
     slug: "demo-las-olas-condo",
     status: "Active",
     price: 2890000,
+    originalListPrice: 3100000,
     address: "Demonstration Las Olas Condo",
     community: "Las Olas",
     communitySlug: "las-olas",
@@ -61,6 +68,11 @@ export const LISTINGS: Listing[] = [
     seniorCommunity: false,
     association: true,
     associationFeeMonthly: 1750,
+    annualTaxes: 32000,
+    architecturalStyles: ["contemporary"],
+    views: ["city", "water"],
+    cooling: ["central air"],
+    heating: ["central"],
     propertyType: "Condo",
     images: [img("photo-1512917774080-9991f1c4c750"), img("photo-1512918728675-ed5a9ecdebfd"), img("photo-1502672260266-1c1ef2d93688")],
     description: "Demonstration listing used to test search, cards, and property-page layouts before live IDX activation.",
@@ -91,6 +103,11 @@ export const LISTINGS: Listing[] = [
     seniorCommunity: false,
     association: false,
     associationFeeMonthly: 0,
+    annualTaxes: 18500,
+    architecturalStyles: ["ranch"],
+    views: ["garden"],
+    cooling: ["central air", "ceiling fans"],
+    heating: ["electric"],
     propertyType: "Single Family",
     images: [img("photo-1568605114967-8130f3a36994"), img("photo-1600585154340-be6161a56a0c"), img("photo-1600566753086-00f18fb6b3ea")],
     description: "Demonstration listing used to test the preview experience before live IDX activation.",
@@ -106,6 +123,7 @@ export const LISTINGS: Listing[] = [
     slug: "demo-boca-raton-home",
     status: "Active",
     price: 3150000,
+    originalListPrice: 3300000,
     address: "Demonstration Boca Raton Home",
     community: "Boca Raton",
     communitySlug: "boca-raton",
@@ -122,6 +140,11 @@ export const LISTINGS: Listing[] = [
     seniorCommunity: true,
     association: true,
     associationFeeMonthly: 450,
+    annualTaxes: 26000,
+    architecturalStyles: ["mediterranean"],
+    views: ["golf"],
+    cooling: ["central air"],
+    heating: ["heat pump"],
     propertyType: "Single Family",
     images: [img("photo-1600047509807-ba8f99d2cdde"), img("photo-1600210492486-724fe5c67fb0"), img("photo-1600585152915-d208bec867a1")],
     description: "Demonstration listing used to test the Boca Raton search experience before live MLS data is connected.",
@@ -165,6 +188,42 @@ function sortSampleListings(listings: Listing[], sort: ListingSort = "newest"): 
     return Date.parse(right.listingUpdatedAt ?? "") - Date.parse(left.listingUpdatedAt ?? "")
       || left.price - right.price;
   });
+}
+
+const SAMPLE_STRUCTURED_TERMS = {
+  architecturalStyle: {
+    ranch: ["ranch"],
+    contemporary: ["contemporary"],
+    mediterranean: ["mediterranean"],
+    modern: ["modern"],
+    traditional: ["traditional"],
+  },
+  viewType: {
+    water: ["water", "ocean", "intracoastal", "canal", "lake", "river", "bay"],
+    golf: ["golf"],
+    garden: ["garden"],
+    pool: ["pool"],
+    city: ["city", "skyline"],
+  },
+  coolingType: {
+    "central-air": ["central air", "central cooling"],
+    "ceiling-fans": ["ceiling fan"],
+    "wall-window": ["wall unit", "window unit", "wall window"],
+  },
+  heatingType: {
+    central: ["central"],
+    electric: ["electric"],
+    "heat-pump": ["heat pump"],
+    gas: ["gas", "natural gas", "propane"],
+  },
+} as const;
+
+function sampleValuesMatch(values: string[] | undefined, selected: string | undefined, terms: Record<string, readonly string[]>): boolean {
+  if (!selected) return true;
+  const selectedTerms = terms[selected];
+  return Boolean(selectedTerms && values?.some((value) => (
+    selectedTerms.some((term) => value.toLowerCase().includes(term))
+  )));
 }
 
 function filterSampleListings(filters: ListingFilters): Listing[] {
@@ -218,6 +277,12 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
       && l.association !== false
       && (l.associationFeeMonthly === undefined || l.associationFeeMonthly > filters.maxHoaMonthly)
     ) return false;
+    if (filters.priceReducedOnly && !(l.originalListPrice && l.originalListPrice > l.price)) return false;
+    if (filters.maxAnnualTaxes && (l.annualTaxes === undefined || l.annualTaxes > filters.maxAnnualTaxes)) return false;
+    if (!sampleValuesMatch(l.architecturalStyles, filters.architecturalStyle, SAMPLE_STRUCTURED_TERMS.architecturalStyle)) return false;
+    if (!sampleValuesMatch(l.views, filters.viewType, SAMPLE_STRUCTURED_TERMS.viewType)) return false;
+    if (!sampleValuesMatch(l.cooling, filters.coolingType, SAMPLE_STRUCTURED_TERMS.coolingType)) return false;
+    if (!sampleValuesMatch(l.heating, filters.heatingType, SAMPLE_STRUCTURED_TERMS.heatingType)) return false;
     if (filters.maxDaysOnMarket && l.daysOnMarket > filters.maxDaysOnMarket) return false;
     if (filters.community && l.communitySlug !== filters.community) return false;
     if (filters.bounds) {

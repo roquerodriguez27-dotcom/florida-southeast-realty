@@ -38,6 +38,9 @@ export default function PropertyResultsView({
     || requestedSort === "price-desc"
     || requestedSort === "sqft-desc"
     || requestedSort === "sqft-asc"
+    || requestedSort === "lot-desc"
+    || requestedSort === "dom-asc"
+    || requestedSort === "dom-desc"
     || requestedSort === "newest"
     ? requestedSort
     : initialSort ?? "newest";

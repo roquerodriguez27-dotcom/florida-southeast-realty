@@ -10,6 +10,43 @@ export type ListingSort =
   | "dom-asc"
   | "dom-desc";
 
+export const LISTING_ARCHITECTURE_FILTERS = [
+  "ranch",
+  "contemporary",
+  "mediterranean",
+  "modern",
+  "traditional",
+] as const;
+
+export type ListingArchitectureFilter = (typeof LISTING_ARCHITECTURE_FILTERS)[number];
+
+export const LISTING_VIEW_FILTERS = [
+  "water",
+  "golf",
+  "garden",
+  "pool",
+  "city",
+] as const;
+
+export type ListingViewFilter = (typeof LISTING_VIEW_FILTERS)[number];
+
+export const LISTING_COOLING_FILTERS = [
+  "central-air",
+  "ceiling-fans",
+  "wall-window",
+] as const;
+
+export type ListingCoolingFilter = (typeof LISTING_COOLING_FILTERS)[number];
+
+export const LISTING_HEATING_FILTERS = [
+  "central",
+  "electric",
+  "heat-pump",
+  "gas",
+] as const;
+
+export type ListingHeatingFilter = (typeof LISTING_HEATING_FILTERS)[number];
+
 export const LISTING_AMENITIES = [
   "spa",
   "boat-dock",
@@ -59,6 +96,7 @@ export interface Listing {
   slug: string;
   status: ListingStatus;
   price: number;
+  originalListPrice?: number;
   address: string;
   community: string;
   communitySlug: string;
@@ -79,7 +117,13 @@ export interface Listing {
   association?: boolean;
   /** Recurring association fees normalized to a monthly amount. */
   associationFeeMonthly?: number;
+  /** Most recent annual property-tax amount supplied by the MLS. */
+  annualTaxes?: number;
   fireplace?: boolean;
+  architecturalStyles?: string[];
+  views?: string[];
+  cooling?: string[];
+  heating?: string[];
   /** Normalized amenity tags derived from MLS property and association fields. */
   amenities?: ListingAmenity[];
   propertyType: PropertyType;
@@ -121,6 +165,12 @@ export interface ListingFilters {
   seniorCommunityMode?: "exclude" | "only";
   noHoaOnly?: boolean;
   maxHoaMonthly?: number;
+  priceReducedOnly?: boolean;
+  maxAnnualTaxes?: number;
+  architecturalStyle?: ListingArchitectureFilter;
+  viewType?: ListingViewFilter;
+  coolingType?: ListingCoolingFilter;
+  heatingType?: ListingHeatingFilter;
   fireplaceOnly?: boolean;
   amenities?: ListingAmenity[];
   maxDaysOnMarket?: number;

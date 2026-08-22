@@ -1,5 +1,11 @@
 import { z } from "zod";
-import type { PropertyType } from "@/lib/types";
+import {
+  LISTING_ARCHITECTURE_FILTERS,
+  LISTING_COOLING_FILTERS,
+  LISTING_HEATING_FILTERS,
+  LISTING_VIEW_FILTERS,
+  type PropertyType,
+} from "@/lib/types";
 import { MAX_SEARCH_LOCATIONS, SOUTH_FLORIDA_LOCATION_NAMES } from "@/lib/south-florida-locations";
 
 const SEARCH_PROPERTY_TYPES = [
@@ -46,6 +52,18 @@ export const propertySearchIntentSchema = z.object({
     .describe("True only when the shopper explicitly asks for no HOA or no homeowner association."),
   maxHoaMonthly: z.number().int().min(1).max(100_000).nullable()
     .describe("Maximum recurring HOA or association fee normalized to dollars per month, or null when none was requested."),
+  priceReducedOnly: z.boolean()
+    .describe("True only when the shopper explicitly asks for a price reduction, price drop, or reduced-price listing."),
+  maxAnnualTaxes: z.number().int().min(1).max(1_000_000).nullable()
+    .describe("Maximum annual property-tax amount in dollars, or null when none was requested."),
+  architecturalStyle: z.enum(LISTING_ARCHITECTURE_FILTERS).nullable()
+    .describe("Requested architectural style, or null when none was requested."),
+  viewType: z.enum(LISTING_VIEW_FILTERS).nullable()
+    .describe("Requested view category, or null when none was requested."),
+  coolingType: z.enum(LISTING_COOLING_FILTERS).nullable()
+    .describe("Requested cooling system, or null when none was requested."),
+  heatingType: z.enum(LISTING_HEATING_FILTERS).nullable()
+    .describe("Requested heating system, or null when none was requested."),
   fireplaceOnly: z.boolean()
     .describe("True only when the shopper explicitly asks for a fireplace."),
   maxDaysOnMarket: z.number().int().min(1).max(3650).nullable()
@@ -92,6 +110,14 @@ function isHoaAmountMatch(prompt: string, match: RegExpMatchArray): boolean {
     || /^\s*(?:(?:per|a)\s+month|monthly|\/\s*mo(?:nth)?|(?:per|a)\s+year|yearly|annually)?\s*(?:in\s+)?(?:hoa|homeowners?(?:['’]\s*)?association|association|condo)\b/i.test(after);
 }
 
+function isTaxAmountMatch(prompt: string, match: RegExpMatchArray): boolean {
+  const index = match.index ?? 0;
+  const before = prompt.slice(Math.max(0, index - 45), index);
+  const after = prompt.slice(index + match[0].length, index + match[0].length + 55);
+  return /(?:annual\s+)?(?:property\s+)?tax(?:es)?\s*(?:amount|bill|cost)?\s*$/i.test(before)
+    || /^\s*(?:per\s+year|yearly|annually|\/\s*yr)?\s*(?:in\s+)?(?:annual\s+)?(?:property\s+)?tax(?:es)?\b/i.test(after);
+}
+
 function hoaAmountFromText(value?: string): number | null {
   if (!value) return null;
   const lower = value.toLowerCase().trim();
@@ -120,6 +146,21 @@ function extractMaxHoaMonthly(prompt: string): number | null {
     const match = prompt.match(pattern);
     const amount = hoaAmountFromText(match?.[1]);
     if (match && amount !== null) return monthlyHoaAmount(amount, match[0]);
+  }
+  return null;
+}
+
+function extractMaxAnnualTaxes(prompt: string): number | null {
+  const comparison = String.raw`(?:under|below|up to|less than|no more than|max(?:imum)?(?: of)?)`;
+  const taxes = String.raw`(?:(?:annual|yearly)\s+)?(?:property\s+)?tax(?:es)?`;
+  const patterns = [
+    new RegExp(`\\b${taxes}(?:\\s+(?:amount|bill|cost))?\\s*(?:of|is|at|costs?)?\\s*${comparison}\\s+(${PRICE_PATTERN})`, "i"),
+    new RegExp(`\\b${comparison}\\s+(${PRICE_PATTERN})(?:\\s*(?:per|a)\\s+year|\\s*(?:yearly|annually)|\\s*\\/\\s*yr)?\\s+(?:in\\s+)?${taxes}`, "i"),
+  ];
+  for (const pattern of patterns) {
+    const match = prompt.match(pattern);
+    const amount = priceFromText(match?.[1]);
+    if (amount !== null) return Math.min(1_000_000, amount);
   }
   return null;
 }
@@ -176,19 +217,19 @@ function extractPrices(prompt: string): { minPrice: number | null; maxPrice: num
   let minPrice: number | null = null;
   let maxPrice: number | null = null;
   const range = prompt.match(new RegExp(`\\b(?:between|from)\\s+(${PRICE_PATTERN})\\s+(?:and|to|-)\\s+(${PRICE_PATTERN})`, "i"));
-  if (range && !followedByLivingAreaUnit(prompt, range) && !isHoaAmountMatch(prompt, range)) {
+  if (range && !followedByLivingAreaUnit(prompt, range) && !isHoaAmountMatch(prompt, range) && !isTaxAmountMatch(prompt, range)) {
     minPrice = priceFromText(range[1]);
     maxPrice = priceFromText(range[2]);
   }
 
   const maximums = [...prompt.matchAll(new RegExp(`\\b(?:under|below|up to|less than|no more than|max(?:imum)?(?: of)?)\\s+(${PRICE_PATTERN})`, "gi"))]
-    .filter((match) => !followedByLivingAreaUnit(prompt, match) && !isHoaAmountMatch(prompt, match))
+    .filter((match) => !followedByLivingAreaUnit(prompt, match) && !isHoaAmountMatch(prompt, match) && !isTaxAmountMatch(prompt, match))
     .map((match) => priceFromText(match[1]))
     .filter((value): value is number => value !== null);
   if (maximums.length > 0) maxPrice = Math.min(...maximums);
 
   const minimums = [...prompt.matchAll(new RegExp(`\\b(?:over|above|at least|more than|min(?:imum)?(?: of)?)\\s+(${PRICE_PATTERN})`, "gi"))]
-    .filter((match) => !followedByLivingAreaUnit(prompt, match) && !isHoaAmountMatch(prompt, match))
+    .filter((match) => !followedByLivingAreaUnit(prompt, match) && !isHoaAmountMatch(prompt, match) && !isTaxAmountMatch(prompt, match))
     .map((match) => priceFromText(match[1]))
     .filter((value): value is number => value !== null);
   if (minimums.length > 0) minPrice = Math.max(...minimums);
@@ -236,6 +277,39 @@ function extractLivingArea(prompt: string): { minSqft: number | null; maxSqft: n
   return { minSqft, maxSqft };
 }
 
+function extractArchitecturalStyle(prompt: string): PropertySearchIntent["architecturalStyle"] {
+  if (/\bmediterranean(?:[- ]style)?\b/i.test(prompt)) return "mediterranean";
+  if (/\bcontemporary(?:[- ]style)?\b/i.test(prompt)) return "contemporary";
+  if (/\btraditional(?:[- ]style)?\b/i.test(prompt)) return "traditional";
+  if (/\bmodern(?:[- ]style)?\b/i.test(prompt)) return "modern";
+  if (/\branch(?:[- ]style)?\b/i.test(prompt)) return "ranch";
+  return null;
+}
+
+function extractViewType(prompt: string): PropertySearchIntent["viewType"] {
+  if (/\b(?:water|ocean|intracoastal|canal|lake|river|bay)[- ]views?\b/i.test(prompt)) return "water";
+  if (/\bgolf(?: course)?[- ]views?\b/i.test(prompt)) return "golf";
+  if (/\bgarden[- ]views?\b/i.test(prompt)) return "garden";
+  if (/\bpool[- ]views?\b/i.test(prompt)) return "pool";
+  if (/\b(?:city|skyline)[- ]views?\b/i.test(prompt)) return "city";
+  return null;
+}
+
+function extractCoolingType(prompt: string): PropertySearchIntent["coolingType"] {
+  if (/\bcentral (?:air|a\/?c|ac|cooling)\b/i.test(prompt)) return "central-air";
+  if (/\bceiling fans?\b/i.test(prompt)) return "ceiling-fans";
+  if (/\b(?:wall|window)(?:[- ]mounted)? (?:a\/?c|ac|air conditioner|unit)s?\b/i.test(prompt)) return "wall-window";
+  return null;
+}
+
+function extractHeatingType(prompt: string): PropertySearchIntent["heatingType"] {
+  if (/\bheat pumps?\b/i.test(prompt)) return "heat-pump";
+  if (/\b(?:natural )?gas heat(?:ing)?\b|\bpropane heat(?:ing)?\b/i.test(prompt)) return "gas";
+  if (/\belectric heat(?:ing)?\b/i.test(prompt)) return "electric";
+  if (/\bcentral heat(?:ing)?\b/i.test(prompt)) return "central";
+  return null;
+}
+
 export function parsePropertySearchIntent(prompt: string): PropertySearchIntent {
   const safePrompt = prompt.trim().replace(/\s+/g, " ").slice(0, 300);
   const prices = extractPrices(safePrompt);
@@ -266,6 +340,12 @@ export function parsePropertySearchIntent(prompt: string): PropertySearchIntent 
     seniorCommunityMode: excludesSeniorCommunity ? "exclude" : requestsSeniorCommunity ? "only" : null,
     noHoaOnly: /\b(?:no|without)\s+(?:an?\s+)?(?:hoa|homeowners? association|homeowners['’]? association)\b/i.test(safePrompt),
     maxHoaMonthly: extractMaxHoaMonthly(safePrompt),
+    priceReducedOnly: /\b(?:price (?:drops?|dropped|reductions?|reduced)|reduced prices?|recently reduced)\b/i.test(safePrompt),
+    maxAnnualTaxes: extractMaxAnnualTaxes(safePrompt),
+    architecturalStyle: extractArchitecturalStyle(safePrompt),
+    viewType: extractViewType(safePrompt),
+    coolingType: extractCoolingType(safePrompt),
+    heatingType: extractHeatingType(safePrompt),
     fireplaceOnly: !rejectsFireplace && /\bfireplaces?\b/i.test(safePrompt),
     maxDaysOnMarket: daysOnMarketMatch ? Number(daysOnMarketMatch[1]) : null,
   });
@@ -324,6 +404,22 @@ export function normalizePropertySearchIntent(intent: PropertySearchIntent): Pro
     maxHoaMonthly: Number.isFinite(intent.maxHoaMonthly) && Number(intent.maxHoaMonthly) > 0
       ? Math.min(100_000, Math.round(Number(intent.maxHoaMonthly)))
       : null,
+    priceReducedOnly: intent.priceReducedOnly === true,
+    maxAnnualTaxes: Number.isFinite(intent.maxAnnualTaxes) && Number(intent.maxAnnualTaxes) > 0
+      ? Math.min(1_000_000, Math.round(Number(intent.maxAnnualTaxes)))
+      : null,
+    architecturalStyle: LISTING_ARCHITECTURE_FILTERS.includes(intent.architecturalStyle as typeof LISTING_ARCHITECTURE_FILTERS[number])
+      ? intent.architecturalStyle
+      : null,
+    viewType: LISTING_VIEW_FILTERS.includes(intent.viewType as typeof LISTING_VIEW_FILTERS[number])
+      ? intent.viewType
+      : null,
+    coolingType: LISTING_COOLING_FILTERS.includes(intent.coolingType as typeof LISTING_COOLING_FILTERS[number])
+      ? intent.coolingType
+      : null,
+    heatingType: LISTING_HEATING_FILTERS.includes(intent.heatingType as typeof LISTING_HEATING_FILTERS[number])
+      ? intent.heatingType
+      : null,
     fireplaceOnly: intent.fireplaceOnly === true,
     maxDaysOnMarket: Number.isFinite(intent.maxDaysOnMarket) && Number(intent.maxDaysOnMarket) > 0
       ? Math.min(3650, Math.floor(Number(intent.maxDaysOnMarket)))
@@ -352,6 +448,12 @@ export function mergePropertySearchIntents(
     seniorCommunityMode: aiIntent.seniorCommunityMode ?? fallbackIntent.seniorCommunityMode,
     noHoaOnly: aiIntent.noHoaOnly || fallbackIntent.noHoaOnly,
     maxHoaMonthly: aiIntent.maxHoaMonthly ?? fallbackIntent.maxHoaMonthly,
+    priceReducedOnly: aiIntent.priceReducedOnly || fallbackIntent.priceReducedOnly,
+    maxAnnualTaxes: aiIntent.maxAnnualTaxes ?? fallbackIntent.maxAnnualTaxes,
+    architecturalStyle: aiIntent.architecturalStyle ?? fallbackIntent.architecturalStyle,
+    viewType: aiIntent.viewType ?? fallbackIntent.viewType,
+    coolingType: aiIntent.coolingType ?? fallbackIntent.coolingType,
+    heatingType: aiIntent.heatingType ?? fallbackIntent.heatingType,
     fireplaceOnly: aiIntent.fireplaceOnly || fallbackIntent.fireplaceOnly,
     maxDaysOnMarket: aiIntent.maxDaysOnMarket ?? fallbackIntent.maxDaysOnMarket,
   });
@@ -375,6 +477,12 @@ export function propertySearchUrl(intent: PropertySearchIntent): string {
   if (intent.seniorCommunityMode) query.set("senior", intent.seniorCommunityMode);
   if (intent.noHoaOnly) query.set("noHoa", "1");
   if (intent.maxHoaMonthly) query.set("maxHoa", String(intent.maxHoaMonthly));
+  if (intent.priceReducedOnly) query.set("priceReduced", "1");
+  if (intent.maxAnnualTaxes) query.set("maxTaxes", String(intent.maxAnnualTaxes));
+  if (intent.architecturalStyle) query.set("style", intent.architecturalStyle);
+  if (intent.viewType) query.set("viewType", intent.viewType);
+  if (intent.coolingType) query.set("cooling", intent.coolingType);
+  if (intent.heatingType) query.set("heating", intent.heatingType);
   if (intent.fireplaceOnly) query.set("fireplace", "1");
   if (intent.maxDaysOnMarket) query.set("maxDom", String(intent.maxDaysOnMarket));
   return `/properties${query.size ? `?${query.toString()}` : ""}#property-results`;

@@ -47,8 +47,9 @@ export async function sendBrokerNotification(
   payload: BrokerNotificationPayload,
 ): Promise<BrokerNotificationResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim();
-  if (!apiKey || !from) return { configured: false, delivered: false };
+  const from = process.env.RESEND_FROM_EMAIL?.trim()
+    || `Florida Southeast Realty <website@${new URL(SITE.url).hostname.replace(/^www\./, "")}>`;
+  if (!apiKey) return { configured: false, delivered: false };
 
   const safeTitle = payload.title.replace(/[\r\n]+/g, " ").slice(0, 160);
   const idempotencyKey = createHash("sha256")

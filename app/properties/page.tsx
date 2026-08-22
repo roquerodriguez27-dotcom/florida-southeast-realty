@@ -63,7 +63,7 @@ interface Props {
 }
 
 const PROPERTY_TYPES: PropertyType[] = ["Single Family", "Condo", "Townhome", "Estate", "Multi-Family", "Land", "Commercial", "Other"];
-const LISTING_SORTS: ListingSort[] = ["newest", "price-asc", "price-desc", "sqft-desc"];
+const LISTING_SORTS: ListingSort[] = ["newest", "price-asc", "price-desc", "sqft-desc", "sqft-asc"];
 
 function propertyType(value?: string): PropertyType | undefined {
   return PROPERTY_TYPES.includes(value as PropertyType) ? value as PropertyType : undefined;

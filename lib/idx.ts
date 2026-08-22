@@ -29,6 +29,7 @@ const RESO_SORTS: Record<ListingSort, string> = {
   "price-asc": "ListPrice asc,ModificationTimestamp desc",
   "price-desc": "ListPrice desc,ModificationTimestamp desc",
   "sqft-desc": "LivingArea desc,ListPrice asc",
+  "sqft-asc": "LivingArea asc,ListPrice asc",
 };
 
 type JsonObject = Record<string, unknown>;

@@ -146,6 +146,7 @@ function sortSampleListings(listings: Listing[], sort: ListingSort = "newest"): 
     if (sort === "price-asc") return left.price - right.price;
     if (sort === "price-desc") return right.price - left.price;
     if (sort === "sqft-desc") return right.sqft - left.sqft || left.price - right.price;
+    if (sort === "sqft-asc") return left.sqft - right.sqft || left.price - right.price;
     return Date.parse(right.listingUpdatedAt ?? "") - Date.parse(left.listingUpdatedAt ?? "")
       || left.price - right.price;
   });

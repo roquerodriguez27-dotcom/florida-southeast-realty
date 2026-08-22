@@ -1,6 +1,6 @@
 export type ListingStatus = "Active" | "Pending" | "Sold" | "Coming Soon";
 
-export type ListingSort = "newest" | "price-asc" | "price-desc" | "sqft-desc";
+export type ListingSort = "newest" | "price-asc" | "price-desc" | "sqft-desc" | "sqft-asc";
 
 export const LISTING_AMENITIES = [
   "spa",

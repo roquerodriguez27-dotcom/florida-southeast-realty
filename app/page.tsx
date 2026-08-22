@@ -16,6 +16,7 @@ import { getAllListings } from "@/lib/listings";
 import { getAllCommunities } from "@/lib/communities";
 import { getGuides } from "@/lib/content";
 import { IDX_PROVIDER } from "@/lib/idx";
+import { SITE } from "@/lib/site-config";
 import Image from "next/image";
 
 export const metadata: Metadata = {
@@ -64,14 +65,25 @@ export default async function HomePage() {
               </Link>
             </div>
           </div>
-          <div className="relative aspect-[4/3] rounded-sm overflow-hidden">
-            <Image
-              src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80"
-              alt="South Florida home exterior"
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover"
-            />
+          <div className="mx-auto w-full max-w-lg overflow-hidden rounded-sm border border-ink/10 bg-white shadow-[0_18px_50px_rgba(14,43,48,0.12)]">
+            <div className="relative aspect-square bg-keystone-dim/50">
+              <Image
+                src={SITE.brokerImage}
+                alt={`${SITE.brokerName}, Broker of ${SITE.name}`}
+                fill
+                sizes="(max-width: 768px) calc(100vw - 2rem), 50vw"
+                className="object-cover"
+              />
+            </div>
+            <div className="flex flex-col gap-1 border-t border-ink/10 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="font-display text-2xl text-ink">{SITE.brokerName}</p>
+                <p className="text-sm text-ink/60">Broker, Florida Southeast Realty</p>
+              </div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-hibiscus">
+                Real estate since {SITE.brokerSince}
+              </p>
+            </div>
           </div>
         </div>
       </section>

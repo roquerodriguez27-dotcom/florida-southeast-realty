@@ -112,6 +112,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         "@id": brokerId,
         name: SITE.brokerName,
         jobTitle: "Broker",
+        image: `${SITE.url}${SITE.brokerImage}`,
         worksFor: { "@id": agentId },
       },
       {

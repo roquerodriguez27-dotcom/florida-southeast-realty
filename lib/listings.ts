@@ -1,5 +1,6 @@
 import type { Listing, ListingFilters, ListingSearchPage, ListingSort } from "./types";
 import { fetchLiveListingBySlug, fetchLiveListingPage } from "./idx";
+import { findSouthFloridaCounty } from "./south-florida-locations";
 
 const img = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1600&q=80`;
@@ -154,6 +155,10 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
   return sortSampleListings(LISTINGS.filter((l) => {
     if (filters.locations?.length) {
       const matchesLocation = filters.locations.some((location) => {
+        const selectedCounty = findSouthFloridaCounty(location);
+        if (selectedCounty) {
+          return selectedCounty.cities.some((city) => city.toLowerCase() === l.city.toLowerCase());
+        }
         const value = location.toLowerCase();
         return l.city.toLowerCase().includes(value)
           || l.community.toLowerCase().includes(value)

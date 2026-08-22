@@ -134,5 +134,10 @@ export const SOUTH_FLORIDA_COUNTIES = [
 ] as const;
 
 export const SOUTH_FLORIDA_LOCATION_NAMES = Array.from(new Set(
-  SOUTH_FLORIDA_COUNTIES.flatMap((county) => county.cities),
+  SOUTH_FLORIDA_COUNTIES.flatMap((county) => [county.name, ...county.cities]),
 ));
+
+export function findSouthFloridaCounty(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return SOUTH_FLORIDA_COUNTIES.find((county) => county.name.toLowerCase() === normalized);
+}

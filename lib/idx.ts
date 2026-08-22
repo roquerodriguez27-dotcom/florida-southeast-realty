@@ -30,6 +30,9 @@ const RESO_SORTS: Record<ListingSort, string> = {
   "price-desc": "ListPrice desc,ModificationTimestamp desc",
   "sqft-desc": "LivingArea desc,ListPrice asc",
   "sqft-asc": "LivingArea asc,ListPrice asc",
+  "lot-desc": "LotSizeSquareFeet desc,ListPrice asc",
+  "dom-asc": "DaysOnMarket asc,ModificationTimestamp desc",
+  "dom-desc": "DaysOnMarket desc,ListPrice asc",
 };
 
 type JsonObject = Record<string, unknown>;
@@ -84,6 +87,15 @@ function firstNumber(object: JsonObject, keys: string[]): number {
   return 0;
 }
 
+function optionalNumber(object: JsonObject, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = object[key];
+    const number = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+    if (Number.isFinite(number)) return number;
+  }
+  return undefined;
+}
+
 function booleanValue(value: unknown): boolean | undefined {
   if (typeof value === "boolean") return value;
   if (typeof value === "number" && Number.isFinite(value)) return value !== 0;
@@ -99,6 +111,46 @@ function truthy(value: unknown): boolean {
   const boolean = booleanValue(value);
   if (boolean !== undefined) return boolean;
   return Array.isArray(value) && value.length > 0;
+}
+
+function monthlyRecurringFee(amount: number, frequency: string): number | undefined {
+  const normalized = frequency.toLowerCase().replace(/[^a-z]/g, "");
+  if (normalized === "annually" || normalized === "annual" || normalized === "yearly") return amount / 12;
+  if (normalized === "bimonthly") return amount / 2;
+  if (normalized === "biweekly") return amount * 26 / 12;
+  if (normalized === "daily") return amount * 365 / 12;
+  if (normalized === "monthly") return amount;
+  if (normalized === "onetime") return 0;
+  if (normalized === "quarterly") return amount / 3;
+  if (normalized === "semiannually") return amount / 6;
+  if (normalized === "semimonthly") return amount * 2;
+  if (normalized === "weekly") return amount * 52 / 12;
+  return undefined;
+}
+
+function monthlyAssociationFee(record: JsonObject, association: boolean | undefined): number | undefined {
+  const feeFields = [
+    ["AssociationFee", "AssociationFeeFrequency"],
+    ["AssociationFee2", "AssociationFee2Frequency"],
+  ] as const;
+  let total = 0;
+  let hasKnownFee = false;
+
+  for (const [amountField, frequencyField] of feeFields) {
+    const amount = optionalNumber(record, [amountField]);
+    if (amount === undefined || amount < 0) continue;
+    if (amount === 0) {
+      hasKnownFee = true;
+      continue;
+    }
+    const monthly = monthlyRecurringFee(amount, firstString(record, [frequencyField]));
+    if (monthly === undefined) return undefined;
+    total += monthly;
+    hasKnownFee = true;
+  }
+
+  if (hasKnownFee) return Math.round(total * 100) / 100;
+  return association === false ? 0 : undefined;
 }
 
 function getAccessToken(): string | null {
@@ -548,6 +600,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
   const newConstruction = truthy(record.NewConstructionYN) || yearBuilt >= CURRENT_YEAR;
   const seniorCommunity = booleanValue(record.SeniorCommunityYN);
   const association = booleanValue(record.AssociationYN);
+  const associationFeeMonthly = monthlyAssociationFee(record, association);
   const fireplace = truthy(record.FireplaceYN);
   const amenities = listingAmenities(record);
   const photos = photoUrls(record);
@@ -583,6 +636,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     newConstruction,
     seniorCommunity,
     association,
+    associationFeeMonthly,
     fireplace,
     amenities,
     propertyType,
@@ -784,7 +838,7 @@ function buildResoFilter(filters: ListingFilters): string {
     Number.isFinite(filters.minGarageSpaces) ? Number(filters.minGarageSpaces) : 0,
   );
   if (minGarageSpaces > 0) conditions.push(`GarageSpaces ge ${minGarageSpaces}`);
-  if (filters.newConstructionOnly) conditions.push(`YearBuilt ge ${CURRENT_YEAR}`);
+  if (filters.newConstructionOnly) conditions.push("NewConstructionYN eq true");
   if (filters.fireplaceOnly) conditions.push("FireplaceYN eq true");
   if (filters.seniorCommunityMode === "only") conditions.push("SeniorCommunityYN eq true");
   if (filters.seniorCommunityMode === "exclude") conditions.push("SeniorCommunityYN eq false");
@@ -849,14 +903,18 @@ export async function fetchLiveListingPage(
   const exactAmenityFallback = Boolean(
     filters.privatePoolOnly
       || filters.fireplaceOnly
+      || filters.newConstructionOnly
       || filters.seniorCommunityMode === "only"
+      || filters.maxHoaMonthly
       || filters.amenities?.length,
   );
   const providerFilters = {
     ...filters,
     privatePoolOnly: false,
     fireplaceOnly: false,
+    newConstructionOnly: false,
     seniorCommunityMode: undefined,
+    maxHoaMonthly: undefined,
     amenities: undefined,
   };
   const exactPolygonFallback = Boolean(filters.polygon?.length);
@@ -887,6 +945,14 @@ export async function fetchLiveListingPage(
     .filter((listing) => filters.seniorCommunityMode !== "only" || listing.seniorCommunity === true)
     .filter((listing) => filters.seniorCommunityMode !== "exclude" || listing.seniorCommunity === false)
     .filter((listing) => !filters.noHoaOnly || listing.association === false)
+    .filter((listing) => (
+      !filters.maxHoaMonthly
+      || listing.association === false
+      || (
+        listing.associationFeeMonthly !== undefined
+        && listing.associationFeeMonthly <= filters.maxHoaMonthly
+      )
+    ))
     .filter((listing) => !filters.maxDaysOnMarket || listing.daysOnMarket <= filters.maxDaysOnMarket)
     .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon))
     .slice(0, LISTING_PAGE_SIZE);
@@ -894,7 +960,9 @@ export async function fetchLiveListingPage(
   const locallyVerifiedBoolean = Boolean(
     filters.privatePoolOnly
       || filters.fireplaceOnly
+      || filters.newConstructionOnly
       || filters.seniorCommunityMode
+      || filters.maxHoaMonthly
       || filters.amenities?.length,
   );
   const totalRowsExact = !exactPolygonFallback && !locallyVerifiedBoolean;

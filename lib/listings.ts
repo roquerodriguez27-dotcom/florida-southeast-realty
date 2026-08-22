@@ -31,6 +31,7 @@ export const LISTINGS: Listing[] = [
     privatePool: true,
     seniorCommunity: false,
     association: false,
+    associationFeeMonthly: 0,
     propertyType: "Estate",
     images: [img("photo-1613977257363-707ba9348227"), img("photo-1600596542815-ffad4c1539a9"), img("photo-1600607687939-ce8a6c25118c")],
     description: "Demonstration listing used to test the design before the live MLS feed is connected.",
@@ -59,6 +60,7 @@ export const LISTINGS: Listing[] = [
     privatePool: false,
     seniorCommunity: false,
     association: true,
+    associationFeeMonthly: 1750,
     propertyType: "Condo",
     images: [img("photo-1512917774080-9991f1c4c750"), img("photo-1512918728675-ed5a9ecdebfd"), img("photo-1502672260266-1c1ef2d93688")],
     description: "Demonstration listing used to test search, cards, and property-page layouts before live IDX activation.",
@@ -88,6 +90,7 @@ export const LISTINGS: Listing[] = [
     privatePool: false,
     seniorCommunity: false,
     association: false,
+    associationFeeMonthly: 0,
     propertyType: "Single Family",
     images: [img("photo-1568605114967-8130f3a36994"), img("photo-1600585154340-be6161a56a0c"), img("photo-1600566753086-00f18fb6b3ea")],
     description: "Demonstration listing used to test the preview experience before live IDX activation.",
@@ -118,6 +121,7 @@ export const LISTINGS: Listing[] = [
     privatePool: true,
     seniorCommunity: true,
     association: true,
+    associationFeeMonthly: 450,
     propertyType: "Single Family",
     images: [img("photo-1600047509807-ba8f99d2cdde"), img("photo-1600210492486-724fe5c67fb0"), img("photo-1600585152915-d208bec867a1")],
     description: "Demonstration listing used to test the Boca Raton search experience before live MLS data is connected.",
@@ -155,6 +159,9 @@ function sortSampleListings(listings: Listing[], sort: ListingSort = "newest"): 
     if (sort === "price-desc") return right.price - left.price;
     if (sort === "sqft-desc") return right.sqft - left.sqft || left.price - right.price;
     if (sort === "sqft-asc") return left.sqft - right.sqft || left.price - right.price;
+    if (sort === "lot-desc") return (right.lotSqft ?? 0) - (left.lotSqft ?? 0) || left.price - right.price;
+    if (sort === "dom-asc") return left.daysOnMarket - right.daysOnMarket || left.price - right.price;
+    if (sort === "dom-desc") return right.daysOnMarket - left.daysOnMarket || left.price - right.price;
     return Date.parse(right.listingUpdatedAt ?? "") - Date.parse(left.listingUpdatedAt ?? "")
       || left.price - right.price;
   });
@@ -206,6 +213,11 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.seniorCommunityMode === "only" && l.seniorCommunity !== true) return false;
     if (filters.seniorCommunityMode === "exclude" && l.seniorCommunity !== false) return false;
     if (filters.noHoaOnly && l.association !== false) return false;
+    if (
+      filters.maxHoaMonthly
+      && l.association !== false
+      && (l.associationFeeMonthly === undefined || l.associationFeeMonthly > filters.maxHoaMonthly)
+    ) return false;
     if (filters.maxDaysOnMarket && l.daysOnMarket > filters.maxDaysOnMarket) return false;
     if (filters.community && l.communitySlug !== filters.community) return false;
     if (filters.bounds) {

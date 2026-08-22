@@ -44,6 +44,8 @@ export const propertySearchIntentSchema = z.object({
     .describe("Whether to exclude age-restricted communities or show only 55+ communities; null means include all."),
   noHoaOnly: z.boolean()
     .describe("True only when the shopper explicitly asks for no HOA or no homeowner association."),
+  maxHoaMonthly: z.number().int().min(1).max(100_000).nullable()
+    .describe("Maximum recurring HOA or association fee normalized to dollars per month, or null when none was requested."),
   fireplaceOnly: z.boolean()
     .describe("True only when the shopper explicitly asks for a fireplace."),
   maxDaysOnMarket: z.number().int().min(1).max(3650).nullable()
@@ -53,6 +55,7 @@ export const propertySearchIntentSchema = z.object({
 export type PropertySearchIntent = z.infer<typeof propertySearchIntentSchema>;
 
 const PRICE_PATTERN = String.raw`\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:million|thousand|m|k)?`;
+const HOA_AMOUNT_PATTERN = String.raw`\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:thousand|k)?`;
 const SOUTH_FLORIDA_POSTAL_CODE = /^(?:33|34)\d{3}(?:-\d{4})?$/;
 
 function escapeRegExp(value: string): string {
@@ -79,6 +82,46 @@ function priceFromText(value?: string): number | null {
 function followedByLivingAreaUnit(prompt: string, match: RegExpMatchArray): boolean {
   const suffix = prompt.slice((match.index ?? 0) + match[0].length);
   return /^\s*(?:sq(?:uare)?\.?\s*(?:ft|feet)|square\s+feet)\b/i.test(suffix);
+}
+
+function isHoaAmountMatch(prompt: string, match: RegExpMatchArray): boolean {
+  const index = match.index ?? 0;
+  const before = prompt.slice(Math.max(0, index - 40), index);
+  const after = prompt.slice(index + match[0].length, index + match[0].length + 50);
+  return /(?:hoa|homeowners?(?:['’]\s*)?association|association|condo)\s*(?:fees?|dues?)?\s*$/i.test(before)
+    || /^\s*(?:(?:per|a)\s+month|monthly|\/\s*mo(?:nth)?|(?:per|a)\s+year|yearly|annually)?\s*(?:in\s+)?(?:hoa|homeowners?(?:['’]\s*)?association|association|condo)\b/i.test(after);
+}
+
+function hoaAmountFromText(value?: string): number | null {
+  if (!value) return null;
+  const lower = value.toLowerCase().trim();
+  const number = Number(lower.replace(/[$,\s]/g, "").replace(/(?:thousand|k)$/i, ""));
+  if (!Number.isFinite(number) || number <= 0) return null;
+  const amount = Math.round(number * (/(?:thousand|k)\s*$/.test(lower) ? 1_000 : 1));
+  return amount <= 100_000 ? amount : null;
+}
+
+function monthlyHoaAmount(amount: number, context: string): number {
+  if (/\b(?:annual|annually|yearly|per\s+year|a\s+year)\b/i.test(context)) return Math.round(amount / 12);
+  if (/\b(?:quarterly|per\s+quarter|a\s+quarter)\b/i.test(context)) return Math.round(amount / 3);
+  if (/\b(?:weekly|per\s+week|a\s+week)\b/i.test(context)) return Math.round(amount * 52 / 12);
+  return amount;
+}
+
+function extractMaxHoaMonthly(prompt: string): number | null {
+  const comparison = String.raw`(?:under|below|up to|less than|no more than|max(?:imum)?(?: of)?)`;
+  const association = String.raw`(?:hoa|homeowners?(?:['’]\s*)?association|association|condo)`;
+  const patterns = [
+    new RegExp(`\\b${association}(?:\\s+(?:fees?|dues?))?\\s*(?:of|is|at|costs?)?\\s*${comparison}\\s+(${HOA_AMOUNT_PATTERN})(?:\\s*(?:per|a)\\s+(?:month|year|quarter|week)|\\s*(?:monthly|yearly|annually|quarterly|weekly)|\\s*\\/\\s*mo(?:nth)?)?`, "i"),
+    new RegExp(`\\b${comparison}\\s+(${HOA_AMOUNT_PATTERN})(?:\\s*(?:per|a)\\s+(?:month|year|quarter|week)|\\s*(?:monthly|yearly|annually|quarterly|weekly)|\\s*\\/\\s*mo(?:nth)?)?\\s+(?:in\\s+)?${association}(?:\\s+(?:fees?|dues?))?`, "i"),
+  ];
+
+  for (const pattern of patterns) {
+    const match = prompt.match(pattern);
+    const amount = hoaAmountFromText(match?.[1]);
+    if (match && amount !== null) return monthlyHoaAmount(amount, match[0]);
+  }
+  return null;
 }
 
 function uniqueLocations(values: string[]): string[] {
@@ -133,19 +176,19 @@ function extractPrices(prompt: string): { minPrice: number | null; maxPrice: num
   let minPrice: number | null = null;
   let maxPrice: number | null = null;
   const range = prompt.match(new RegExp(`\\b(?:between|from)\\s+(${PRICE_PATTERN})\\s+(?:and|to|-)\\s+(${PRICE_PATTERN})`, "i"));
-  if (range && !followedByLivingAreaUnit(prompt, range)) {
+  if (range && !followedByLivingAreaUnit(prompt, range) && !isHoaAmountMatch(prompt, range)) {
     minPrice = priceFromText(range[1]);
     maxPrice = priceFromText(range[2]);
   }
 
   const maximums = [...prompt.matchAll(new RegExp(`\\b(?:under|below|up to|less than|no more than|max(?:imum)?(?: of)?)\\s+(${PRICE_PATTERN})`, "gi"))]
-    .filter((match) => !followedByLivingAreaUnit(prompt, match))
+    .filter((match) => !followedByLivingAreaUnit(prompt, match) && !isHoaAmountMatch(prompt, match))
     .map((match) => priceFromText(match[1]))
     .filter((value): value is number => value !== null);
   if (maximums.length > 0) maxPrice = Math.min(...maximums);
 
   const minimums = [...prompt.matchAll(new RegExp(`\\b(?:over|above|at least|more than|min(?:imum)?(?: of)?)\\s+(${PRICE_PATTERN})`, "gi"))]
-    .filter((match) => !followedByLivingAreaUnit(prompt, match))
+    .filter((match) => !followedByLivingAreaUnit(prompt, match) && !isHoaAmountMatch(prompt, match))
     .map((match) => priceFromText(match[1]))
     .filter((value): value is number => value !== null);
   if (minimums.length > 0) minPrice = Math.max(...minimums);
@@ -222,6 +265,7 @@ export function parsePropertySearchIntent(prompt: string): PropertySearchIntent 
     newConstructionOnly: /\b(?:new construction|new build|newly built)\b/i.test(safePrompt),
     seniorCommunityMode: excludesSeniorCommunity ? "exclude" : requestsSeniorCommunity ? "only" : null,
     noHoaOnly: /\b(?:no|without)\s+(?:an?\s+)?(?:hoa|homeowners? association|homeowners['’]? association)\b/i.test(safePrompt),
+    maxHoaMonthly: extractMaxHoaMonthly(safePrompt),
     fireplaceOnly: !rejectsFireplace && /\bfireplaces?\b/i.test(safePrompt),
     maxDaysOnMarket: daysOnMarketMatch ? Number(daysOnMarketMatch[1]) : null,
   });
@@ -277,6 +321,9 @@ export function normalizePropertySearchIntent(intent: PropertySearchIntent): Pro
       ? intent.seniorCommunityMode
       : null,
     noHoaOnly: intent.noHoaOnly === true,
+    maxHoaMonthly: Number.isFinite(intent.maxHoaMonthly) && Number(intent.maxHoaMonthly) > 0
+      ? Math.min(100_000, Math.round(Number(intent.maxHoaMonthly)))
+      : null,
     fireplaceOnly: intent.fireplaceOnly === true,
     maxDaysOnMarket: Number.isFinite(intent.maxDaysOnMarket) && Number(intent.maxDaysOnMarket) > 0
       ? Math.min(3650, Math.floor(Number(intent.maxDaysOnMarket)))
@@ -304,6 +351,7 @@ export function mergePropertySearchIntents(
     newConstructionOnly: aiIntent.newConstructionOnly || fallbackIntent.newConstructionOnly,
     seniorCommunityMode: aiIntent.seniorCommunityMode ?? fallbackIntent.seniorCommunityMode,
     noHoaOnly: aiIntent.noHoaOnly || fallbackIntent.noHoaOnly,
+    maxHoaMonthly: aiIntent.maxHoaMonthly ?? fallbackIntent.maxHoaMonthly,
     fireplaceOnly: aiIntent.fireplaceOnly || fallbackIntent.fireplaceOnly,
     maxDaysOnMarket: aiIntent.maxDaysOnMarket ?? fallbackIntent.maxDaysOnMarket,
   });
@@ -326,6 +374,7 @@ export function propertySearchUrl(intent: PropertySearchIntent): string {
   if (intent.newConstructionOnly) query.set("newConstruction", "1");
   if (intent.seniorCommunityMode) query.set("senior", intent.seniorCommunityMode);
   if (intent.noHoaOnly) query.set("noHoa", "1");
+  if (intent.maxHoaMonthly) query.set("maxHoa", String(intent.maxHoaMonthly));
   if (intent.fireplaceOnly) query.set("fireplace", "1");
   if (intent.maxDaysOnMarket) query.set("maxDom", String(intent.maxDaysOnMarket));
   return `/properties${query.size ? `?${query.toString()}` : ""}#property-results`;

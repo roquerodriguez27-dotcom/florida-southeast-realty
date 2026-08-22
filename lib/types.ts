@@ -1,6 +1,14 @@
 export type ListingStatus = "Active" | "Pending" | "Sold" | "Coming Soon";
 
-export type ListingSort = "newest" | "price-asc" | "price-desc" | "sqft-desc" | "sqft-asc";
+export type ListingSort =
+  | "newest"
+  | "price-asc"
+  | "price-desc"
+  | "sqft-desc"
+  | "sqft-asc"
+  | "lot-desc"
+  | "dom-asc"
+  | "dom-desc";
 
 export const LISTING_AMENITIES = [
   "spa",
@@ -69,6 +77,8 @@ export interface Listing {
   seniorCommunity?: boolean;
   /** Whether the MLS explicitly identifies a homeowner association. */
   association?: boolean;
+  /** Recurring association fees normalized to a monthly amount. */
+  associationFeeMonthly?: number;
   fireplace?: boolean;
   /** Normalized amenity tags derived from MLS property and association fields. */
   amenities?: ListingAmenity[];
@@ -110,6 +120,7 @@ export interface ListingFilters {
   newConstructionOnly?: boolean;
   seniorCommunityMode?: "exclude" | "only";
   noHoaOnly?: boolean;
+  maxHoaMonthly?: number;
   fireplaceOnly?: boolean;
   amenities?: ListingAmenity[];
   maxDaysOnMarket?: number;

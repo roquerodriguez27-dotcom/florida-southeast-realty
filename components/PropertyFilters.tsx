@@ -5,8 +5,6 @@ import { useState, type ReactNode } from "react";
 import MultiLocationField from "@/components/MultiLocationField";
 import type { ListingAmenity, ListingFilters, ListingSort } from "@/lib/types";
 
-const CURRENT_YEAR = new Date().getUTCFullYear();
-
 interface CurrentFilters {
   locations: string[];
   q?: string;
@@ -29,6 +27,7 @@ interface CurrentFilters {
   newConstruction?: string;
   senior?: string;
   noHoa?: string;
+  maxHoa?: string;
   fireplace?: string;
   amenities: ListingAmenity[];
   maxDom?: string;
@@ -152,6 +151,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
     current.newConstruction,
     current.senior,
     current.noHoa,
+    current.maxHoa,
     current.fireplace,
     ...current.amenities,
     current.maxDom,
@@ -289,7 +289,26 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
               <div className="mt-2">
                 <Amenity name="noHoa" label="No HOA / association" checked={current.noHoa === "1"} />
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-ink/50">“No HOA” includes only listings explicitly marked as having no association in BeachesMLS.</p>
+              <div className="mt-3 text-xs font-medium text-ink/60">
+                <label htmlFor="f-max-hoa">Maximum HOA / association fee</label>
+                <div className="relative mt-1">
+                  <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink/45">$</span>
+                  <input
+                    id="f-max-hoa"
+                    name="maxHoa"
+                    defaultValue={current.maxHoa ?? ""}
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    placeholder="Any"
+                    autoComplete="off"
+                    className="w-full rounded-sm border border-ink/15 bg-white py-2.5 pl-7 pr-20 text-sm outline-none focus:border-tide"
+                  />
+                  <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink/45">/ month</span>
+                </div>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-ink/50">“No HOA” requires an explicit no-association value. Fee limits normalize the MLS payment frequency to a monthly amount.</p>
 
               <h3 className="mt-6 text-sm font-semibold text-ink">Property features</h3>
               <p className="mt-1 text-xs text-ink/50">Matched against fields supplied by BeachesMLS.</p>
@@ -299,7 +318,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
                 <Amenity name="amenity" value="boat-dock" label="Boat dock / marina" checked={current.amenities.includes("boat-dock")} />
                 <Amenity name="amenity" value="spa" label="Spa / hot tub" checked={current.amenities.includes("spa")} />
                 <Amenity name="amenity" value="impact-windows" label="Impact windows" checked={current.amenities.includes("impact-windows")} />
-                <Amenity name="newConstruction" label={`New construction (${CURRENT_YEAR})`} checked={current.newConstruction === "1"} />
+                <Amenity name="newConstruction" label="New construction" checked={current.newConstruction === "1"} />
                 <Amenity name="fireplace" label="Fireplace" checked={current.fireplace === "1"} />
                 <Amenity name="amenity" value="horse-property" label="Horse / equestrian" checked={current.amenities.includes("horse-property")} />
               </div>

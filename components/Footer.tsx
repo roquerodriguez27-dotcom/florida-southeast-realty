@@ -52,6 +52,7 @@ export default async function Footer() {
             <h3 className="font-mono text-xs uppercase tracking-[0.15em] text-brass mb-4">Company</h3>
             <ul className="space-y-2 text-sm">
               <li><Link href="/about" className="hover:text-sand">About</Link></li>
+              <li><Link href="/join" className="hover:text-sand">Join Our Team</Link></li>
               <li><Link href="/testimonials" className="hover:text-sand">Client Reviews</Link></li>
               <li><Link href="/contact" className="hover:text-sand">Contact</Link></li>
               <li><Link href="/fair-housing" className="hover:text-sand">Fair Housing</Link></li>

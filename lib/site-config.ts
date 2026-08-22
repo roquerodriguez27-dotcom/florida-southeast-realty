@@ -3,6 +3,8 @@ export const SITE = {
   shortName: "Florida Southeast Realty",
   url: "https://www.floridasoutheastrealty.com",
   brokerName: "Roque Rodriguez",
+  brokerImage: "/roque-rodriguez-broker.webp",
+  brokerSince: 1997,
   phoneDisplay: "(973) 985-6011",
   phoneHref: "tel:+19739856011",
   email: "roque@floridasoutheastrealty.com",

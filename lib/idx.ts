@@ -18,6 +18,9 @@ const DEFAULT_MLS_DISCLAIMER =
   "© 2026 Beaches MLS. All Rights Reserved. This information is for your personal, non-commercial use and may not be used for any purpose other than to identify prospective properties you may be interested in purchasing. Display of MLS data is usually deemed reliable but is NOT guaranteed accurate by the MLS. Buyers are responsible for verifying the accuracy of all information and should investigate the data themselves or retain appropriate professionals. Information from sources other than the Listing Agent may have been included in the MLS data. Unless otherwise specified in writing, Broker/Agent has not and will not verify any information obtained from other sources. The Broker/Agent providing the information contained herein may or may not have been the Listing and/or Selling Agent.";
 const LISTING_PAGE_SIZE = 24;
 const REQUEST_TIMEOUT_MS = 10_000;
+const RESO_MAX_ATTEMPTS = 3;
+const RETRYABLE_RESO_STATUSES = new Set([429, 502, 503, 504]);
+const CURRENT_YEAR = new Date().getUTCFullYear();
 
 const RESO_SORTS: Record<ListingSort, string> = {
   newest: "ModificationTimestamp desc,ListPrice asc",
@@ -126,6 +129,22 @@ function getOriginatingSystemId(): string {
 
 export const IDX_PROVIDER = getAccessToken() ? ("reso" as const) : ("not_connected" as const);
 
+function retryDelayMilliseconds(attempt: number, retryAfter: string | null): number {
+  const fallback = 300 * (2 ** attempt);
+  if (!retryAfter) return fallback;
+
+  const seconds = Number(retryAfter);
+  const headerDelay = Number.isFinite(seconds)
+    ? seconds * 1_000
+    : Date.parse(retryAfter) - Date.now();
+  if (!Number.isFinite(headerDelay) || headerDelay <= 0) return fallback;
+  return Math.min(1_500, Math.max(fallback, headerDelay));
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 async function resoRequest(
   path: string,
   query: Record<string, string | number | boolean> = {},
@@ -138,28 +157,65 @@ async function resoRequest(
   const url = new URL(`${getApiBase()}/${path.replace(/^\/+/, "")}`);
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, String(value));
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${accessToken}`,
-        "User-Agent": "FloridaSoutheastRealty/1.0",
-      },
-      next: { revalidate, tags: ["beaches-mls-reso"] },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-  } catch {
-    if (reportFailures) {
-      console.error("[BeachesMLS RESO] API request failed.", {
-        resource: path.split("?")[0],
-        status: "network_error",
-      });
-    }
-    throw new Error("RESO Web API request failed.");
-  }
+  let lastFailure: { status: number | "network_error" | "invalid_payload"; code?: string; message?: string } = {
+    status: "network_error",
+  };
 
-  if (!response.ok) {
+  for (let attempt = 0; attempt < RESO_MAX_ATTEMPTS; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          "User-Agent": "FloridaSoutheastRealty/1.0",
+        },
+        next: { revalidate, tags: ["beaches-mls-reso"] },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      lastFailure = { status: "network_error" };
+      if (attempt < RESO_MAX_ATTEMPTS - 1) {
+        await wait(retryDelayMilliseconds(attempt, null));
+        continue;
+      }
+      break;
+    }
+
+    if (response.ok) {
+      try {
+        const envelope = asObject(await response.json());
+        const rawCount = envelope["@odata.count"];
+        const parsedCount =
+          typeof rawCount === "number"
+            ? rawCount
+            : typeof rawCount === "string" && Number.isFinite(Number(rawCount))
+              ? Number(rawCount)
+              : undefined;
+
+        // OData collection requests use `value`; an individual Property request
+        // returns the entity directly, so normalize both response shapes here.
+        const value = Array.isArray(envelope.value)
+          ? envelope.value
+          : firstString(envelope, ["ListingKey", "ListingId"])
+            ? [envelope]
+            : [];
+
+        return {
+          value,
+          count: parsedCount,
+          nextLink: firstString(envelope, ["@odata.nextLink"]) || undefined,
+        };
+      } catch {
+        lastFailure = { status: "invalid_payload" };
+        if (attempt < RESO_MAX_ATTEMPTS - 1) {
+          await wait(retryDelayMilliseconds(attempt, null));
+          continue;
+        }
+        break;
+      }
+    }
+
     let code = "";
     let message = "";
     try {
@@ -171,40 +227,30 @@ async function resoRequest(
     } catch {
       // The HTTP status remains sufficient for safe diagnostics.
     }
+    lastFailure = {
+      status: response.status,
+      ...(code ? { code } : {}),
+      ...(message ? { message: message.slice(0, 240) } : {}),
+    };
 
-    if (reportFailures) {
-      console.error("[BeachesMLS RESO] API request failed.", {
-        resource: path.split("?")[0],
-        status: response.status,
-        ...(code ? { code } : {}),
-        ...(message ? { message } : {}),
-      });
+    if (RETRYABLE_RESO_STATUSES.has(response.status) && attempt < RESO_MAX_ATTEMPTS - 1) {
+      await wait(retryDelayMilliseconds(attempt, response.headers.get("retry-after")));
+      continue;
     }
-    throw new Error(`RESO Web API request failed with status ${response.status}.`);
+    break;
   }
 
-  const envelope = asObject(await response.json());
-  const rawCount = envelope["@odata.count"];
-  const parsedCount =
-    typeof rawCount === "number"
-      ? rawCount
-      : typeof rawCount === "string" && Number.isFinite(Number(rawCount))
-        ? Number(rawCount)
-        : undefined;
-
-  // OData collection requests use `value`; an individual Property request
-  // returns the entity directly, so normalize both response shapes here.
-  const value = Array.isArray(envelope.value)
-    ? envelope.value
-    : firstString(envelope, ["ListingKey", "ListingId"])
-      ? [envelope]
-      : [];
-
-  return {
-    value,
-    count: parsedCount,
-    nextLink: firstString(envelope, ["@odata.nextLink"]) || undefined,
-  };
+  if (reportFailures) {
+    console.error("[BeachesMLS RESO] API request failed after bounded retries.", {
+      resource: path.split("?")[0],
+      ...lastFailure,
+    });
+  }
+  throw new Error(
+    typeof lastFailure.status === "number"
+      ? `RESO Web API request failed with status ${lastFailure.status}.`
+      : "RESO Web API request failed.",
+  );
 }
 
 function slugify(value: string): string {
@@ -428,7 +474,10 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
   const waterfront = isWaterfront(record);
   const privatePool = hasPrivatePool(record);
   const garageSpaces = firstNumber(record, ["GarageSpaces"]);
-  const newConstruction = truthy(record.NewConstructionYN);
+  const yearBuilt = firstNumber(record, ["YearBuilt"]);
+  // BeachesMLS exposes NewConstructionYN but does not consistently populate it
+  // in replication records. A current-year build is the reliable live fallback.
+  const newConstruction = truthy(record.NewConstructionYN) || yearBuilt >= CURRENT_YEAR;
   const seniorCommunity = truthy(record.SeniorCommunityYN);
   const fireplace = truthy(record.FireplaceYN);
   const photos = photoUrls(record);
@@ -457,7 +506,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     halfBaths: halfBaths || undefined,
     sqft: firstNumber(record, ["LivingArea", "BuildingAreaTotal", "SquareFeet"]),
     lotSqft: firstNumber(record, ["LotSizeSquareFeet", "LotSqFt"]) || undefined,
-    yearBuilt: firstNumber(record, ["YearBuilt"]),
+    yearBuilt,
     waterfront,
     privatePool,
     garageSpaces: garageSpaces || undefined,
@@ -521,6 +570,11 @@ function contains(field: string, value: string): string {
   return `contains(${field},${odataString(value)})`;
 }
 
+function postalCode(value: string): string | null {
+  const trimmed = value.trim();
+  return /^(?:33|34)\d{3}(?:-\d{4})?$/.test(trimmed) ? trimmed.slice(0, 5) : null;
+}
+
 const STREET_SUFFIXES = new Set([
   "avenue", "ave", "boulevard", "blvd", "circle", "cir", "court", "ct",
   "drive", "dr", "highway", "hwy", "lane", "ln", "loop", "parkway", "pkwy",
@@ -549,6 +603,9 @@ function streetAddressTokens(value: string): string[] | null {
 }
 
 function locationSearchCondition(value: string): string {
+  const exactPostalCode = postalCode(value);
+  if (exactPostalCode) return `PostalCode eq ${odataString(exactPostalCode)}`;
+
   const addressTokens = streetAddressTokens(value);
   if (addressTokens) {
     return `(${addressTokens.map((token) => contains("UnparsedAddress", token)).join(" and ")})`;
@@ -559,54 +616,13 @@ function locationSearchCondition(value: string): string {
 }
 
 function areaSearchCondition(value: string): string {
+  const exactPostalCode = postalCode(value);
+  if (exactPostalCode) return `PostalCode eq ${odataString(exactPostalCode)}`;
+
   const fields = ["City", "PostalCode", "SubdivisionName"];
   // Keep the individual area terms ungrouped so the combined multi-area
   // expression stays within FBS RESO's two-level nesting limit.
   return fields.map((field) => contains(field, value)).join(" or ");
-}
-
-function polygonSearchCondition(points: NonNullable<ListingFilters["polygon"]>): string | null {
-  if (points.length < 3) return null;
-  const latitudes = points.map((point) => point.lat);
-  const south = Math.min(...latitudes);
-  const north = Math.max(...latitudes);
-  if (!Number.isFinite(south) || !Number.isFinite(north) || north <= south) return null;
-
-  const bandCount = Math.min(8, Math.max(4, points.length));
-  const bandHeight = (north - south) / bandCount;
-  const rectangles: string[] = [];
-  const closed = [...points, points[0]];
-
-  for (let index = 0; index < bandCount; index += 1) {
-    const bandSouth = south + index * bandHeight;
-    const bandNorth = index === bandCount - 1 ? north : bandSouth + bandHeight;
-    const samples = [bandSouth, (bandSouth + bandNorth) / 2, bandNorth];
-    const longitudes: number[] = [];
-
-    for (const latitude of samples) {
-      for (let edge = 0; edge < closed.length - 1; edge += 1) {
-        const start = closed[edge];
-        const end = closed[edge + 1];
-        if (!start || !end || start.lat === end.lat) continue;
-        if (latitude < Math.min(start.lat, end.lat) || latitude > Math.max(start.lat, end.lat)) continue;
-        const ratio = (latitude - start.lat) / (end.lat - start.lat);
-        if (ratio < 0 || ratio > 1) continue;
-        longitudes.push(start.lng + ratio * (end.lng - start.lng));
-      }
-    }
-
-    if (longitudes.length < 2) continue;
-    const west = Math.min(...longitudes);
-    const east = Math.max(...longitudes);
-    // FBS RESO allows at most two nested filter levels. The outer union below
-    // provides the grouping; `and` binds more tightly than `or`, so each band
-    // does not need another pair of parentheses.
-    rectangles.push(
-      `Latitude ge ${bandSouth} and Latitude le ${bandNorth} and Longitude ge ${west} and Longitude le ${east}`,
-    );
-  }
-
-  return rectangles.length ? `(${rectangles.join(" or ")})` : null;
 }
 
 function pointInPolygon(
@@ -670,9 +686,20 @@ function buildResoFilter(filters: ListingFilters): string {
   if (Number.isFinite(filters.minYearBuilt) && Number(filters.minYearBuilt) > 0) {
     conditions.push(`YearBuilt ge ${Number(filters.minYearBuilt)}`);
   }
+  if (Number.isFinite(filters.maxDaysOnMarket) && Number(filters.maxDaysOnMarket) > 0) {
+    conditions.push(`DaysOnMarket le ${Number(filters.maxDaysOnMarket)}`);
+  }
   if (filters.waterfrontOnly) conditions.push("WaterfrontYN eq true");
   if (filters.privatePoolOnly) conditions.push("PoolPrivateYN eq true");
-  if (filters.garageOnly) conditions.push("GarageSpaces ge 1");
+  const minGarageSpaces = Math.max(
+    filters.garageOnly ? 1 : 0,
+    Number.isFinite(filters.minGarageSpaces) ? Number(filters.minGarageSpaces) : 0,
+  );
+  if (minGarageSpaces > 0) conditions.push(`GarageSpaces ge ${minGarageSpaces}`);
+  if (filters.newConstructionOnly) conditions.push(`YearBuilt ge ${CURRENT_YEAR}`);
+  if (filters.fireplaceOnly) conditions.push("FireplaceYN eq true");
+  if (filters.seniorCommunityMode === "only") conditions.push("SeniorCommunityYN eq true");
+  if (filters.seniorCommunityMode === "exclude") conditions.push("SeniorCommunityYN ne true");
 
   if (filters.propertyType) {
     const values: Partial<Record<PropertyType, string[]>> = {
@@ -695,11 +722,19 @@ function buildResoFilter(filters: ListingFilters): string {
     conditions.push(`(${contains("City", value)} or ${contains("SubdivisionName", value)})`);
   }
 
-  const polygonCondition = filters.polygon ? polygonSearchCondition(filters.polygon) : null;
-  if (polygonCondition) {
-    conditions.push(polygonCondition);
-  } else if (filters.bounds) {
-    const { north, south, east, west } = filters.bounds;
+  // The provider rejects deeply nested polygon unions. Query the polygon's
+  // flat bounding box through RESO, then enforce the exact shape locally.
+  const polygonBounds = filters.polygon?.length
+    ? {
+        north: Math.max(...filters.polygon.map((point) => point.lat)),
+        south: Math.min(...filters.polygon.map((point) => point.lat)),
+        east: Math.max(...filters.polygon.map((point) => point.lng)),
+        west: Math.min(...filters.polygon.map((point) => point.lng)),
+      }
+    : undefined;
+  const requestedBounds = polygonBounds ?? filters.bounds;
+  if (requestedBounds) {
+    const { north, south, east, west } = requestedBounds;
     if ([north, south, east, west].every(Number.isFinite)) {
       conditions.push(`Latitude ge ${south}`);
       conditions.push(`Latitude le ${north}`);
@@ -718,13 +753,24 @@ export async function fetchLiveListingPage(
   if (!getAccessToken()) return null;
 
   const currentPage = Math.max(1, Math.floor(page) || 1);
-  // BeachesMLS returns PoolPrivateYN in listing records but its replication
-  // endpoint currently ignores that field when it appears in `$filter`.
-  // Pull a wider, paginated candidate window and enforce the Boolean locally
-  // so a private-pool search never displays a non-private-pool property.
-  const exactPoolFallback = filters.privatePoolOnly === true;
-  const providerFilters = exactPoolFallback ? { ...filters, privatePoolOnly: false } : filters;
-  const providerPageSize = exactPoolFallback ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
+  // BeachesMLS returns several Boolean amenities in listing records but does
+  // not consistently enforce them in `$filter`. Polygon searches also need
+  // point-in-shape verification. Pull a wider candidate window for those cases,
+  // then enforce exact matches locally.
+  const exactAmenityFallback = Boolean(
+    filters.privatePoolOnly
+      || filters.fireplaceOnly
+      || filters.seniorCommunityMode === "only",
+  );
+  const providerFilters = {
+    ...filters,
+    privatePoolOnly: false,
+    fireplaceOnly: false,
+    seniorCommunityMode: undefined,
+  };
+  const exactPolygonFallback = Boolean(filters.polygon?.length);
+  const widerCandidateWindow = exactAmenityFallback || exactPolygonFallback;
+  const providerPageSize = widerCandidateWindow ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
   const payload = await resoRequest("Property", {
     "$filter": buildResoFilter(providerFilters),
     "$expand": "Media($top=24;$orderby=Order)",
@@ -733,19 +779,43 @@ export async function fetchLiveListingPage(
     "$count": true,
     "$orderby": RESO_SORTS[filters.sort ?? "newest"],
   });
+  const minGarageSpaces = Math.max(
+    filters.garageOnly ? 1 : 0,
+    Number.isFinite(filters.minGarageSpaces) ? Number(filters.minGarageSpaces) : 0,
+  );
   const listings = payload.value
     .map((record) => normalizeListing(record, "Summary"))
     .filter((listing): listing is Listing => Boolean(listing))
     .filter((listing) => !listing.forLease)
     .filter((listing) => !filters.privatePoolOnly || listing.privatePool)
     .filter((listing) => !filters.baths || listing.baths >= filters.baths)
+    .filter((listing) => minGarageSpaces <= 0 || (listing.garageSpaces ?? 0) >= minGarageSpaces)
+    .filter((listing) => !filters.newConstructionOnly || listing.newConstruction === true)
+    .filter((listing) => !filters.fireplaceOnly || listing.fireplace === true)
+    .filter((listing) => filters.seniorCommunityMode !== "only" || listing.seniorCommunity === true)
+    .filter((listing) => filters.seniorCommunityMode !== "exclude" || listing.seniorCommunity !== true)
+    .filter((listing) => !filters.maxDaysOnMarket || listing.daysOnMarket <= filters.maxDaysOnMarket)
     .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon))
     .slice(0, LISTING_PAGE_SIZE);
   const providerTotalRows = payload.count ?? ((currentPage - 1) * providerPageSize + payload.value.length);
-  const totalRows = exactPoolFallback ? listings.length : providerTotalRows;
-  const totalPages = payload.count !== undefined
-    ? Math.max(1, Math.ceil(providerTotalRows / providerPageSize))
-    : payload.nextLink
+  const locallyVerifiedBoolean = Boolean(
+    filters.privatePoolOnly
+      || filters.fireplaceOnly
+      || filters.seniorCommunityMode,
+  );
+  const totalRowsExact = !exactPolygonFallback && !locallyVerifiedBoolean;
+  const totalRows = totalRowsExact ? providerTotalRows : listings.length;
+  const hasMoreProviderRows = Boolean(
+    payload.nextLink
+      || (payload.count !== undefined && currentPage * providerPageSize < providerTotalRows),
+  );
+  const totalPages = totalRowsExact
+    ? payload.count !== undefined
+      ? Math.max(1, Math.ceil(providerTotalRows / providerPageSize))
+      : hasMoreProviderRows
+        ? currentPage + 1
+        : currentPage
+    : hasMoreProviderRows
       ? currentPage + 1
       : currentPage;
 
@@ -758,7 +828,7 @@ export async function fetchLiveListingPage(
       pageSize: LISTING_PAGE_SIZE,
       totalPages,
       totalRows,
-      totalRowsExact: !exactPoolFallback,
+      totalRowsExact,
     },
   };
 }

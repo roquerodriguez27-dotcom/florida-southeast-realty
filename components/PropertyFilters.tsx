@@ -5,6 +5,8 @@ import { useState, type ReactNode } from "react";
 import MultiLocationField from "@/components/MultiLocationField";
 import type { ListingFilters, ListingSort } from "@/lib/types";
 
+const CURRENT_YEAR = new Date().getUTCFullYear();
+
 interface CurrentFilters {
   locations: string[];
   q?: string;
@@ -20,6 +22,11 @@ interface CurrentFilters {
   waterfront?: string;
   pool?: string;
   garage?: string;
+  garageSpaces?: string;
+  newConstruction?: string;
+  senior?: string;
+  fireplace?: string;
+  maxDom?: string;
   newer?: string;
   spacious?: string;
   largeLot?: string;
@@ -89,7 +96,11 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
     current.minYearBuilt,
     current.waterfront,
     current.pool,
-    current.garage,
+    current.garageSpaces || current.garage,
+    current.newConstruction,
+    current.senior,
+    current.fireplace,
+    current.maxDom,
     current.newer,
     current.spacious,
     current.largeLot,
@@ -97,6 +108,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
   const [showMore, setShowMore] = useState(advancedCount > 0);
   const priceLabel = [compactPrice(current.minPrice), compactPrice(current.maxPrice)].filter(Boolean).join(" – ");
   const bedBathLabel = [current.beds ? `${current.beds}+ bd` : "", current.baths ? `${current.baths}+ ba` : ""].filter(Boolean).join(" · ");
+  const garageSpaces = current.garageSpaces || (current.garage === "1" ? "1" : "");
 
   return (
     <form
@@ -176,17 +188,33 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
                 <NumberField id="f-min-sqft" name="minSqft" label="Min. living area" value={current.minSqft} placeholder="Sq. ft." />
                 <NumberField id="f-max-sqft" name="maxSqft" label="Max. living area" value={current.maxSqft} placeholder="Sq. ft." />
                 <NumberField id="f-lot-sqft" name="minLotSqft" label="Min. lot size" value={current.minLotSqft} placeholder="Sq. ft." />
-                <NumberField id="f-year-built" name="minYearBuilt" label="Year built after" value={current.minYearBuilt} placeholder="Any year" />
+                <NumberField id="f-year-built" name="minYearBuilt" label="Built in or after" value={current.minYearBuilt} placeholder="Any year" />
+                <label className="text-xs font-medium text-ink/60" htmlFor="f-garage-spaces">Garage spaces
+                  <select id="f-garage-spaces" name="garageSpaces" defaultValue={garageSpaces} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
+                    <option value="">Any</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option>
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-ink/60" htmlFor="f-max-dom">Time on market
+                  <select id="f-max-dom" name="maxDom" defaultValue={current.maxDom ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
+                    <option value="">Any</option><option value="1">Listed today</option><option value="7">7 days or less</option><option value="14">14 days or less</option><option value="30">30 days or less</option><option value="60">60 days or less</option><option value="90">90 days or less</option>
+                  </select>
+                </label>
+                <label className="col-span-2 text-xs font-medium text-ink/60 sm:col-span-1" htmlFor="f-senior">55+ communities
+                  <select id="f-senior" name="senior" defaultValue={current.senior ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
+                    <option value="">Include all</option><option value="exclude">Exclude 55+</option><option value="only">55+ only</option>
+                  </select>
+                </label>
               </div>
             </section>
 
             <section>
-              <h2 className="text-sm font-semibold text-ink">Popular features &amp; size</h2>
-              <p className="mt-1 text-xs text-ink/50">Quick filters use live, reliably searchable BeachesMLS fields.</p>
+              <h2 className="text-sm font-semibold text-ink">Amenities &amp; lifestyle</h2>
+              <p className="mt-1 text-xs text-ink/50">MLS-verified features plus useful size shortcuts.</p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
                 <Amenity name="pool" label="Private pool" checked={current.pool === "1"} />
                 <Amenity name="waterfront" label="Waterfront" checked={current.waterfront === "1"} />
-                <Amenity name="garage" label="Garage" checked={current.garage === "1"} />
+                <Amenity name="newConstruction" label={`New construction / ${CURRENT_YEAR}+`} checked={current.newConstruction === "1"} />
+                <Amenity name="fireplace" label="Fireplace" checked={current.fireplace === "1"} />
                 <Amenity name="newer" label="Built 2020+" checked={current.newer === "1"} />
                 <Amenity name="spacious" label="2,000+ sq. ft." checked={current.spacious === "1"} />
                 <Amenity name="largeLot" label="10,000+ sq. ft. lot" checked={current.largeLot === "1"} />

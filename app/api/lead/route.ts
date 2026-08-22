@@ -11,8 +11,9 @@ import { z } from "zod";
  * Broker email delivery is then attempted separately so the response can
  * report CRM storage and notification delivery truthfully.
  *
- * RESEND_API_KEY and RESEND_FROM_EMAIL enable broker notification emails.
- * RESEND_TO_EMAIL defaults to the brokerage email in site-config. An optional
+ * RESEND_API_KEY enables broker notification emails. RESEND_FROM_EMAIL may
+ * override the website@ brokerage-domain sender, and RESEND_TO_EMAIL defaults
+ * to the brokerage email in site-config. An optional
  * LEAD_WEBHOOK_URL may also mirror the inquiry to another authorized system.
  *
  * Add real reCAPTCHA/hCaptcha verification here before going live —

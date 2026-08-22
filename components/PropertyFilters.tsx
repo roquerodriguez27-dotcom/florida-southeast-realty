@@ -17,7 +17,10 @@ interface CurrentFilters {
   minSqft?: string;
   maxSqft?: string;
   minLotSqft?: string;
+  maxLotSqft?: string;
   minYearBuilt?: string;
+  maxYearBuilt?: string;
+  listingStatus?: string;
   type?: string;
   waterfront?: string;
   pool?: string;
@@ -27,9 +30,6 @@ interface CurrentFilters {
   senior?: string;
   fireplace?: string;
   maxDom?: string;
-  newer?: string;
-  spacious?: string;
-  largeLot?: string;
   bounds?: NonNullable<ListingFilters["bounds"]>;
   shape?: string;
   view?: "map";
@@ -87,13 +87,40 @@ function Amenity({ name, label, checked }: { name: string; label: string; checke
   );
 }
 
+function basicFiltersHref(current: CurrentFilters): string {
+  const query = new URLSearchParams();
+  for (const location of current.locations) query.append("location", location);
+  for (const [key, value] of [
+    ["minPrice", current.minPrice],
+    ["maxPrice", current.maxPrice],
+    ["beds", current.beds],
+    ["baths", current.baths],
+    ["type", current.type],
+    ["shape", current.shape],
+    ["view", current.view],
+    ["sort", current.sort === "newest" ? undefined : current.sort],
+  ] as const) {
+    if (value) query.set(key, value);
+  }
+  if (current.bounds) {
+    query.set("north", String(current.bounds.north));
+    query.set("south", String(current.bounds.south));
+    query.set("east", String(current.bounds.east));
+    query.set("west", String(current.bounds.west));
+  }
+  return `/properties${query.size ? `?${query.toString()}` : ""}`;
+}
+
 export default function PropertyFilters({ current }: { current: CurrentFilters }) {
   const advancedCount = [
     current.q,
     current.minSqft,
     current.maxSqft,
     current.minLotSqft,
+    current.maxLotSqft,
     current.minYearBuilt,
+    current.maxYearBuilt,
+    current.listingStatus,
     current.waterfront,
     current.pool,
     current.garageSpaces || current.garage,
@@ -101,9 +128,6 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
     current.senior,
     current.fireplace,
     current.maxDom,
-    current.newer,
-    current.spacious,
-    current.largeLot,
   ].filter(Boolean).length;
   const [showMore, setShowMore] = useState(advancedCount > 0);
   const priceLabel = [compactPrice(current.minPrice), compactPrice(current.maxPrice)].filter(Boolean).join(" – ");
@@ -176,22 +200,28 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
       </div>
 
       {showMore ? (
-        <div className="mt-4 border-t border-ink/10 pt-4">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
-            <section>
-              <h2 className="text-sm font-semibold text-ink">Property details</h2>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="col-span-2 sm:col-span-3">
-                  <label htmlFor="f-q" className="text-xs font-medium text-ink/60">Address, ZIP, subdivision, or MLS number</label>
-                  <input id="f-q" name="q" defaultValue={current.q} type="text" placeholder="Example: 2815 SW 9th Street or B26065561" className="mt-1 w-full rounded-sm border border-ink/15 px-3 py-2.5 text-sm outline-none focus:border-tide" />
-                </div>
-                <NumberField id="f-min-sqft" name="minSqft" label="Min. living area" value={current.minSqft} placeholder="Sq. ft." />
-                <NumberField id="f-max-sqft" name="maxSqft" label="Max. living area" value={current.maxSqft} placeholder="Sq. ft." />
-                <NumberField id="f-lot-sqft" name="minLotSqft" label="Min. lot size" value={current.minLotSqft} placeholder="Sq. ft." />
-                <NumberField id="f-year-built" name="minYearBuilt" label="Built in or after" value={current.minYearBuilt} placeholder="Any year" />
-                <label className="text-xs font-medium text-ink/60" htmlFor="f-garage-spaces">Garage spaces
-                  <select id="f-garage-spaces" name="garageSpaces" defaultValue={garageSpaces} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
-                    <option value="">Any</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option>
+        <div className="mt-4 overflow-hidden rounded-sm border border-ink/10 bg-sand/35">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ink/10 bg-white px-4 py-4 md:px-5">
+            <div>
+              <h2 className="font-display text-xl text-ink">More filters</h2>
+              <p className="mt-0.5 text-xs text-ink/55">Choose exact MLS criteria. Blank fields mean no limit.</p>
+            </div>
+            <button type="button" onClick={() => setShowMore(false)} className="rounded-sm border border-ink/15 bg-white px-3 py-2 text-sm font-medium text-ink/70 hover:border-tide/30" aria-label="Close more filters">Done</button>
+          </div>
+
+          <div className="grid gap-0 lg:grid-cols-3">
+            <section className="border-b border-ink/10 p-4 md:p-5 lg:border-b-0 lg:border-r">
+              <h3 className="text-sm font-semibold text-ink">Search focus</h3>
+              <div className="mt-3 grid gap-3">
+                <label htmlFor="f-q" className="text-xs font-medium text-ink/60">Address, subdivision, or MLS number
+                  <input id="f-q" name="q" defaultValue={current.q} type="text" placeholder="Address, community, or MLS #" className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide" />
+                </label>
+                <label className="text-xs font-medium text-ink/60" htmlFor="f-listing-status">Listing status
+                  <select id="f-listing-status" name="listingStatus" defaultValue={current.listingStatus ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
+                    <option value="">Active, coming soon &amp; under contract</option>
+                    <option value="active">Active only</option>
+                    <option value="coming-soon">Coming soon only</option>
+                    <option value="under-contract">Under contract only</option>
                   </select>
                 </label>
                 <label className="text-xs font-medium text-ink/60" htmlFor="f-max-dom">Time on market
@@ -199,7 +229,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
                     <option value="">Any</option><option value="1">Listed today</option><option value="7">7 days or less</option><option value="14">14 days or less</option><option value="30">30 days or less</option><option value="60">60 days or less</option><option value="90">90 days or less</option>
                   </select>
                 </label>
-                <label className="col-span-2 text-xs font-medium text-ink/60 sm:col-span-1" htmlFor="f-senior">55+ communities
+                <label className="text-xs font-medium text-ink/60" htmlFor="f-senior">55+ communities
                   <select id="f-senior" name="senior" defaultValue={current.senior ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
                     <option value="">Include all</option><option value="exclude">Exclude 55+</option><option value="only">55+ only</option>
                   </select>
@@ -207,23 +237,38 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
               </div>
             </section>
 
-            <section>
-              <h2 className="text-sm font-semibold text-ink">Amenities &amp; lifestyle</h2>
-              <p className="mt-1 text-xs text-ink/50">MLS-verified features plus useful size shortcuts.</p>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+            <section className="border-b border-ink/10 p-4 md:p-5 lg:border-b-0 lg:border-r">
+              <h3 className="text-sm font-semibold text-ink">Size, lot &amp; age</h3>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <NumberField id="f-min-sqft" name="minSqft" label="Min. living area" value={current.minSqft} placeholder="Sq. ft." />
+                <NumberField id="f-max-sqft" name="maxSqft" label="Max. living area" value={current.maxSqft} placeholder="Sq. ft." />
+                <NumberField id="f-min-lot-sqft" name="minLotSqft" label="Min. lot size" value={current.minLotSqft} placeholder="Sq. ft." />
+                <NumberField id="f-max-lot-sqft" name="maxLotSqft" label="Max. lot size" value={current.maxLotSqft} placeholder="Sq. ft." />
+                <NumberField id="f-min-year-built" name="minYearBuilt" label="Built from" value={current.minYearBuilt} placeholder="Any year" />
+                <NumberField id="f-max-year-built" name="maxYearBuilt" label="Built through" value={current.maxYearBuilt} placeholder="Any year" />
+                <label className="col-span-2 text-xs font-medium text-ink/60" htmlFor="f-garage-spaces">Garage spaces
+                  <select id="f-garage-spaces" name="garageSpaces" defaultValue={garageSpaces} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
+                    <option value="">Any</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section className="p-4 md:p-5">
+              <h3 className="text-sm font-semibold text-ink">Must-have features</h3>
+              <p className="mt-1 text-xs text-ink/50">These selections use fields supplied by BeachesMLS.</p>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <Amenity name="pool" label="Private pool" checked={current.pool === "1"} />
                 <Amenity name="waterfront" label="Waterfront" checked={current.waterfront === "1"} />
-                <Amenity name="newConstruction" label={`New construction / ${CURRENT_YEAR}+`} checked={current.newConstruction === "1"} />
+                <Amenity name="newConstruction" label={`New construction (${CURRENT_YEAR})`} checked={current.newConstruction === "1"} />
                 <Amenity name="fireplace" label="Fireplace" checked={current.fireplace === "1"} />
-                <Amenity name="newer" label="Built 2020+" checked={current.newer === "1"} />
-                <Amenity name="spacious" label="2,000+ sq. ft." checked={current.spacious === "1"} />
-                <Amenity name="largeLot" label="10,000+ sq. ft. lot" checked={current.largeLot === "1"} />
               </div>
             </section>
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 pt-4">
-            <Link href="/properties" className="text-sm font-medium text-tide underline underline-offset-4">Clear all filters</Link>
-            <button type="submit" className="rounded-sm bg-tide px-5 py-2.5 text-sm font-semibold text-sand hover:bg-tide-light">Apply filters</button>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 bg-white px-4 py-4 md:px-5">
+            <Link href={basicFiltersHref(current)} className="text-sm font-medium text-tide underline underline-offset-4">Reset more filters</Link>
+            <button type="submit" className="rounded-sm bg-tide px-6 py-2.5 text-sm font-semibold text-sand hover:bg-tide-light">Show matching homes</button>
           </div>
         </div>
       ) : null}

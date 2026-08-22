@@ -78,7 +78,10 @@ export interface ListingFilters {
   minSqft?: number;
   maxSqft?: number;
   minLotSqft?: number;
+  maxLotSqft?: number;
   minYearBuilt?: number;
+  maxYearBuilt?: number;
+  listingStatus?: "active" | "coming-soon" | "under-contract";
   propertyType?: PropertyType;
   waterfrontOnly?: boolean;
   privatePoolOnly?: boolean;

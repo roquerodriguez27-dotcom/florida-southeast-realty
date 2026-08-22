@@ -644,9 +644,16 @@ function pointInPolygon(
 }
 
 function buildResoFilter(filters: ListingFilters): string {
+  const statusCondition = filters.listingStatus === "active"
+    ? "StandardStatus eq 'Active'"
+    : filters.listingStatus === "coming-soon"
+      ? "StandardStatus eq 'Coming Soon'"
+      : filters.listingStatus === "under-contract"
+        ? "StandardStatus eq 'Active Under Contract'"
+        : "(StandardStatus eq 'Active' or StandardStatus eq 'Coming Soon' or StandardStatus eq 'Active Under Contract')";
   const conditions = [
     `OriginatingSystemID eq ${odataString(getOriginatingSystemId())}`,
-    "(StandardStatus eq 'Active' or StandardStatus eq 'Coming Soon' or StandardStatus eq 'Active Under Contract')",
+    statusCondition,
     "PropertyType ne 'Residential Lease'",
     "PropertyType ne 'Commercial Lease'",
   ];
@@ -683,8 +690,14 @@ function buildResoFilter(filters: ListingFilters): string {
   if (Number.isFinite(filters.minLotSqft) && Number(filters.minLotSqft) > 0) {
     conditions.push(`LotSizeSquareFeet ge ${Number(filters.minLotSqft)}`);
   }
+  if (Number.isFinite(filters.maxLotSqft) && Number(filters.maxLotSqft) > 0) {
+    conditions.push(`LotSizeSquareFeet le ${Number(filters.maxLotSqft)}`);
+  }
   if (Number.isFinite(filters.minYearBuilt) && Number(filters.minYearBuilt) > 0) {
     conditions.push(`YearBuilt ge ${Number(filters.minYearBuilt)}`);
+  }
+  if (Number.isFinite(filters.maxYearBuilt) && Number(filters.maxYearBuilt) > 0) {
+    conditions.push(`YearBuilt le ${Number(filters.maxYearBuilt)}`);
   }
   if (Number.isFinite(filters.maxDaysOnMarket) && Number(filters.maxDaysOnMarket) > 0) {
     conditions.push(`DaysOnMarket le ${Number(filters.maxDaysOnMarket)}`);

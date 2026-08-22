@@ -34,7 +34,10 @@ interface Props {
     minSqft?: string;
     maxSqft?: string;
     minLotSqft?: string;
+    maxLotSqft?: string;
     minYearBuilt?: string;
+    maxYearBuilt?: string;
+    listingStatus?: string;
     type?: string;
     waterfront?: string;
     pool?: string;
@@ -71,6 +74,10 @@ function listingSort(value?: string): ListingSort {
 
 function seniorCommunityMode(value?: string): "exclude" | "only" | undefined {
   return value === "exclude" || value === "only" ? value : undefined;
+}
+
+function listingStatusMode(value?: string): "active" | "coming-soon" | "under-contract" | undefined {
+  return value === "active" || value === "coming-soon" || value === "under-contract" ? value : undefined;
 }
 
 function optionalNonNegativeNumber(value?: string): number | undefined {
@@ -185,6 +192,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
   const minGarageSpaces = Math.max(optionalPositiveInteger(params.garageSpaces) ?? 0, params.garage === "1" ? 1 : 0) || undefined;
   const maxDaysOnMarket = optionalPositiveInteger(params.maxDom);
   const selectedSeniorCommunityMode = seniorCommunityMode(params.senior);
+  const selectedListingStatus = listingStatusMode(params.listingStatus);
 
   const result = await searchListingPage({
     q: propertyQuery,
@@ -196,7 +204,10 @@ export default async function PropertiesPage({ searchParams }: Props) {
     minSqft,
     maxSqft: optionalPositiveInteger(params.maxSqft),
     minLotSqft,
+    maxLotSqft: optionalPositiveInteger(params.maxLotSqft),
     minYearBuilt,
+    maxYearBuilt: optionalPositiveInteger(params.maxYearBuilt),
+    listingStatus: selectedListingStatus,
     propertyType: propertyType(params.type),
     waterfrontOnly: params.waterfront === "1",
     privatePoolOnly: params.pool === "1",
@@ -214,7 +225,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
   const addressQuery = looksLikeStreetAddress(propertyQuery) ? propertyQuery : undefined;
   const hasSecondaryFilters = Boolean(
     locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.baths
-      || params.minSqft || params.maxSqft || params.minLotSqft || params.minYearBuilt || params.type
+      || params.minSqft || params.maxSqft || params.minLotSqft || params.maxLotSqft
+      || params.minYearBuilt || params.maxYearBuilt || selectedListingStatus || params.type
       || params.waterfront === "1" || params.pool === "1" || params.garage === "1"
       || params.garageSpaces || params.newConstruction === "1" || selectedSeniorCommunityMode
       || params.fireplace === "1" || params.maxDom
@@ -273,7 +285,10 @@ export default async function PropertiesPage({ searchParams }: Props) {
           minSqft: params.minSqft,
           maxSqft: params.maxSqft,
           minLotSqft: params.minLotSqft,
+          maxLotSqft: params.maxLotSqft,
           minYearBuilt: params.minYearBuilt,
+          maxYearBuilt: params.maxYearBuilt,
+          listingStatus: params.listingStatus,
           type: params.type,
           waterfront: params.waterfront,
           pool: params.pool,
@@ -283,9 +298,6 @@ export default async function PropertiesPage({ searchParams }: Props) {
           senior: params.senior,
           fireplace: params.fireplace,
           maxDom: params.maxDom,
-          newer: params.newer,
-          spacious: params.spacious,
-          largeLot: params.largeLot,
           bounds,
           shape: params.shape,
           view: params.view === "map" ? "map" : undefined,
@@ -302,7 +314,10 @@ export default async function PropertiesPage({ searchParams }: Props) {
           minSqft: minSqft ? String(minSqft) : undefined,
           maxSqft: params.maxSqft,
           minLotSqft: minLotSqft ? String(minLotSqft) : undefined,
+          maxLotSqft: params.maxLotSqft,
           minYearBuilt: minYearBuilt ? String(minYearBuilt) : undefined,
+          maxYearBuilt: params.maxYearBuilt,
+          listingStatus: selectedListingStatus,
           propertyType: params.type,
           waterfrontOnly: params.waterfront === "1",
           privatePoolOnly: params.pool === "1",

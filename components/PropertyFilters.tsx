@@ -108,16 +108,15 @@ function FilterMenu({
         <span>{value || label}</span>
         <span aria-hidden className={`text-xs opacity-50 transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
       </button>
-      {open ? (
-        <div
-          id={panelId}
-          role="group"
-          aria-label={`${label} filters`}
-          className="absolute left-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-sm border border-ink/10 bg-white p-4 shadow-xl sm:left-auto sm:right-0"
-        >
-          {children}
-        </div>
-      ) : null}
+      <div
+        id={panelId}
+        role="group"
+        aria-label={`${label} filters`}
+        hidden={!open}
+        className="absolute left-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-sm border border-ink/10 bg-white p-4 shadow-xl sm:left-auto sm:right-0"
+      >
+        {children}
+      </div>
     </div>
   );
 }

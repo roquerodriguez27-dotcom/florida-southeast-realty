@@ -177,7 +177,12 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.minSqft && l.sqft < filters.minSqft) return false;
     if (filters.maxSqft && l.sqft > filters.maxSqft) return false;
     if (filters.minLotSqft && (l.lotSqft ?? 0) < filters.minLotSqft) return false;
+    if (filters.maxLotSqft && (l.lotSqft ?? 0) > filters.maxLotSqft) return false;
     if (filters.minYearBuilt && l.yearBuilt < filters.minYearBuilt) return false;
+    if (filters.maxYearBuilt && l.yearBuilt > filters.maxYearBuilt) return false;
+    if (filters.listingStatus === "active" && l.status !== "Active") return false;
+    if (filters.listingStatus === "coming-soon" && l.status !== "Coming Soon") return false;
+    if (filters.listingStatus === "under-contract" && l.status !== "Pending") return false;
     if (filters.propertyType && l.propertyType !== filters.propertyType) return false;
     if (filters.waterfrontOnly && !l.waterfront) return false;
     if (filters.privatePoolOnly && !l.privatePool) return false;

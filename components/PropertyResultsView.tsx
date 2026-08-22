@@ -98,6 +98,9 @@ export default function PropertyResultsView({
               <option value="price-desc">Price: high to low</option>
               <option value="sqft-desc">Square footage: largest first</option>
               <option value="sqft-asc">Square footage: smallest first</option>
+              <option value="lot-desc">Lot size: largest first</option>
+              <option value="dom-asc">Days on market: newest first</option>
+              <option value="dom-desc">Days on market: longest first</option>
             </select>
           </label>
           <div className="inline-grid grid-cols-2 rounded-sm border border-tide/20 bg-white p-1" role="group" aria-label="Property results view">

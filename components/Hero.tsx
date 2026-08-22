@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import lakeWorthBeachHero from "@/public/lake-worth-beach-pier.webp";
 import SearchPanel from "./SearchPanel";
 
 export default function Hero() {
@@ -7,14 +8,25 @@ export default function Hero() {
     <section className="relative">
       <div className="relative h-[88svh] min-h-[620px] w-full overflow-hidden bg-tide">
         <Image
-          src="https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?auto=format&fit=crop&w=2000&q=85"
-          alt="South Florida waterfront homes at golden hour"
+          src={lakeWorthBeachHero}
+          alt="Aerial view of Lake Worth Beach Pier and the Palm Beach County coastline"
           fill
-          priority
+          preload
+          placeholder="blur"
           sizes="100vw"
-          className="object-cover"
+          className="object-cover object-[62%_center] md:object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-tide/95 via-tide/35 to-tide/55" />
+
+        <a
+          href="https://unsplash.com/photos/an-aerial-view-of-a-beach-and-a-pier-zoiydkKd0dc"
+          target="_blank"
+          rel="noreferrer"
+          className="absolute bottom-12 right-4 z-10 rounded-full border border-sand/20 bg-tide/60 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-sand/80 backdrop-blur-sm transition-colors hover:bg-tide/75 sm:bottom-14 sm:right-6 sm:text-[10px]"
+          aria-label="Lake Worth Beach, Palm Beach County. Photo by Gene Gallin on Unsplash"
+        >
+          Lake Worth Beach · Palm Beach County
+        </a>
 
         <div className="relative h-full container-fsre flex flex-col justify-center pt-16">
           <p className="font-mono text-[11px] sm:text-xs md:text-sm uppercase tracking-[0.18em] md:tracking-[0.25em] text-brass mb-4 animate-rise max-w-3xl">

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { SITE } from "./site-config";
+import { findSouthFloridaCounty } from "./south-florida-locations";
 import type {
   IdxAttribution,
   Listing,
@@ -618,6 +619,11 @@ function locationSearchCondition(value: string): string {
 function areaSearchCondition(value: string): string {
   const exactPostalCode = postalCode(value);
   if (exactPostalCode) return `PostalCode eq ${odataString(exactPostalCode)}`;
+
+  const exactCounty = findSouthFloridaCounty(value);
+  if (exactCounty) {
+    return `CountyOrParish eq ${odataString(exactCounty.name.replace(/ County$/i, ""))}`;
+  }
 
   const fields = ["City", "PostalCode", "SubdivisionName"];
   // Keep the individual area terms ungrouped so the combined multi-area

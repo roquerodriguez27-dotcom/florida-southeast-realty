@@ -18,6 +18,7 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
   const [locations, setLocations] = useState(() => initialLocations.slice(0, MAX_SEARCH_LOCATIONS));
   const [draft, setDraft] = useState("");
   const [browseOpen, setBrowseOpen] = useState(false);
+  const [fieldFocused, setFieldFocused] = useState(false);
   const [cityQuery, setCityQuery] = useState("");
   const [activeCounty, setActiveCounty] = useState(() => {
     const initial = new Set(initialLocations.map((location) => location.toLowerCase()));
@@ -62,6 +63,29 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
 
   const atLimit = locations.length >= MAX_SEARCH_LOCATIONS;
   const county = SOUTH_FLORIDA_COUNTIES.find((item) => item.name === activeCounty) ?? SOUTH_FLORIDA_COUNTIES[0];
+  const suggestions = useMemo(() => {
+    const query = draft.trim();
+    if (!query || atLimit) return [];
+    if (/^\d{5}$/.test(query)) return [{ value: query, context: "Exact ZIP code" }];
+    if (query.length < 2 || /^\d+$/.test(query)) return [];
+
+    const normalized = query.toLowerCase();
+    return SOUTH_FLORIDA_LOCATION_NAMES
+      .filter((location) => location.toLowerCase().includes(normalized))
+      .filter((location) => !locations.some((selected) => selected.toLowerCase() === location.toLowerCase()))
+      .slice(0, 8)
+      .map((location) => {
+        const matchingCounty = SOUTH_FLORIDA_COUNTIES.find((item) => item.name === location);
+        const cityCounty = matchingCounty
+          ? undefined
+          : SOUTH_FLORIDA_COUNTIES.find((item) => item.cities.some((city) => city === location));
+        return {
+          value: location,
+          context: matchingCounty ? "County" : cityCounty?.name ?? "City or town",
+        };
+      });
+  }, [atLimit, draft, locations]);
+  const suggestionsOpen = fieldFocused && suggestions.length > 0;
   const visibleCities = useMemo(() => {
     const query = cityQuery.trim().toLowerCase();
     return query ? county.cities.filter((city) => city.toLowerCase().includes(query)) : county.cities;
@@ -69,57 +93,104 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
 
   return (
     <div>
-      <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-sm border border-ink/15 bg-white px-2 py-1.5 focus-within:border-tide">
-        {locations.map((location) => (
-          <span key={location.toLowerCase()} className="inline-flex items-center gap-1 rounded-full bg-tide/8 px-2.5 py-1 text-xs font-medium text-tide">
-            {location}
+      <div className="relative">
+        <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-sm border border-ink/15 bg-white px-2 py-1.5 focus-within:border-tide">
+          {locations.map((location) => (
+            <span key={location.toLowerCase()} className="inline-flex items-center gap-1 rounded-full bg-tide/8 px-2.5 py-1 text-xs font-medium text-tide">
+              {location}
+              <button
+                type="button"
+                onClick={() => removeLocation(location)}
+                className="grid h-4 w-4 place-items-center rounded-full text-sm leading-none text-tide/60 hover:bg-tide/10 hover:text-hibiscus"
+                aria-label={`Remove ${location}`}
+              >
+                ×
+              </button>
+              <input type="hidden" name="location" value={location} />
+            </span>
+          ))}
+          <input
+            id="f-location"
+            name={draft.trim() ? "location" : undefined}
+            value={draft}
+            onFocus={() => setFieldFocused(true)}
+            onBlur={() => setFieldFocused(false)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              if (event.target.value.trim()) setBrowseOpen(false);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === ",") {
+                event.preventDefault();
+                addDraft();
+              } else if (event.key === "Backspace" && draft === "" && locations.length > 0) {
+                setLocations((current) => current.slice(0, -1));
+              }
+            }}
+            type="text"
+            placeholder={atLimit ? "Area limit reached" : locations.length > 0 ? "Add another ZIP, city, or county" : "Enter a ZIP, city, town, or county"}
+            disabled={atLimit}
+            autoComplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls="fsre-location-suggestions"
+            aria-expanded={suggestionsOpen}
+            aria-describedby="f-location-help"
+            className="min-w-[170px] flex-1 bg-transparent px-1 py-1 text-sm outline-none disabled:cursor-not-allowed"
+          />
+          {draft.trim() && !atLimit ? (
             <button
               type="button"
-              onClick={() => removeLocation(location)}
-              className="grid h-4 w-4 place-items-center rounded-full text-sm leading-none text-tide/60 hover:bg-tide/10 hover:text-hibiscus"
-              aria-label={`Remove ${location}`}
+              onClick={addDraft}
+              className="rounded-sm bg-tide px-3 py-1.5 text-xs font-semibold text-sand hover:bg-tide/90"
             >
-              ×
+              Add
             </button>
-            <input type="hidden" name="location" value={location} />
-          </span>
-        ))}
-        <input
-          id="f-location"
-          name="location"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === ",") {
-              event.preventDefault();
-              addDraft();
-            } else if (event.key === "Backspace" && draft === "" && locations.length > 0) {
-              setLocations((current) => current.slice(0, -1));
-            }
-          }}
-          type="text"
-          list="fsre-location-suggestions"
-          placeholder={atLimit ? "Area limit reached" : locations.length > 0 ? "Type another city or community" : "Type a city, community, or ZIP"}
-          disabled={atLimit}
-          autoComplete="off"
-          aria-describedby="f-location-help"
-          className="min-w-[140px] flex-1 bg-transparent px-1 py-1 text-sm outline-none disabled:cursor-not-allowed"
-        />
-        <datalist id="fsre-location-suggestions">
-          {SOUTH_FLORIDA_LOCATION_NAMES.map((location) => <option key={location} value={location} />)}
-        </datalist>
+          ) : null}
+        </div>
+
+        {suggestionsOpen ? (
+          <div
+            id="fsre-location-suggestions"
+            role="listbox"
+            aria-label="Matching locations"
+            className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-sm border border-ink/10 bg-white shadow-xl"
+          >
+            {suggestions.map((suggestion) => (
+              <button
+                key={`${suggestion.context}-${suggestion.value}`}
+                type="button"
+                role="option"
+                aria-selected="false"
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  addLocations([suggestion.value]);
+                  setDraft("");
+                  setFieldFocused(false);
+                }}
+                className="flex w-full items-center justify-between gap-3 border-b border-ink/5 px-3 py-2.5 text-left text-sm text-ink last:border-b-0 hover:bg-tide/5"
+              >
+                <span className="font-medium">{suggestion.value}</span>
+                <span className="text-[11px] text-ink/45">{suggestion.context}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
         <p id="f-location-help" className="text-[11px] leading-relaxed text-ink/50">
-          Add several cities, communities, or ZIP codes. Press Enter after each area.
+          Add one or several areas. Press Enter or tap Add after each ZIP, city, town, or county.
         </p>
         <button
           type="button"
           aria-expanded={browseOpen}
-          onClick={() => setBrowseOpen((open) => !open)}
+          onClick={() => {
+            setFieldFocused(false);
+            setBrowseOpen((open) => !open);
+          }}
           className="rounded-full border border-tide/20 bg-tide/5 px-3 py-1.5 text-xs font-medium text-tide hover:bg-tide/10"
         >
-          {browseOpen ? "Close county browser" : "Browse by county"}
+          {browseOpen ? "Close area browser" : "Browse counties & cities"}
         </button>
       </div>
       {browseOpen ? (
@@ -148,7 +219,7 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold text-ink">{county.name}</p>
-                  <p className="text-[11px] text-ink/50">Choose one or several cities.</p>
+                  <p className="text-[11px] text-ink/50">Search the entire county or choose cities and towns.</p>
                 </div>
                 <label className="sr-only" htmlFor="f-city-filter">Filter cities</label>
                 <input
@@ -160,6 +231,15 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
                   className="rounded-sm border border-ink/15 bg-white px-3 py-2 text-sm outline-none focus:border-tide"
                 />
               </div>
+              <button
+                type="button"
+                aria-pressed={locations.some((location) => location.toLowerCase() === county.name.toLowerCase())}
+                onClick={() => toggleLocation(county.name)}
+                className={`mt-3 w-full rounded-sm border px-3 py-2.5 text-left text-xs font-semibold transition-colors ${locations.some((location) => location.toLowerCase() === county.name.toLowerCase()) ? "border-tide bg-tide text-sand" : "border-tide/20 bg-tide/5 text-tide hover:bg-tide/10"}`}
+              >
+                {locations.some((location) => location.toLowerCase() === county.name.toLowerCase()) ? "✓ " : ""}
+                Search all of {county.name}
+              </button>
               <div className="mt-3 grid max-h-56 grid-cols-2 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-3" role="group" aria-label={`Cities in ${county.name}`}>
                 {visibleCities.map((city) => {
                   const selected = locations.some((location) => location.toLowerCase() === city.toLowerCase());

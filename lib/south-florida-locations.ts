@@ -133,6 +133,49 @@ export const SOUTH_FLORIDA_COUNTIES = [
   },
 ] as const;
 
-export const SOUTH_FLORIDA_LOCATION_NAMES = Array.from(new Set(
+export const SOUTH_FLORIDA_COUNTY_NAMES = SOUTH_FLORIDA_COUNTIES.map((county) => county.name);
+
+export const SOUTH_FLORIDA_CITY_NAMES = Array.from(new Set(
   SOUTH_FLORIDA_COUNTIES.flatMap((county) => county.cities),
 ));
+
+export const SOUTH_FLORIDA_LOCATION_OPTIONS = [
+  ...SOUTH_FLORIDA_COUNTIES.map((county) => ({
+    name: county.name,
+    county: county.name,
+    type: "County" as const,
+  })),
+  ...SOUTH_FLORIDA_COUNTIES.flatMap((county) => county.cities.map((city) => ({
+    name: city,
+    county: county.name,
+    type: "City" as const,
+  }))),
+];
+
+export const SOUTH_FLORIDA_LOCATION_NAMES = Array.from(new Set(
+  SOUTH_FLORIDA_LOCATION_OPTIONS.map((location) => location.name),
+));
+
+export function southFloridaCounty(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return SOUTH_FLORIDA_COUNTIES.find((county) => county.name.toLowerCase() === normalized);
+}
+
+export function southFloridaCountyValue(value: string): string | null {
+  return southFloridaCounty(value)?.name.replace(/ County$/, "") ?? null;
+}
+
+export function southFloridaLocationKind(value: string): "ZIP" | "County" | "City" | "Area" {
+  const normalized = value.trim().toLowerCase();
+  if (/^(?:33|34)\d{3}(?:-\d{4})?$/.test(normalized)) return "ZIP";
+  if (SOUTH_FLORIDA_COUNTY_NAMES.some((county) => county.toLowerCase() === normalized)) return "County";
+  if (SOUTH_FLORIDA_CITY_NAMES.some((city) => city.toLowerCase() === normalized)) return "City";
+  return "Area";
+}
+
+export function southFloridaCityCounty(value: string): string | null {
+  const normalized = value.trim().toLowerCase();
+  return SOUTH_FLORIDA_COUNTIES.find((county) => (
+    county.cities.some((city) => city.toLowerCase() === normalized)
+  ))?.name ?? null;
+}

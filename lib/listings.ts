@@ -146,6 +146,7 @@ function sortSampleListings(listings: Listing[], sort: ListingSort = "newest"): 
     if (sort === "price-asc") return left.price - right.price;
     if (sort === "price-desc") return right.price - left.price;
     if (sort === "sqft-desc") return right.sqft - left.sqft || left.price - right.price;
+    if (sort === "sqft-asc") return left.sqft - right.sqft || left.price - right.price;
     return Date.parse(right.listingUpdatedAt ?? "") - Date.parse(left.listingUpdatedAt ?? "")
       || left.price - right.price;
   });
@@ -193,6 +194,7 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.minGarageSpaces && (l.garageSpaces ?? 0) < filters.minGarageSpaces) return false;
     if (filters.newConstructionOnly && l.newConstruction !== true) return false;
     if (filters.fireplaceOnly && l.fireplace !== true) return false;
+    if (filters.amenities?.some((amenity) => !l.amenities?.includes(amenity))) return false;
     if (filters.seniorCommunityMode === "only" && l.seniorCommunity !== true) return false;
     if (filters.seniorCommunityMode === "exclude" && l.seniorCommunity === true) return false;
     if (filters.maxDaysOnMarket && l.daysOnMarket > filters.maxDaysOnMarket) return false;

@@ -10,7 +10,7 @@ import { searchListingPage } from "@/lib/listings";
 import { IDX_PROVIDER } from "@/lib/idx";
 import SavedSearchAlert from "@/components/SavedSearchAlert";
 import { IdxPageDisclaimer } from "@/components/IdxAttribution";
-import type { ListingSort, PropertyType } from "@/lib/types";
+import { LISTING_AMENITIES, type ListingAmenity, type ListingSort, type PropertyType } from "@/lib/types";
 import { MAX_SEARCH_LOCATIONS } from "@/lib/south-florida-locations";
 
 const idxLive = IDX_PROVIDER !== "not_connected";
@@ -46,6 +46,7 @@ interface Props {
     newConstruction?: string;
     senior?: string;
     fireplace?: string;
+    amenity?: string | string[];
     maxDom?: string;
     newer?: string;
     spacious?: string;
@@ -62,7 +63,7 @@ interface Props {
 }
 
 const PROPERTY_TYPES: PropertyType[] = ["Single Family", "Condo", "Townhome", "Estate", "Multi-Family", "Land", "Commercial", "Other"];
-const LISTING_SORTS: ListingSort[] = ["newest", "price-asc", "price-desc", "sqft-desc"];
+const LISTING_SORTS: ListingSort[] = ["newest", "price-asc", "price-desc", "sqft-desc", "sqft-asc"];
 
 function propertyType(value?: string): PropertyType | undefined {
   return PROPERTY_TYPES.includes(value as PropertyType) ? value as PropertyType : undefined;
@@ -78,6 +79,13 @@ function seniorCommunityMode(value?: string): "exclude" | "only" | undefined {
 
 function listingStatusMode(value?: string): "active" | "coming-soon" | "under-contract" | undefined {
   return value === "active" || value === "coming-soon" || value === "under-contract" ? value : undefined;
+}
+
+function listingAmenities(value?: string | string[]): ListingAmenity[] {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.filter((amenity): amenity is ListingAmenity => (
+    LISTING_AMENITIES.includes(amenity as ListingAmenity)
+  )))];
 }
 
 function optionalNonNegativeNumber(value?: string): number | undefined {
@@ -193,6 +201,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
   const maxDaysOnMarket = optionalPositiveInteger(params.maxDom);
   const selectedSeniorCommunityMode = seniorCommunityMode(params.senior);
   const selectedListingStatus = listingStatusMode(params.listingStatus);
+  const selectedAmenities = listingAmenities(params.amenity);
 
   const result = await searchListingPage({
     q: propertyQuery,
@@ -216,6 +225,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
     newConstructionOnly: params.newConstruction === "1",
     seniorCommunityMode: selectedSeniorCommunityMode,
     fireplaceOnly: params.fireplace === "1",
+    amenities: selectedAmenities,
     maxDaysOnMarket,
     bounds,
     polygon,
@@ -229,7 +239,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
       || params.minYearBuilt || params.maxYearBuilt || selectedListingStatus || params.type
       || params.waterfront === "1" || params.pool === "1" || params.garage === "1"
       || params.garageSpaces || params.newConstruction === "1" || selectedSeniorCommunityMode
-      || params.fireplace === "1" || params.maxDom
+      || params.fireplace === "1" || selectedAmenities.length > 0 || params.maxDom
       || params.newer === "1" || params.spacious === "1" || params.largeLot === "1" || bounds,
   );
   const noCurrentAddressListing = Boolean(
@@ -297,6 +307,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
           newConstruction: params.newConstruction,
           senior: params.senior,
           fireplace: params.fireplace,
+          amenities: selectedAmenities,
           maxDom: params.maxDom,
           bounds,
           shape: params.shape,
@@ -325,6 +336,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
           newConstructionOnly: params.newConstruction === "1",
           seniorCommunity: selectedSeniorCommunityMode,
           fireplaceOnly: params.fireplace === "1",
+          amenities: selectedAmenities.length > 0 ? selectedAmenities.join(", ") : undefined,
           maxDaysOnMarket: maxDaysOnMarket ? String(maxDaysOnMarket) : undefined,
           sort,
           mapArea: bounds

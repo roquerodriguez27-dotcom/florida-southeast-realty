@@ -37,6 +37,7 @@ export default function PropertyResultsView({
   const selectedSort: ListingSort = requestedSort === "price-asc"
     || requestedSort === "price-desc"
     || requestedSort === "sqft-desc"
+    || requestedSort === "sqft-asc"
     || requestedSort === "newest"
     ? requestedSort
     : initialSort ?? "newest";
@@ -63,17 +64,17 @@ export default function PropertyResultsView({
     query.delete("page");
     if (nextSort === "newest") query.delete("sort");
     else query.set("sort", nextSort);
-    startTransition(() => router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`));
+    startTransition(() => router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`, { scroll: false }));
   }
 
   return (
     <div aria-busy={isPending}>
-      <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="mb-5 flex flex-col justify-between gap-4 rounded-sm border border-tide/15 bg-white p-4 shadow-[0_16px_45px_-38px_rgba(14,43,48,0.8)] sm:flex-row sm:items-center md:p-5">
         <div>
-          <p className="text-sm font-medium text-ink">Choose how to browse</p>
-          <p className="text-xs text-ink/55">
+          <p className="font-display text-xl text-ink">Sort &amp; view results</p>
+          <p className="mt-1 text-xs text-ink/55">
             {view === "list"
-              ? "Each card is a preview—open it to swipe through every available MLS photo."
+              ? `${listings.length} ${listings.length === 1 ? "home" : "homes"} shown on this page. Your location and filters stay selected when you reorder them.`
               : `${mappableListings.length} homes on this results page include a map location.`}
           </p>
           {initialBounds ? (
@@ -82,19 +83,21 @@ export default function PropertyResultsView({
             </button>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-end gap-3 self-start">
-          <label className="text-xs font-medium text-ink/60" htmlFor="property-sort">
-            Sort homes
+        <div className="flex w-full flex-wrap items-end gap-3 self-start sm:w-auto">
+          <label className="min-w-[15rem] flex-1 text-[11px] font-mono uppercase tracking-wide text-ink/55 sm:flex-none" htmlFor="property-sort">
+            Sort by
             <select
               id="property-sort"
               value={selectedSort}
               onChange={(event) => selectSort(event.target.value as ListingSort)}
-              className="mt-1 block min-w-52 rounded-sm border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-tide"
+              disabled={isPending}
+              className="mt-1 block w-full rounded-sm border border-tide/20 bg-sand/35 px-3 py-2.5 font-sans text-sm normal-case tracking-normal text-ink outline-none focus:border-tide disabled:cursor-wait disabled:opacity-60"
             >
               <option value="newest">Newest / recently updated</option>
               <option value="price-asc">Price: low to high</option>
               <option value="price-desc">Price: high to low</option>
               <option value="sqft-desc">Square footage: largest first</option>
+              <option value="sqft-asc">Square footage: smallest first</option>
             </select>
           </label>
           <div className="inline-grid grid-cols-2 rounded-sm border border-tide/20 bg-white p-1" role="group" aria-label="Property results view">

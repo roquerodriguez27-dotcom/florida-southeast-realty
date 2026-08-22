@@ -28,6 +28,12 @@ interface CurrentFilters {
   senior?: string;
   noHoa?: string;
   maxHoa?: string;
+  priceReduced?: string;
+  maxTaxes?: string;
+  style?: string;
+  viewType?: string;
+  cooling?: string;
+  heating?: string;
   fireplace?: string;
   amenities: ListingAmenity[];
   maxDom?: string;
@@ -75,6 +81,34 @@ function NumberField({ id, name, label, value, placeholder }: { id: string; name
         autoComplete="off"
         className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide"
       />
+    </label>
+  );
+}
+
+function SelectField({
+  id,
+  name,
+  label,
+  value,
+  children,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="text-xs font-medium text-ink/60" htmlFor={id}>
+      {label}
+      <select
+        id={id}
+        name={name}
+        defaultValue={value ?? ""}
+        className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide"
+      >
+        {children}
+      </select>
     </label>
   );
 }
@@ -152,6 +186,12 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
     current.senior,
     current.noHoa,
     current.maxHoa,
+    current.priceReduced,
+    current.maxTaxes,
+    current.style,
+    current.viewType,
+    current.cooling,
+    current.heating,
     current.fireplace,
     ...current.amenities,
     current.maxDom,
@@ -236,31 +276,30 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
             <button type="button" onClick={() => setShowMore(false)} className="rounded-sm border border-ink/15 bg-white px-3 py-2 text-sm font-medium text-ink/70 hover:border-tide/30" aria-label="Close more filters">Done</button>
           </div>
 
-          <div className="grid gap-0 lg:grid-cols-3">
-            <section className="border-b border-ink/10 p-4 md:p-5 lg:border-b-0 lg:border-r">
-              <h3 className="text-sm font-semibold text-ink">Search focus</h3>
+          <div className="grid gap-3 p-3 md:grid-cols-2 md:p-4 xl:grid-cols-4">
+            <section className="rounded-sm border border-ink/10 bg-white p-4">
+              <h3 className="text-sm font-semibold text-ink">Listing &amp; activity</h3>
+              <p className="mt-1 text-xs text-ink/50">Status, listing age, and price opportunities.</p>
               <div className="mt-3 grid gap-3">
                 <label htmlFor="f-q" className="text-xs font-medium text-ink/60">Address, subdivision, or MLS number
                   <input id="f-q" name="q" defaultValue={current.q} type="text" placeholder="Address, community, or MLS #" className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide" />
                 </label>
-                <label className="text-xs font-medium text-ink/60" htmlFor="f-listing-status">Listing status
-                  <select id="f-listing-status" name="listingStatus" defaultValue={current.listingStatus ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
-                    <option value="">Active, coming soon &amp; under contract</option>
-                    <option value="active">Active only</option>
-                    <option value="coming-soon">Coming soon only</option>
-                    <option value="under-contract">Under contract only</option>
-                  </select>
-                </label>
-                <label className="text-xs font-medium text-ink/60" htmlFor="f-max-dom">Time on market
-                  <select id="f-max-dom" name="maxDom" defaultValue={current.maxDom ?? ""} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
-                    <option value="">Any</option><option value="1">Listed today</option><option value="7">7 days or less</option><option value="14">14 days or less</option><option value="30">30 days or less</option><option value="60">60 days or less</option><option value="90">90 days or less</option>
-                  </select>
-                </label>
+                <SelectField id="f-listing-status" name="listingStatus" label="Listing status" value={current.listingStatus}>
+                  <option value="">Active, coming soon &amp; under contract</option>
+                  <option value="active">Active only</option>
+                  <option value="coming-soon">Coming soon only</option>
+                  <option value="under-contract">Under contract only</option>
+                </SelectField>
+                <SelectField id="f-max-dom" name="maxDom" label="Time on market" value={current.maxDom}>
+                  <option value="">Any</option><option value="1">Listed today</option><option value="7">7 days or less</option><option value="14">14 days or less</option><option value="30">30 days or less</option><option value="60">60 days or less</option><option value="90">90 days or less</option>
+                </SelectField>
+                <Amenity name="priceReduced" label="Price reduced" checked={current.priceReduced === "1"} />
               </div>
             </section>
 
-            <section className="border-b border-ink/10 p-4 md:p-5 lg:border-b-0 lg:border-r">
+            <section className="rounded-sm border border-ink/10 bg-white p-4">
               <h3 className="text-sm font-semibold text-ink">Size, lot &amp; age</h3>
+              <p className="mt-1 text-xs text-ink/50">Choose ranges directly from MLS measurements.</p>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <NumberField id="f-min-sqft" name="minSqft" label="Min. living area" value={current.minSqft} placeholder="Sq. ft." />
                 <NumberField id="f-max-sqft" name="maxSqft" label="Max. living area" value={current.maxSqft} placeholder="Sq. ft." />
@@ -268,20 +307,21 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
                 <NumberField id="f-max-lot-sqft" name="maxLotSqft" label="Max. lot size" value={current.maxLotSqft} placeholder="Sq. ft." />
                 <NumberField id="f-min-year-built" name="minYearBuilt" label="Built from" value={current.minYearBuilt} placeholder="Any year" />
                 <NumberField id="f-max-year-built" name="maxYearBuilt" label="Built through" value={current.maxYearBuilt} placeholder="Any year" />
-                <label className="col-span-2 text-xs font-medium text-ink/60" htmlFor="f-garage-spaces">Garage spaces
-                  <select id="f-garage-spaces" name="garageSpaces" defaultValue={garageSpaces} className="mt-1 w-full rounded-sm border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-tide">
+                <div className="col-span-2">
+                  <SelectField id="f-garage-spaces" name="garageSpaces" label="Garage spaces" value={garageSpaces}>
                     <option value="">Any</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option>
-                  </select>
-                </label>
+                  </SelectField>
+                </div>
               </div>
             </section>
 
-            <section className="p-4 md:p-5">
-              <h3 className="text-sm font-semibold text-ink">Community preferences</h3>
+            <section className="rounded-sm border border-ink/10 bg-white p-4">
+              <h3 className="text-sm font-semibold text-ink">Community &amp; costs</h3>
+              <p className="mt-1 text-xs text-ink/50">Age restrictions, association fees, and taxes.</p>
               <fieldset className="mt-3">
                 <legend className="text-xs font-medium text-ink/60">55+ communities</legend>
-                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                  <SeniorCommunityOption value="" label="No preference" checked={!current.senior} />
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 md:grid-cols-1 2xl:grid-cols-3">
+                  <SeniorCommunityOption value="" label="Any age" checked={!current.senior} />
                   <SeniorCommunityOption value="only" label="55+ only" checked={current.senior === "only"} />
                   <SeniorCommunityOption value="exclude" label="Exclude 55+" checked={current.senior === "exclude"} />
                 </div>
@@ -293,48 +333,67 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
                 <label htmlFor="f-max-hoa">Maximum HOA / association fee</label>
                 <div className="relative mt-1">
                   <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink/45">$</span>
-                  <input
-                    id="f-max-hoa"
-                    name="maxHoa"
-                    defaultValue={current.maxHoa ?? ""}
-                    type="number"
-                    min="1"
-                    step="1"
-                    inputMode="numeric"
-                    placeholder="Any"
-                    autoComplete="off"
-                    className="w-full rounded-sm border border-ink/15 bg-white py-2.5 pl-7 pr-20 text-sm outline-none focus:border-tide"
-                  />
+                  <input id="f-max-hoa" name="maxHoa" defaultValue={current.maxHoa ?? ""} type="number" min="1" step="1" inputMode="numeric" placeholder="Any" autoComplete="off" className="w-full rounded-sm border border-ink/15 bg-white py-2.5 pl-7 pr-20 text-sm outline-none focus:border-tide" />
                   <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink/45">/ month</span>
                 </div>
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-ink/50">“No HOA” requires an explicit no-association value. Fee limits normalize the MLS payment frequency to a monthly amount.</p>
-
-              <h3 className="mt-6 text-sm font-semibold text-ink">Property features</h3>
-              <p className="mt-1 text-xs text-ink/50">Matched against fields supplied by BeachesMLS.</p>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <Amenity name="pool" label="Private pool" checked={current.pool === "1"} />
-                <Amenity name="waterfront" label="Waterfront" checked={current.waterfront === "1"} />
-                <Amenity name="amenity" value="boat-dock" label="Boat dock / marina" checked={current.amenities.includes("boat-dock")} />
-                <Amenity name="amenity" value="spa" label="Spa / hot tub" checked={current.amenities.includes("spa")} />
-                <Amenity name="amenity" value="impact-windows" label="Impact windows" checked={current.amenities.includes("impact-windows")} />
-                <Amenity name="newConstruction" label="New construction" checked={current.newConstruction === "1"} />
-                <Amenity name="fireplace" label="Fireplace" checked={current.fireplace === "1"} />
-                <Amenity name="amenity" value="horse-property" label="Horse / equestrian" checked={current.amenities.includes("horse-property")} />
+              <div className="mt-3 text-xs font-medium text-ink/60">
+                <label htmlFor="f-max-taxes">Maximum annual property taxes</label>
+                <div className="relative mt-1">
+                  <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink/45">$</span>
+                  <input id="f-max-taxes" name="maxTaxes" defaultValue={current.maxTaxes ?? ""} type="number" min="1" step="1" inputMode="numeric" placeholder="Any" autoComplete="off" className="w-full rounded-sm border border-ink/15 bg-white py-2.5 pl-7 pr-16 text-sm outline-none focus:border-tide" />
+                  <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink/45">/ year</span>
+                </div>
               </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-ink/45">Fee frequency is normalized monthly. Tax amounts use the most recent year supplied by BeachesMLS.</p>
+            </section>
 
-              <h3 className="mt-6 text-sm font-semibold text-ink">Community amenities</h3>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <Amenity name="amenity" value="community-pool" label="Community pool" checked={current.amenities.includes("community-pool")} />
-                <Amenity name="amenity" value="gated-community" label="Gated community" checked={current.amenities.includes("gated-community")} />
-                <Amenity name="amenity" value="golf-community" label="Golf community" checked={current.amenities.includes("golf-community")} />
-                <Amenity name="amenity" value="clubhouse" label="Clubhouse" checked={current.amenities.includes("clubhouse")} />
-                <Amenity name="amenity" value="fitness-center" label="Fitness center" checked={current.amenities.includes("fitness-center")} />
-                <Amenity name="amenity" value="pickleball" label="Pickleball" checked={current.amenities.includes("pickleball")} />
-                <Amenity name="amenity" value="tennis" label="Tennis courts" checked={current.amenities.includes("tennis")} />
+            <section className="rounded-sm border border-ink/10 bg-white p-4">
+              <h3 className="text-sm font-semibold text-ink">Style, view &amp; systems</h3>
+              <p className="mt-1 text-xs text-ink/50">Structured RESO characteristics—not marketing tags.</p>
+              <div className="mt-3 grid gap-3">
+                <SelectField id="f-style" name="style" label="Architectural style" value={current.style}>
+                  <option value="">Any style</option><option value="ranch">Ranch</option><option value="contemporary">Contemporary</option><option value="mediterranean">Mediterranean</option><option value="modern">Modern</option><option value="traditional">Traditional</option>
+                </SelectField>
+                <SelectField id="f-view-type" name="viewType" label="View" value={current.viewType}>
+                  <option value="">Any view</option><option value="water">Water</option><option value="golf">Golf course</option><option value="garden">Garden</option><option value="pool">Pool</option><option value="city">City / skyline</option>
+                </SelectField>
+                <SelectField id="f-cooling" name="cooling" label="Cooling" value={current.cooling}>
+                  <option value="">Any cooling</option><option value="central-air">Central air</option><option value="ceiling-fans">Ceiling fans</option><option value="wall-window">Wall / window units</option>
+                </SelectField>
+                <SelectField id="f-heating" name="heating" label="Heating" value={current.heating}>
+                  <option value="">Any heating</option><option value="central">Central</option><option value="electric">Electric</option><option value="heat-pump">Heat pump</option><option value="gas">Gas / propane</option>
+                </SelectField>
               </div>
             </section>
           </div>
+
+          <section className="border-t border-ink/10 bg-white p-4 md:p-5">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-ink">Features &amp; community amenities</h3>
+                <p className="mt-1 text-xs text-ink/50">Every selection is matched against fields supplied by BeachesMLS.</p>
+              </div>
+              <p className="rounded-full bg-tide/5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide text-tide">MLS-powered</p>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+              <Amenity name="pool" label="Private pool" checked={current.pool === "1"} />
+              <Amenity name="waterfront" label="Waterfront" checked={current.waterfront === "1"} />
+              <Amenity name="amenity" value="boat-dock" label="Boat dock / marina" checked={current.amenities.includes("boat-dock")} />
+              <Amenity name="amenity" value="spa" label="Spa / hot tub" checked={current.amenities.includes("spa")} />
+              <Amenity name="amenity" value="impact-windows" label="Impact windows" checked={current.amenities.includes("impact-windows")} />
+              <Amenity name="newConstruction" label="New construction" checked={current.newConstruction === "1"} />
+              <Amenity name="fireplace" label="Fireplace" checked={current.fireplace === "1"} />
+              <Amenity name="amenity" value="horse-property" label="Horse / equestrian" checked={current.amenities.includes("horse-property")} />
+              <Amenity name="amenity" value="community-pool" label="Community pool" checked={current.amenities.includes("community-pool")} />
+              <Amenity name="amenity" value="gated-community" label="Gated community" checked={current.amenities.includes("gated-community")} />
+              <Amenity name="amenity" value="golf-community" label="Golf community" checked={current.amenities.includes("golf-community")} />
+              <Amenity name="amenity" value="clubhouse" label="Clubhouse" checked={current.amenities.includes("clubhouse")} />
+              <Amenity name="amenity" value="fitness-center" label="Fitness center" checked={current.amenities.includes("fitness-center")} />
+              <Amenity name="amenity" value="pickleball" label="Pickleball" checked={current.amenities.includes("pickleball")} />
+              <Amenity name="amenity" value="tennis" label="Tennis courts" checked={current.amenities.includes("tennis")} />
+            </div>
+          </section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 bg-white px-4 py-4 md:px-5">
             <Link href={basicFiltersHref(current)} className="text-sm font-medium text-tide underline underline-offset-4">Reset more filters</Link>

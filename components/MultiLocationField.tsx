@@ -136,7 +136,7 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
           ))}
           <input
             id="f-location"
-            name="location"
+            name={locations.length === 0 || draft ? "location" : undefined}
             value={draft}
             onChange={(event) => {
               setDraft(event.target.value);

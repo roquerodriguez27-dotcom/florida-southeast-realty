@@ -10,7 +10,16 @@ import { searchListingPage } from "@/lib/listings";
 import { IDX_PROVIDER } from "@/lib/idx";
 import SavedSearchAlert from "@/components/SavedSearchAlert";
 import { IdxPageDisclaimer } from "@/components/IdxAttribution";
-import { LISTING_AMENITIES, type ListingAmenity, type ListingSort, type PropertyType } from "@/lib/types";
+import {
+  LISTING_AMENITIES,
+  LISTING_ARCHITECTURE_FILTERS,
+  LISTING_COOLING_FILTERS,
+  LISTING_HEATING_FILTERS,
+  LISTING_VIEW_FILTERS,
+  type ListingAmenity,
+  type ListingSort,
+  type PropertyType,
+} from "@/lib/types";
 import { MAX_SEARCH_LOCATIONS } from "@/lib/south-florida-locations";
 
 const idxLive = IDX_PROVIDER !== "not_connected";
@@ -47,6 +56,12 @@ interface Props {
     senior?: string;
     noHoa?: string;
     maxHoa?: string;
+    priceReduced?: string;
+    maxTaxes?: string;
+    style?: string;
+    viewType?: string;
+    cooling?: string;
+    heating?: string;
     fireplace?: string;
     amenity?: string | string[];
     maxDom?: string;
@@ -90,6 +105,13 @@ function seniorCommunityMode(value?: string): "exclude" | "only" | undefined {
 
 function listingStatusMode(value?: string): "active" | "coming-soon" | "under-contract" | undefined {
   return value === "active" || value === "coming-soon" || value === "under-contract" ? value : undefined;
+}
+
+function supportedFilter<const Values extends readonly string[]>(
+  values: Values,
+  value?: string,
+): Values[number] | undefined {
+  return value && values.includes(value as Values[number]) ? value as Values[number] : undefined;
 }
 
 function listingAmenities(value?: string | string[]): ListingAmenity[] {
@@ -213,6 +235,12 @@ export default async function PropertiesPage({ searchParams }: Props) {
   const selectedSeniorCommunityMode = seniorCommunityMode(params.senior);
   const noHoaOnly = params.noHoa === "1";
   const maxHoaMonthly = optionalPositiveInteger(params.maxHoa);
+  const priceReducedOnly = params.priceReduced === "1";
+  const maxAnnualTaxes = optionalPositiveInteger(params.maxTaxes);
+  const architecturalStyle = supportedFilter(LISTING_ARCHITECTURE_FILTERS, params.style);
+  const viewType = supportedFilter(LISTING_VIEW_FILTERS, params.viewType);
+  const coolingType = supportedFilter(LISTING_COOLING_FILTERS, params.cooling);
+  const heatingType = supportedFilter(LISTING_HEATING_FILTERS, params.heating);
   const selectedListingStatus = listingStatusMode(params.listingStatus);
   const selectedAmenities = listingAmenities(params.amenity);
 
@@ -239,6 +267,12 @@ export default async function PropertiesPage({ searchParams }: Props) {
     seniorCommunityMode: selectedSeniorCommunityMode,
     noHoaOnly,
     maxHoaMonthly,
+    priceReducedOnly,
+    maxAnnualTaxes,
+    architecturalStyle,
+    viewType,
+    coolingType,
+    heatingType,
     fireplaceOnly: params.fireplace === "1",
     amenities: selectedAmenities,
     maxDaysOnMarket,
@@ -254,7 +288,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
       || params.minYearBuilt || params.maxYearBuilt || selectedListingStatus || params.type
       || params.waterfront === "1" || params.pool === "1" || params.garage === "1"
       || params.garageSpaces || params.newConstruction === "1" || selectedSeniorCommunityMode
-      || noHoaOnly || maxHoaMonthly
+      || noHoaOnly || maxHoaMonthly || priceReducedOnly || maxAnnualTaxes
+      || architecturalStyle || viewType || coolingType || heatingType
       || params.fireplace === "1" || selectedAmenities.length > 0 || params.maxDom
       || params.newer === "1" || params.spacious === "1" || params.largeLot === "1" || bounds,
   );
@@ -324,6 +359,12 @@ export default async function PropertiesPage({ searchParams }: Props) {
           senior: selectedSeniorCommunityMode,
           noHoa: noHoaOnly ? "1" : undefined,
           maxHoa: maxHoaMonthly ? String(maxHoaMonthly) : undefined,
+          priceReduced: priceReducedOnly ? "1" : undefined,
+          maxTaxes: maxAnnualTaxes ? String(maxAnnualTaxes) : undefined,
+          style: architecturalStyle,
+          viewType,
+          cooling: coolingType,
+          heating: heatingType,
           fireplace: params.fireplace,
           amenities: selectedAmenities,
           maxDom: params.maxDom,
@@ -355,6 +396,12 @@ export default async function PropertiesPage({ searchParams }: Props) {
           seniorCommunity: selectedSeniorCommunityMode,
           noHoaOnly,
           maxHoaMonthly: maxHoaMonthly ? String(maxHoaMonthly) : undefined,
+          priceReducedOnly,
+          maxAnnualTaxes: maxAnnualTaxes ? String(maxAnnualTaxes) : undefined,
+          architecturalStyle,
+          viewType,
+          coolingType,
+          heatingType,
           fireplaceOnly: params.fireplace === "1",
           amenities: selectedAmenities.length > 0 ? selectedAmenities.join(", ") : undefined,
           maxDaysOnMarket: maxDaysOnMarket ? String(maxDaysOnMarket) : undefined,

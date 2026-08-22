@@ -15,7 +15,7 @@ const SEARCH_PROPERTY_TYPES = [
 
 export const propertySearchIntentSchema = z.object({
   locations: z.array(z.string().min(1).max(100)).max(MAX_SEARCH_LOCATIONS)
-    .describe("South Florida city names, community names, or five-digit ZIP codes explicitly requested by the shopper."),
+    .describe("South Florida county names, city names, community names, or five-digit ZIP codes explicitly requested by the shopper."),
   minPrice: z.number().nonnegative().nullable()
     .describe("Minimum whole-dollar listing price, or null when none was requested."),
   maxPrice: z.number().nonnegative().nullable()

@@ -2,6 +2,22 @@ export type ListingStatus = "Active" | "Pending" | "Sold" | "Coming Soon";
 
 export type ListingSort = "newest" | "price-asc" | "price-desc" | "sqft-desc";
 
+export const LISTING_AMENITIES = [
+  "spa",
+  "boat-dock",
+  "impact-windows",
+  "horse-property",
+  "community-pool",
+  "gated-community",
+  "golf-community",
+  "clubhouse",
+  "fitness-center",
+  "pickleball",
+  "tennis",
+] as const;
+
+export type ListingAmenity = (typeof LISTING_AMENITIES)[number];
+
 export type PropertyType =
   | "Single Family"
   | "Condo"
@@ -52,6 +68,8 @@ export interface Listing {
   newConstruction?: boolean;
   seniorCommunity?: boolean;
   fireplace?: boolean;
+  /** Normalized amenity tags derived from MLS property and association fields. */
+  amenities?: ListingAmenity[];
   propertyType: PropertyType;
   /** True when the MLS broad property type identifies a lease or rental listing. */
   forLease?: boolean;
@@ -90,6 +108,7 @@ export interface ListingFilters {
   newConstructionOnly?: boolean;
   seniorCommunityMode?: "exclude" | "only";
   fireplaceOnly?: boolean;
+  amenities?: ListingAmenity[];
   maxDaysOnMarket?: number;
   sort?: ListingSort;
   community?: string;

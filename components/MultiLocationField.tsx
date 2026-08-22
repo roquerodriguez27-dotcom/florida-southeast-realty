@@ -153,9 +153,6 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
               } else if (event.key === "ArrowUp" && suggestions.length > 0) {
                 event.preventDefault();
                 setActiveSuggestion((current) => Math.max(current - 1, 0));
-              } else if (event.key === "Enter" && draft.trim()) {
-                event.preventDefault();
-                addDraft(suggestions[activeSuggestion]?.name);
               } else if (event.key === ",") {
                 event.preventDefault();
                 addDraft();
@@ -172,7 +169,7 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
             aria-controls="fsre-location-suggestions"
             aria-expanded={suggestionsOpen && suggestions.length > 0}
             aria-activedescendant={activeSuggestion >= 0 ? `fsre-location-${activeSuggestion}` : undefined}
-            placeholder={atLimit ? "Area limit reached" : locations.length > 0 ? "Add another city, county, or ZIP" : "City, county, community, or ZIP"}
+            placeholder={atLimit ? "Area limit reached" : locations.length > 0 ? "Optional: add another area" : "City, county, community, or ZIP"}
             disabled={atLimit}
             autoComplete="off"
             aria-describedby="f-location-help"
@@ -201,7 +198,7 @@ export default function MultiLocationField({ initialLocations }: { initialLocati
       </div>
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
         <p id="f-location-help" className="text-[11px] leading-relaxed text-ink/50">
-          Add several exact ZIP codes, cities, communities, or whole counties. Press Enter after each area.
+          Press Enter to search. Adding another area is optional; choose suggestions or use commas for multiple areas.
         </p>
         <div className="flex items-center gap-2">
           {locations.length > 0 ? (

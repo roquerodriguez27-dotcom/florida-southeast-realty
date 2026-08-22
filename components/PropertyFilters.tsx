@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import MultiLocationField from "@/components/MultiLocationField";
-import type { ListingFilters, ListingSort } from "@/lib/types";
+import type { ListingAmenity, ListingFilters, ListingSort } from "@/lib/types";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 
@@ -29,6 +29,7 @@ interface CurrentFilters {
   newConstruction?: string;
   senior?: string;
   fireplace?: string;
+  amenities: ListingAmenity[];
   maxDom?: string;
   bounds?: NonNullable<ListingFilters["bounds"]>;
   shape?: string;
@@ -78,10 +79,10 @@ function NumberField({ id, name, label, value, placeholder }: { id: string; name
   );
 }
 
-function Amenity({ name, label, checked }: { name: string; label: string; checked: boolean }) {
+function Amenity({ name, label, checked, value = "1" }: { name: string; label: string; checked: boolean; value?: string }) {
   return (
     <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-sm border border-ink/10 bg-white px-3 py-2 text-sm text-ink/75 hover:border-tide/25">
-      <input type="checkbox" name={name} value="1" defaultChecked={checked} className="h-4 w-4 accent-hibiscus" />
+      <input type="checkbox" name={name} value={value} defaultChecked={checked} className="h-4 w-4 accent-hibiscus" />
       {label}
     </label>
   );
@@ -127,6 +128,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
     current.newConstruction,
     current.senior,
     current.fireplace,
+    ...current.amenities,
     current.maxDom,
   ].filter(Boolean).length;
   const [showMore, setShowMore] = useState(advancedCount > 0);
@@ -255,13 +257,28 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
             </section>
 
             <section className="p-4 md:p-5">
-              <h3 className="text-sm font-semibold text-ink">Must-have features</h3>
-              <p className="mt-1 text-xs text-ink/50">These selections use fields supplied by BeachesMLS.</p>
+              <h3 className="text-sm font-semibold text-ink">Property features</h3>
+              <p className="mt-1 text-xs text-ink/50">Matched against fields supplied by BeachesMLS.</p>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <Amenity name="pool" label="Private pool" checked={current.pool === "1"} />
                 <Amenity name="waterfront" label="Waterfront" checked={current.waterfront === "1"} />
+                <Amenity name="amenity" value="boat-dock" label="Boat dock / marina" checked={current.amenities.includes("boat-dock")} />
+                <Amenity name="amenity" value="spa" label="Spa / hot tub" checked={current.amenities.includes("spa")} />
+                <Amenity name="amenity" value="impact-windows" label="Impact windows" checked={current.amenities.includes("impact-windows")} />
                 <Amenity name="newConstruction" label={`New construction (${CURRENT_YEAR})`} checked={current.newConstruction === "1"} />
                 <Amenity name="fireplace" label="Fireplace" checked={current.fireplace === "1"} />
+                <Amenity name="amenity" value="horse-property" label="Horse / equestrian" checked={current.amenities.includes("horse-property")} />
+              </div>
+
+              <h3 className="mt-6 text-sm font-semibold text-ink">Community amenities</h3>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <Amenity name="amenity" value="community-pool" label="Community pool" checked={current.amenities.includes("community-pool")} />
+                <Amenity name="amenity" value="gated-community" label="Gated community" checked={current.amenities.includes("gated-community")} />
+                <Amenity name="amenity" value="golf-community" label="Golf community" checked={current.amenities.includes("golf-community")} />
+                <Amenity name="amenity" value="clubhouse" label="Clubhouse" checked={current.amenities.includes("clubhouse")} />
+                <Amenity name="amenity" value="fitness-center" label="Fitness center" checked={current.amenities.includes("fitness-center")} />
+                <Amenity name="amenity" value="pickleball" label="Pickleball" checked={current.amenities.includes("pickleball")} />
+                <Amenity name="amenity" value="tennis" label="Tennis courts" checked={current.amenities.includes("tennis")} />
               </div>
             </section>
           </div>

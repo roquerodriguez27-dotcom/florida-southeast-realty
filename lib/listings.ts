@@ -193,6 +193,7 @@ function filterSampleListings(filters: ListingFilters): Listing[] {
     if (filters.minGarageSpaces && (l.garageSpaces ?? 0) < filters.minGarageSpaces) return false;
     if (filters.newConstructionOnly && l.newConstruction !== true) return false;
     if (filters.fireplaceOnly && l.fireplace !== true) return false;
+    if (filters.amenities?.some((amenity) => !l.amenities?.includes(amenity))) return false;
     if (filters.seniorCommunityMode === "only" && l.seniorCommunity !== true) return false;
     if (filters.seniorCommunityMode === "exclude" && l.seniorCommunity === true) return false;
     if (filters.maxDaysOnMarket && l.daysOnMarket > filters.maxDaysOnMarket) return false;

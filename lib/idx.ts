@@ -5,6 +5,7 @@ import { southFloridaCountyValue } from "./south-florida-locations";
 import type {
   IdxAttribution,
   Listing,
+  ListingAmenity,
   ListingFilters,
   ListingSearchPage,
   ListingSort,
@@ -371,6 +372,57 @@ function hasPrivatePool(record: JsonObject): boolean {
   return truthy(record.PoolPrivateYN);
 }
 
+function normalizedFeatureValues(record: JsonObject, fields: string[]): string[] {
+  return fields.flatMap((field) => flattenStrings(record[field])).map((value) => (
+    value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  )).filter(Boolean);
+}
+
+function includesFeature(values: string[], terms: string[]): boolean {
+  return values.some((value) => terms.some((term) => value.includes(term)));
+}
+
+function listingAmenities(record: JsonObject): ListingAmenity[] {
+  const generalValues = normalizedFeatureValues(record, [
+    "InteriorFeatures",
+    "ExteriorFeatures",
+    "CommunityFeatures",
+    "AssociationAmenities",
+    "PoolFeatures",
+    "SpaFeatures",
+    "WaterfrontFeatures",
+    "WindowFeatures",
+    "HorseAmenities",
+    "LotFeatures",
+  ]);
+  const communityValues = normalizedFeatureValues(record, ["CommunityFeatures", "AssociationAmenities"]);
+  const poolValues = normalizedFeatureValues(record, ["PoolFeatures"]);
+  const waterfrontValues = normalizedFeatureValues(record, [
+    "WaterfrontFeatures",
+    "AssociationAmenities",
+    "ExteriorFeatures",
+  ]);
+  const windowValues = normalizedFeatureValues(record, ["WindowFeatures", "ExteriorFeatures"]);
+  const amenities: ListingAmenity[] = [];
+  const add = (amenity: ListingAmenity, matches: boolean) => {
+    if (matches) amenities.push(amenity);
+  };
+
+  add("spa", truthy(record.SpaYN) || includesFeature(generalValues, ["spa", "hot tub"]));
+  add("boat-dock", includesFeature(waterfrontValues, ["boat dock", "boat slip", "dock", "marina"]));
+  add("impact-windows", includesFeature(windowValues, ["impact glass", "impact window", "hurricane window", "storm window"]));
+  add("horse-property", truthy(record.HorseYN) || includesFeature(generalValues, ["equestrian", "horse"]));
+  add("community-pool", includesFeature(communityValues, ["pool"]) || includesFeature(poolValues, ["association", "community"]));
+  add("gated-community", includesFeature(communityValues, ["gated", "guard gated", "security gate"]));
+  add("golf-community", includesFeature(communityValues, ["golf"]));
+  add("clubhouse", includesFeature(communityValues, ["clubhouse", "club house"]));
+  add("fitness-center", includesFeature(communityValues, ["fitness", "exercise room", "gym"]));
+  add("pickleball", includesFeature(communityValues, ["pickleball"]));
+  add("tennis", includesFeature(communityValues, ["tennis"]));
+
+  return amenities;
+}
+
 function listingFeatures(
   record: JsonObject,
   propertyType: PropertyType,
@@ -392,11 +444,15 @@ function listingFeatures(
     ...flattenStrings(record.InteriorFeatures),
     ...flattenStrings(record.ExteriorFeatures),
     ...flattenStrings(record.CommunityFeatures),
+    ...flattenStrings(record.AssociationAmenities),
     ...flattenStrings(record.PoolFeatures),
+    ...flattenStrings(record.SpaFeatures),
+    ...flattenStrings(record.WaterfrontFeatures),
+    ...flattenStrings(record.WindowFeatures),
     ...flattenStrings(record.Appliances),
   ];
 
-  return values.filter((value, index) => value && values.indexOf(value) === index).slice(0, 12);
+  return values.filter((value, index) => value && values.indexOf(value) === index).slice(0, 18);
 }
 
 function formatAttributionValue(value: unknown): string {
@@ -481,6 +537,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
   const newConstruction = truthy(record.NewConstructionYN) || yearBuilt >= CURRENT_YEAR;
   const seniorCommunity = truthy(record.SeniorCommunityYN);
   const fireplace = truthy(record.FireplaceYN);
+  const amenities = listingAmenities(record);
   const photos = photoUrls(record);
   const fullBaths = firstNumber(record, ["BathroomsFull", "BathsFull"]);
   const halfBaths = firstNumber(record, ["BathroomsHalf", "BathsHalf"]);
@@ -514,6 +571,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     newConstruction,
     seniorCommunity,
     fireplace,
+    amenities,
     propertyType,
     forLease,
     images: photos.length ? photos : ["/property-placeholder.svg"],
@@ -777,13 +835,15 @@ export async function fetchLiveListingPage(
   const exactAmenityFallback = Boolean(
     filters.privatePoolOnly
       || filters.fireplaceOnly
-      || filters.seniorCommunityMode === "only",
+      || filters.seniorCommunityMode === "only"
+      || filters.amenities?.length,
   );
   const providerFilters = {
     ...filters,
     privatePoolOnly: false,
     fireplaceOnly: false,
     seniorCommunityMode: undefined,
+    amenities: undefined,
   };
   const exactPolygonFallback = Boolean(filters.polygon?.length);
   const widerCandidateWindow = exactAmenityFallback || exactPolygonFallback;
@@ -809,6 +869,7 @@ export async function fetchLiveListingPage(
     .filter((listing) => minGarageSpaces <= 0 || (listing.garageSpaces ?? 0) >= minGarageSpaces)
     .filter((listing) => !filters.newConstructionOnly || listing.newConstruction === true)
     .filter((listing) => !filters.fireplaceOnly || listing.fireplace === true)
+    .filter((listing) => !filters.amenities?.some((amenity) => !listing.amenities?.includes(amenity)))
     .filter((listing) => filters.seniorCommunityMode !== "only" || listing.seniorCommunity === true)
     .filter((listing) => filters.seniorCommunityMode !== "exclude" || listing.seniorCommunity !== true)
     .filter((listing) => !filters.maxDaysOnMarket || listing.daysOnMarket <= filters.maxDaysOnMarket)
@@ -818,7 +879,8 @@ export async function fetchLiveListingPage(
   const locallyVerifiedBoolean = Boolean(
     filters.privatePoolOnly
       || filters.fireplaceOnly
-      || filters.seniorCommunityMode,
+      || filters.seniorCommunityMode
+      || filters.amenities?.length,
   );
   const totalRowsExact = !exactPolygonFallback && !locallyVerifiedBoolean;
   const totalRows = totalRowsExact ? providerTotalRows : listings.length;

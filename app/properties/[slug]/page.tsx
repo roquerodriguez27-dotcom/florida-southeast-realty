@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { getListingBySlug, searchListings } from "@/lib/listings";
 import { formatFullPrice } from "@/lib/format";
 import Tideline from "@/components/Tideline";
@@ -21,11 +22,12 @@ interface Props {
 }
 
 const idxLive = IDX_PROVIDER !== "not_connected";
+const getCachedListingBySlug = cache(getListingBySlug);
 export const revalidate = 300;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const listing = await getListingBySlug(slug);
+  const listing = await getCachedListingBySlug(slug);
   if (!listing) return {};
   return {
     title: `${listing.address}, ${listing.city} FL | ${formatFullPrice(listing.price)}`,
@@ -38,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ListingPage({ params }: Props) {
   const { slug } = await params;
-  const listing = await getListingBySlug(slug);
+  const listing = await getCachedListingBySlug(slug);
   if (!listing) notFound();
   const isLiveListing = Boolean(listing.idx);
 

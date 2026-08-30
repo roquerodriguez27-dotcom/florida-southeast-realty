@@ -24,11 +24,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const community = await getCommunityBySlug(slug);
   if (!community) return {};
   return {
-    title: `${community.name} FL Real Estate & Neighborhood Guide`,
-    description: `Explore ${community.name}, Florida real estate, homes, local lifestyle, and buyer research resources for schools, flood maps, property records, permits, and more.`,
+    title: `${community.name} FL Homes for Sale & Real Estate Guide`,
+    description: `Browse homes for sale in ${community.name}, Florida from the live BeachesMLS feed and research neighborhoods, flood maps, schools, property records, HOA considerations, and buyer costs.`,
     alternates: { canonical: `/communities/${community.slug}` },
     openGraph: {
-      title: `${community.name} Real Estate & Neighborhood Guide`,
+      title: `${community.name} FL Homes for Sale & Real Estate Guide`,
       description: community.overview,
       images: [{ url: community.heroImage, alt: community.heroImageAlt }],
     },
@@ -43,6 +43,22 @@ export default async function CommunityPage({ params }: Props) {
 
   const listings = await searchListings({ community: community.slug });
   const usingSampleListings = IDX_PROVIDER === "not_connected";
+  const propertySearchHref = `/properties?location=${encodeURIComponent(community.name)}`;
+
+  const faqItems = [
+    {
+      question: `Where can I see homes for sale in ${community.name}?`,
+      answer: `Florida Southeast Realty displays current ${community.name} inventory from the BeachesMLS RESO feed. Use the live property search to refine by price, beds, baths, property type, waterfront, pool, HOA, age restrictions, and other available MLS criteria.`,
+    },
+    {
+      question: `What should I research before buying in ${community.name}?`,
+      answer: `Verify property-specific flood information, insurance needs, taxes, permits, school assignments, HOA or condo rules, assessments, and public records. The details can vary by address and community.`,
+    },
+    {
+      question: `Can I compare ${community.name} homes by monthly ownership cost?`,
+      answer: `Yes. Florida Southeast Realty's Buyer Tools can compare up to three homes and estimate mortgage, taxes, insurance, flood coverage, HOA or condo fees, PMI, and other assessments in one monthly-cost view.`,
+    },
+  ];
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -61,6 +77,14 @@ export default async function CommunityPage({ params }: Props) {
           { "@type": "ListItem", position: 2, name: "Communities", item: `${SITE.url}/communities` },
           { "@type": "ListItem", position: 3, name: community.name, item: `${SITE.url}/communities/${community.slug}` },
         ],
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: faqItems.map((item) => ({
+          "@type": "Question",
+          name: item.question,
+          acceptedAnswer: { "@type": "Answer", text: item.answer },
+        })),
       },
     ],
   };
@@ -81,8 +105,16 @@ export default async function CommunityPage({ params }: Props) {
         <div className="absolute inset-0 bg-gradient-to-t from-tide/95 via-tide/30 to-tide/35" />
         <div className="relative h-full container-fsre flex flex-col justify-end pb-10 pt-24">
           <p className="font-mono text-xs uppercase tracking-[0.14em] text-brass mb-2">{community.county} · South Florida</p>
-          <h1 className="font-display text-4xl md:text-6xl text-sand">{community.name}</h1>
+          <h1 className="font-display text-4xl md:text-6xl text-sand">{community.name} homes & real estate</h1>
           <p className="text-sand/85 mt-2 max-w-2xl">{community.tagline}</p>
+          <div className="mt-5 flex flex-col sm:flex-row gap-3">
+            <Link href={propertySearchHref} className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
+              Search {community.name} Homes
+            </Link>
+            <Link href="/buyer-tools" className="border border-white/35 bg-white/10 text-sand font-medium text-center px-5 py-3 rounded-sm hover:bg-white/15 transition-colors">
+              Compare Ownership Costs
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -148,20 +180,42 @@ export default async function CommunityPage({ params }: Props) {
       <div className="container-fsre my-12"><Tideline /></div>
 
       <section className="container-fsre">
-        <h2 className="font-display text-2xl text-ink mb-2">Homes in {community.name}</h2>
-        <p className="text-sm text-ink/60 mb-6">Browse matching inventory and contact us for properties that fit your exact criteria.</p>
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus mb-2">Live BeachesMLS</p>
+            <h2 className="font-display text-2xl md:text-3xl text-ink">Homes for sale in {community.name}, FL</h2>
+            <p className="text-sm text-ink/60 mt-2">Browse current inventory, then open the full search for exact filters and saved-search alerts.</p>
+          </div>
+          <Link href={propertySearchHref} className="text-sm text-tide underline underline-offset-4">Search all {community.name} homes</Link>
+        </div>
         {usingSampleListings && listings.length > 0 && <div className="mb-6"><SampleDataNotice variant="listings" /></div>}
         {listings.length > 0 ? (
           <PropertyGrid listings={listings} />
         ) : (
           <div className="bg-white border border-ink/10 rounded-sm p-6 md:p-8">
-            <p className="font-display text-xl text-ink">Live MLS inventory is being connected.</p>
+            <p className="font-display text-xl text-ink">No matching {community.name} listings are available in this view right now.</p>
             <p className="text-sm text-ink/65 mt-2 max-w-2xl">
-              Tell us what you want in {community.name} and we can help you search while the new site&apos;s live MLS feed is being finalized.
+              Inventory changes throughout the day. Open the full BeachesMLS search to adjust filters, or save your criteria so new matches and price changes can come to you automatically.
             </p>
-            <Link href="/contact" className="inline-block mt-4 bg-hibiscus text-sand font-medium px-4 py-2.5 rounded-sm">Ask about {community.name}</Link>
+            <div className="mt-5 flex flex-col sm:flex-row gap-3">
+              <Link href={propertySearchHref} className="bg-hibiscus text-sand font-medium text-center px-4 py-2.5 rounded-sm">Search {community.name}</Link>
+              <Link href="/contact" className="border border-tide/25 text-tide font-medium text-center px-4 py-2.5 rounded-sm hover:bg-tide/5">Ask Roque for Help</Link>
+            </div>
           </div>
         )}
+      </section>
+
+      <section className="container-fsre mt-14" aria-labelledby="community-faq-heading">
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus mb-2">Buyer Questions</p>
+        <h2 id="community-faq-heading" className="font-display text-2xl md:text-3xl text-ink">Buying in {community.name}</h2>
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          {faqItems.map((item) => (
+            <article key={item.question} className="rounded-sm border border-ink/10 bg-white p-5">
+              <h3 className="font-display text-lg text-ink">{item.question}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink/65">{item.answer}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <div className="mt-20"><LeadCaptureBand /></div>

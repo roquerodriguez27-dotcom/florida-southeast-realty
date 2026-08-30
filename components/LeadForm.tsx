@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { SITE } from "@/lib/site-config";
+import { trackSiteEvent } from "@/components/SiteAnalytics";
 
 export interface LeadFormField {
   name: string;
@@ -81,6 +82,7 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
           notificationConfigured: data.notificationConfigured === true,
           notificationDelivered: data.notificationDelivered === true,
         });
+        trackSiteEvent("lead_submit", { formName });
         setStatus("success");
       } else if (data.reason === "not_configured") {
         setStatus("not_configured");

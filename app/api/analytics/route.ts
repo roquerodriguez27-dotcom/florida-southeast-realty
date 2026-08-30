@@ -9,6 +9,8 @@ const analyticsSchema = z.object({
   eventName: z.enum([
     "page_view",
     "property_search",
+    "property_view",
+    "home_valuation_view",
     "lead_submit",
     "phone_click",
     "email_click",

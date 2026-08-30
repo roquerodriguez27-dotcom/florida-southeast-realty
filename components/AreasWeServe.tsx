@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const AREAS = [
-  ["Fort Lauderdale", "/communities/las-olas"],
+  ["Fort Lauderdale", "/fort-lauderdale-homes-for-sale"],
   ["Boca Raton", "/communities/boca-raton"],
   ["Delray Beach", "/communities/delray-beach"],
   ["Boynton Beach", "/communities/boynton-beach"],

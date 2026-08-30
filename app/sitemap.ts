@@ -20,6 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "",
     "/sellers",
     "/communities",
+    "/fort-lauderdale-homes-for-sale",
     "/research",
     "/buyer-tools",
     "/home-valuation",
@@ -37,8 +38,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticRoutes: MetadataRoute.Sitemap = staticPaths.map((route) => ({
     url: `${SITE.url}${route}`,
-    changeFrequency: route === "" ? "weekly" : route === "/blog" ? "weekly" : "monthly",
-    priority: route === "" || route === "/sellers" ? 1 : route === "/communities" || route === "/research" ? 0.9 : 0.7,
+    changeFrequency: route === "" || route === "/blog" || route === "/fort-lauderdale-homes-for-sale" ? "weekly" : "monthly",
+    priority: route === "" || route === "/sellers"
+      ? 1
+      : route === "/communities" || route === "/research" || route === "/fort-lauderdale-homes-for-sale"
+        ? 0.9
+        : 0.7,
   }));
 
   const listingRoutes: MetadataRoute.Sitemap = idxLive

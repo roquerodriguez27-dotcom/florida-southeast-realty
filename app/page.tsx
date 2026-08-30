@@ -20,11 +20,22 @@ import { SITE } from "@/lib/site-config";
 import Image from "next/image";
 
 export const metadata: Metadata = {
-  title: "South Florida Real Estate | Search, Research & Sell for 0.5%",
+  title: "South Florida Homes for Sale | Live MLS Search & 0.5% Listing Fee",
   description:
-    "Search South Florida homes, compare Broward and Palm Beach County communities, research flood maps, schools and property records, or sell with a 0.5% listing-side fee.",
+    "Search live South Florida homes for sale across Broward and Palm Beach counties, compare neighborhoods and ownership costs, or sell with Florida Southeast Realty's 0.5% listing-side fee.",
   alternates: { canonical: "/" },
 };
+
+const POPULAR_HOME_SEARCHES = [
+  { name: "Boca Raton", slug: "boca-raton" },
+  { name: "Delray Beach", slug: "delray-beach" },
+  { name: "Boynton Beach", slug: "boynton-beach" },
+  { name: "Lake Worth Beach", slug: "lake-worth-beach" },
+  { name: "West Palm Beach", slug: "west-palm-beach" },
+  { name: "Wellington", slug: "wellington" },
+  { name: "Palm Beach Gardens", slug: "palm-beach-gardens" },
+  { name: "Jupiter", slug: "jupiter" },
+];
 
 export default async function HomePage() {
   await connection();
@@ -42,6 +53,31 @@ export default async function HomePage() {
       <Hero />
       <ValuePropsBar />
       <AreasWeServe />
+
+      <section className="container-fsre pt-10 md:pt-14" aria-labelledby="popular-home-searches-heading">
+        <div className="rounded-sm border border-tide/15 bg-white p-5 md:p-7 shadow-[0_18px_50px_-42px_rgba(14,43,48,0.7)]">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-hibiscus">Live BeachesMLS searches</p>
+              <h2 id="popular-home-searches-heading" className="font-display text-2xl md:text-3xl text-ink mt-1">Popular South Florida homes for sale</h2>
+              <p className="text-sm text-ink/55 mt-2 max-w-2xl">Start with a market, then refine current listings by price, property type, pool, waterfront, HOA, 55+ status, square footage, and more.</p>
+            </div>
+            <Link href="/properties" className="text-sm text-tide underline underline-offset-4 shrink-0">Search all homes</Link>
+          </div>
+          <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-2.5">
+            {POPULAR_HOME_SEARCHES.map((area) => (
+              <div key={area.slug} className="rounded-sm border border-ink/10 bg-sand/35 p-3.5">
+                <Link href={`/properties?location=${encodeURIComponent(area.name)}`} className="block text-sm font-semibold text-tide hover:underline underline-offset-4">
+                  {area.name} homes for sale
+                </Link>
+                <Link href={`/communities/${area.slug}`} className="mt-1 block text-xs text-ink/50 hover:text-tide">
+                  Real estate & neighborhood guide →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="container-fsre py-16 md:py-24">
         <div className="grid md:grid-cols-2 gap-10 items-center">
@@ -92,7 +128,7 @@ export default async function HomePage() {
 
       {featured.length > 0 && (
         <section className="container-fsre py-16 md:py-24">
-          <SectionHeading eyebrow="Property Search" title="Browse the search experience" action={{ href: "/properties", label: "Search all homes" }} />
+          <SectionHeading eyebrow="Property Search" title="Browse current South Florida listings" action={{ href: "/properties", label: "Search all homes" }} />
           {usingSampleListings && <div className="mb-6"><SampleDataNotice variant="listings" /></div>}
           <PropertyGrid listings={featured} />
         </section>

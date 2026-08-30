@@ -39,6 +39,27 @@ function responseFromSnapshot(snapshot: ResoSnapshot): Response {
   });
 }
 
+function temporaryResoFailureResponse(
+  reason: "circuit_open" | "network_error",
+  retryAfterSeconds = 5,
+): Response {
+  const code = reason === "circuit_open" ? "RESO_CIRCUIT_OPEN" : "RESO_NETWORK_ERROR";
+  const message = reason === "circuit_open"
+    ? "BeachesMLS RESO is temporarily protected by a circuit breaker."
+    : "BeachesMLS RESO is temporarily unreachable.";
+
+  return new Response(JSON.stringify({ error: { code, message } }), {
+    status: 503,
+    statusText: "Service Unavailable",
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      "Retry-After": String(Math.max(1, Math.min(30, Math.ceil(retryAfterSeconds)))),
+      "X-FSR-RESO-Fallback": reason,
+    },
+  });
+}
+
 function trimCache(cache: Map<string, ResoSnapshot>): void {
   while (cache.size > MAX_CACHE_ENTRIES) {
     const oldestKey = cache.keys().next().value as string | undefined;
@@ -166,9 +187,10 @@ export async function register() {
     if (circuitOpenUntil > now) {
       if (cached && cached.staleUntil > now) return responseFromSnapshot(cached);
 
-      const error = new Error("BeachesMLS RESO circuit temporarily open.") as Error & { code?: string };
-      error.code = "RESO_CIRCUIT_OPEN";
-      throw error;
+      return temporaryResoFailureResponse(
+        "circuit_open",
+        Math.ceil((circuitOpenUntil - now) / 1_000),
+      );
     }
 
     const existing = inflight.get(key);
@@ -224,11 +246,21 @@ export async function register() {
         }
 
         return snapshot;
-      } catch (error) {
+      } catch {
         recordFailure(fsrGlobal, failureTimes);
         const stale = cache.get(key);
         if (stale && stale.staleUntil > Date.now()) return stale;
-        throw error;
+
+        const fallback = temporaryResoFailureResponse("network_error");
+        const body = await fallback.arrayBuffer();
+        return {
+          body,
+          status: fallback.status,
+          statusText: fallback.statusText,
+          headers: Array.from(fallback.headers.entries()),
+          freshUntil: Date.now(),
+          staleUntil: Date.now(),
+        };
       }
     })();
 

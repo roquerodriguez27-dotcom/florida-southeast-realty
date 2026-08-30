@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackSiteEvent } from "@/components/SiteAnalytics";
 
 type SearchCriteria = Record<string, string | boolean | undefined>;
 
@@ -41,6 +42,7 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
       setPendingIdx(Boolean(result.pendingIdx));
       setNotificationConfigured(Boolean(result.notificationConfigured));
       setNotificationDelivered(Boolean(result.notificationDelivered));
+      trackSiteEvent("saved_search_submit", { frequency: String(form.get("frequency") ?? "daily") });
       setState("saved");
     } catch {
       setState("error");

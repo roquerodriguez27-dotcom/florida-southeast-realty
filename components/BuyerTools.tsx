@@ -79,7 +79,7 @@ function comparisonHomeFromSavedListing(listing: SavedComparisonListing, index: 
     beds: String(listing.beds),
     baths: String(listing.baths + (listing.halfBaths ?? 0) * 0.5),
     sqft: String(listing.sqft),
-    hoa: "",
+    hoa: listing.associationFeeMonthly !== undefined ? String(listing.associationFeeMonthly) : "",
     yearBuilt: listing.yearBuilt ? String(listing.yearBuilt) : "",
     notes: `${listing.propertyType}${listing.waterfront ? " · Waterfront" : ""} · MLS ${listing.mlsId}`,
   };

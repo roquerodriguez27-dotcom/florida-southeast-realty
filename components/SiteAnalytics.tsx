@@ -6,6 +6,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 type EventName =
   | "page_view"
   | "property_search"
+  | "property_view"
+  | "home_valuation_view"
   | "lead_submit"
   | "phone_click"
   | "email_click"
@@ -64,6 +66,8 @@ export default function SiteAnalytics() {
   useEffect(() => {
     send("page_view");
     if (pathname === "/properties" && searchParams.toString()) send("property_search");
+    if (pathname.startsWith("/properties/")) send("property_view");
+    if (pathname === "/home-valuation") send("home_valuation_view");
     if (pathname === "/buyer-tools") send("buyer_tool_use", { tool: searchParams.get("tool") ?? "cost" });
   }, [pathname, searchParams]);
 

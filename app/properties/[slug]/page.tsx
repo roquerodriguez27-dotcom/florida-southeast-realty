@@ -23,10 +23,17 @@ interface Props {
 
 const idxLive = IDX_PROVIDER !== "not_connected";
 const getCachedListingBySlug = cache(getListingBySlug);
+const INVALID_PROPERTY_SLUGS = new Set(["null", "undefined", "false", "nan"]);
 export const revalidate = 300;
+
+function validPropertySlug(slug: string) {
+  const normalized = slug.trim().toLowerCase();
+  return normalized.length >= 4 && normalized.length <= 300 && !INVALID_PROPERTY_SLUGS.has(normalized);
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  if (!validPropertySlug(slug)) return { robots: { index: false, follow: false } };
   const listing = await getCachedListingBySlug(slug);
   if (!listing) return {};
   return {
@@ -40,6 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ListingPage({ params }: Props) {
   const { slug } = await params;
+  if (!validPropertySlug(slug)) notFound();
   const listing = await getCachedListingBySlug(slug);
   if (!listing) notFound();
   const isLiveListing = Boolean(listing.idx);

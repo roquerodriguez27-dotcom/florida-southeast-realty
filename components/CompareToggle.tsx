@@ -5,6 +5,7 @@ import {
   toggleComparisonListing,
   useComparisonListings,
 } from "@/components/useComparisonListings";
+import { trackSiteEvent } from "@/components/SiteAnalytics";
 
 export default function CompareToggle({
   listing,
@@ -30,7 +31,10 @@ export default function CompareToggle({
         type="checkbox"
         checked={selected}
         disabled={atLimit}
-        onChange={() => toggleComparisonListing(listing)}
+        onChange={() => {
+          toggleComparisonListing(listing);
+          trackSiteEvent("compare_change", { action: selected ? "remove" : "add", listing: listing.slug });
+        }}
         className="h-5 w-5 shrink-0 accent-hibiscus"
         aria-label={`${selected ? "Remove" : "Add"} ${listing.address} ${selected ? "from" : "to"} comparison`}
       />

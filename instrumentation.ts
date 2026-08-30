@@ -92,13 +92,14 @@ function recordFailure(
   fsrGlobal: FsrGlobal,
   failureTimes: number[],
   retryAfter: string | null = null,
+  forceOpen = false,
 ): void {
   const now = Date.now();
   pruneFailures(failureTimes, now);
   failureTimes.push(now);
 
   const retryDelay = retryAfterMilliseconds(retryAfter);
-  const shouldOpen = retryDelay !== null || failureTimes.length >= FAILURE_THRESHOLD;
+  const shouldOpen = forceOpen || retryDelay !== null || failureTimes.length >= FAILURE_THRESHOLD;
   if (!shouldOpen) return;
 
   const openUntil = now + (retryDelay ?? CIRCUIT_OPEN_MS);
@@ -205,7 +206,12 @@ export async function register() {
           const retryAfterHeader = response.status === 429
             ? response.headers.get("retry-after")
             : null;
-          recordFailure(fsrGlobal, failureTimes, retryAfterHeader);
+          recordFailure(
+            fsrGlobal,
+            failureTimes,
+            retryAfterHeader,
+            response.status === 429,
+          );
 
           const retryAfter = Number(response.headers.get("retry-after"));
           const delay = Number.isFinite(retryAfter) && retryAfter > 0

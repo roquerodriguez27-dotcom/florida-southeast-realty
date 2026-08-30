@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { getListingBySlug, searchListings } from "@/lib/listings";
@@ -24,6 +25,7 @@ interface Props {
 const idxLive = IDX_PROVIDER !== "not_connected";
 const getCachedListingBySlug = cache(getListingBySlug);
 const INVALID_PROPERTY_SLUGS = new Set(["null", "undefined", "false", "nan"]);
+const CRAWLER_USER_AGENT = /(bot|crawler|spider|slurp|bingpreview|facebookexternalhit|linkedinbot|twitterbot|googleother|google-inspectiontool|semrush|ahrefs|mj12bot|dotbot)/i;
 export const revalidate = 300;
 
 function validPropertySlug(slug: string) {
@@ -51,10 +53,18 @@ export default async function ListingPage({ params }: Props) {
   const listing = await getCachedListingBySlug(slug);
   if (!listing) notFound();
   const isLiveListing = Boolean(listing.idx);
+  const requestHeaders = await headers();
+  const crawlerRequest = CRAWLER_USER_AGENT.test(requestHeaders.get("user-agent") ?? "");
 
-  const similar = (await searchListings({ community: listing.communitySlug }))
-    .filter((item) => item.slug !== listing.slug)
-    .slice(0, 3);
+  // The property itself remains indexable for legitimate search engines, but
+  // crawlers do not need a second live BeachesMLS query just to render the
+  // "More in this community" rail. Skipping it cuts crawler MLS pressure while
+  // preserving the full experience for real visitors.
+  const similar = crawlerRequest
+    ? []
+    : (await searchListings({ community: listing.communitySlug }))
+      .filter((item) => item.slug !== listing.slug)
+      .slice(0, 3);
 
   const jsonLd = isLiveListing
     ? {

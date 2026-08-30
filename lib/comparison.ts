@@ -17,6 +17,7 @@ export interface SavedComparisonListing {
   yearBuilt: number;
   waterfront: boolean;
   propertyType: PropertyType;
+  associationFeeMonthly?: number;
 }
 
 export function savedComparisonListing(listing: Listing): SavedComparisonListing {
@@ -35,5 +36,6 @@ export function savedComparisonListing(listing: Listing): SavedComparisonListing
     yearBuilt: listing.yearBuilt,
     waterfront: listing.waterfront,
     propertyType: listing.propertyType,
+    associationFeeMonthly: listing.associationFeeMonthly,
   };
 }

@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import { SITE } from "@/lib/site-config";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
 import CompareTray from "@/components/CompareTray";
+import SiteAnalytics from "@/components/SiteAnalytics";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -145,6 +146,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Script>
           </>
         )}
+        <SiteAnalytics />
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-sand focus:text-tide focus:px-4 focus:py-2 focus:rounded-sm"

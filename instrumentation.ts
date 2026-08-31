@@ -18,14 +18,15 @@ type FsrGlobal = typeof globalThis & {
 };
 
 const RESO_HOST = "replication.sparkapi.com";
-const FRESH_TTL_MS = 30_000;
+const FRESH_TTL_MS = 60_000;
 const STALE_TTL_MS = 10 * 60_000;
 const MAX_CACHE_ENTRIES = 100;
-const MAX_BACKOFF_MS = 2_500;
+const MAX_BACKOFF_MS = 3_000;
 const FAILURE_WINDOW_MS = 20_000;
-const FAILURE_THRESHOLD = 4;
-const CIRCUIT_OPEN_MS = 15_000;
+const FAILURE_THRESHOLD = 5;
+const CIRCUIT_OPEN_MS = 3_000;
 const MAX_CIRCUIT_OPEN_MS = 30_000;
+const CIRCUIT_RECOVERY_GRACE_MS = 1_200;
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -187,10 +188,15 @@ export async function register() {
     if (circuitOpenUntil > now) {
       if (cached && cached.staleUntil > now) return responseFromSnapshot(cached);
 
-      return temporaryResoFailureResponse(
-        "circuit_open",
-        Math.ceil((circuitOpenUntil - now) / 1_000),
-      );
+      const remainingMs = circuitOpenUntil - now;
+      if (remainingMs <= CIRCUIT_RECOVERY_GRACE_MS) {
+        await wait(remainingMs);
+      } else {
+        return temporaryResoFailureResponse(
+          "circuit_open",
+          Math.ceil(remainingMs / 1_000),
+        );
+      }
     }
 
     const existing = inflight.get(key);

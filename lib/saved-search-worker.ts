@@ -177,7 +177,10 @@ export async function sendSavedSearchEmail(args: {
   searchId: string;
 }): Promise<{ configured: boolean; delivered: boolean }> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) return { configured: false, delivered: false };
+  if (!apiKey) {
+    console.error("[saved-search-email:not-configured]", { provider: "resend" });
+    return { configured: false, delivered: false };
+  }
   const from = process.env.RESEND_FROM_EMAIL?.trim()
     || `Florida Southeast Realty <website@${new URL(SITE.url).hostname.replace(/^www\./, "")}>`;
   const sections: string[] = [];
@@ -225,8 +228,28 @@ export async function sendSavedSearchEmail(args: {
       }),
       signal: AbortSignal.timeout(8_000),
     });
+    if (!response.ok) {
+      let providerCode: string | undefined;
+      try {
+        const errorBody = await response.json() as { name?: unknown; code?: unknown };
+        providerCode = typeof errorBody.name === "string"
+          ? errorBody.name
+          : typeof errorBody.code === "string" ? errorBody.code : undefined;
+      } catch {
+        providerCode = undefined;
+      }
+      console.error("[saved-search-email:provider-rejected]", {
+        provider: "resend",
+        status: response.status,
+        providerCode,
+      });
+    }
     return { configured: true, delivered: response.ok };
-  } catch {
+  } catch (error) {
+    console.error("[saved-search-email:network-failed]", {
+      provider: "resend",
+      error: error instanceof Error ? error.name : "unknown",
+    });
     return { configured: true, delivered: false };
   }
 }

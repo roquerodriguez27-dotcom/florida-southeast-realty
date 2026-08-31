@@ -1,0 +1,1 @@
+Production redeploy trigger after installing the Vercel Resend integration so RESEND_API_KEY is loaded by server functions.

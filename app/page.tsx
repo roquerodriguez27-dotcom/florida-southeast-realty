@@ -11,12 +11,14 @@ import SampleDataNotice from "@/components/SampleDataNotice";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import ResearchLinks from "@/components/ResearchLinks";
 import Tideline from "@/components/Tideline";
+import HomeEngagement from "@/components/HomeEngagement";
 import Link from "next/link";
 import { getAllListings } from "@/lib/listings";
 import { getAllCommunities } from "@/lib/communities";
 import { getGuides } from "@/lib/content";
 import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
+import { savedComparisonListing } from "@/lib/comparison";
 import Image from "next/image";
 
 export const metadata: Metadata = {
@@ -45,7 +47,9 @@ export default async function HomePage() {
     getGuides(),
   ]);
 
-  const featured = listings.filter((l) => l.status === "Active").slice(0, 6);
+  const activeListings = listings.filter((l) => l.status === "Active");
+  const featured = activeListings.slice(0, 6);
+  const recommendationPool = activeListings.slice(0, 18).map(savedComparisonListing);
   const usingSampleListings = IDX_PROVIDER === "not_connected";
 
   return (
@@ -53,6 +57,7 @@ export default async function HomePage() {
       <Hero />
       <ValuePropsBar />
       <AreasWeServe />
+      <HomeEngagement listings={recommendationPool} />
 
       <section className="container-fsre pt-10 md:pt-14" aria-labelledby="popular-home-searches-heading">
         <div className="rounded-sm border border-tide/15 bg-white p-5 md:p-7 shadow-[0_18px_50px_-42px_rgba(14,43,48,0.7)]">

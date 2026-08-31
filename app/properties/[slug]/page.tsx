@@ -17,6 +17,8 @@ import IdxAttribution from "@/components/IdxAttribution";
 import CompareToggle from "@/components/CompareToggle";
 import { savedComparisonListing } from "@/lib/comparison";
 import PropertyGallery from "@/components/PropertyGallery";
+import SaveListingButton from "@/components/SaveListingButton";
+import AskRoqueActions from "@/components/AskRoqueActions";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -55,6 +57,7 @@ export default async function ListingPage({ params }: Props) {
   const isLiveListing = Boolean(listing.idx);
   const requestHeaders = await headers();
   const crawlerRequest = CRAWLER_USER_AGENT.test(requestHeaders.get("user-agent") ?? "");
+  const savedListing = savedComparisonListing(listing);
 
   // The property itself remains indexable for legitimate search engines, but
   // crawlers do not need a second live BeachesMLS query just to render the
@@ -104,6 +107,8 @@ export default async function ListingPage({ params }: Props) {
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-seagrass text-sand">{listing.status}</span>
             {listing.waterfront && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-tide text-sand">Waterfront</span>}
+            {listing.privatePool && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-brass/20 text-ink">Private Pool</span>}
+            {listing.originalListPrice && listing.originalListPrice > listing.price && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-hibiscus text-sand">Price Reduced</span>}
             {!isLiveListing && <span className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-brass/20 text-ink">Preview Demo</span>}
           </div>
 
@@ -113,10 +118,19 @@ export default async function ListingPage({ params }: Props) {
 
           <div className="flex flex-wrap gap-3 mt-5">
             <Link href={`/buyer-tools?listing=${listing.slug}&tool=cost`} className="bg-tide text-sand px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide-light transition-colors">Calculate true monthly cost</Link>
-            <CompareToggle listing={savedComparisonListing(listing)} variant="detail" />
+            <SaveListingButton listing={savedListing} variant="detail" />
+            <CompareToggle listing={savedListing} variant="detail" />
             <Link href="/properties" className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">Choose more homes</Link>
           </div>
-          <p className="mt-2 text-xs text-ink/50">Select up to three listings as you browse. Your choices stay saved until you compare or clear them.</p>
+          <p className="mt-2 text-xs text-ink/50">Save favorites for later, or select up to three homes to compare side-by-side.</p>
+
+          <AskRoqueActions
+            slug={listing.slug}
+            mlsId={listing.mlsId}
+            city={listing.city}
+            price={listing.price}
+            associationFeeMonthly={listing.associationFeeMonthly}
+          />
 
           <div className="flex flex-wrap gap-x-8 gap-y-3 mt-6 py-5 border-y border-ink/10 font-mono text-sm text-ink/80">
             <span>{listing.beds} beds</span>
@@ -143,7 +157,7 @@ export default async function ListingPage({ params }: Props) {
           {(listing.lat !== 0 || listing.lng !== 0) && <div className="mt-10"><Tideline label={`${listing.lat.toFixed(4)}, ${listing.lng.toFixed(4)}`} /></div>}
         </div>
 
-        <aside className="lg:col-span-1">
+        <aside id="property-inquiry" className="lg:col-span-1 scroll-mt-32">
           <div className="bg-white border border-ink/10 rounded-sm p-6 sticky top-28">
             <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1">Ask about this property</p>
             <p className="font-display text-xl text-ink">Florida Southeast Realty</p>
@@ -179,7 +193,13 @@ export default async function ListingPage({ params }: Props) {
 
       {similar.length > 0 && (
         <div className="container-fsre mt-20">
-          <h2 className="font-display text-2xl text-ink mb-6">More in {listing.community}</h2>
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-hibiscus">Keep exploring</p>
+              <h2 className="font-display text-2xl text-ink">More homes in {listing.community}</h2>
+            </div>
+            <Link href={`/properties?location=${encodeURIComponent(listing.city)}`} className="text-sm text-tide underline underline-offset-4">See more in {listing.city}</Link>
+          </div>
           <PropertyGrid listings={similar} />
         </div>
       )}

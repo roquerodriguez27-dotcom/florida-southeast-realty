@@ -15,6 +15,9 @@ type EventName =
   | "compare_change"
   | "buyer_tool_use";
 
+const LAST_SEARCH_STORAGE_KEY = "fsr-last-property-search-v1";
+const LAST_SEARCH_UPDATED_EVENT = "fsr-last-property-search-updated";
+
 function getOrCreateId(storage: Storage, key: string) {
   const existing = storage.getItem(key);
   if (existing) return existing;
@@ -55,6 +58,25 @@ function send(eventName: EventName, metadata: Record<string, string | number | b
   }
 }
 
+function rememberPropertySearch(searchParams: URLSearchParams) {
+  try {
+    const query = new URLSearchParams(searchParams.toString());
+    for (const key of ["page", "view", "north", "south", "east", "west", "shape"]) query.delete(key);
+    if (!query.size) return;
+
+    const location = query.get("location")?.split(",").map((value) => value.trim()).filter(Boolean).slice(0, 2).join(" + ");
+    const label = location || query.get("q")?.trim() || "South Florida homes";
+    window.localStorage.setItem(LAST_SEARCH_STORAGE_KEY, JSON.stringify({
+      href: `/properties?${query.toString()}`,
+      label: label.slice(0, 80),
+      updatedAt: Date.now(),
+    }));
+    window.dispatchEvent(new Event(LAST_SEARCH_UPDATED_EVENT));
+  } catch {
+    // Personalization is optional and must never interrupt browsing.
+  }
+}
+
 export function trackSiteEvent(eventName: EventName, metadata: Record<string, string | number | boolean | null> = {}) {
   if (typeof window !== "undefined") send(eventName, metadata);
 }
@@ -65,7 +87,10 @@ export default function SiteAnalytics() {
 
   useEffect(() => {
     send("page_view");
-    if (pathname === "/properties" && searchParams.toString()) send("property_search");
+    if (pathname === "/properties" && searchParams.toString()) {
+      send("property_search");
+      rememberPropertySearch(new URLSearchParams(searchParams.toString()));
+    }
     if (pathname.startsWith("/properties/")) send("property_view");
     if (pathname === "/home-valuation") send("home_valuation_view");
     if (pathname === "/buyer-tools") send("buyer_tool_use", { tool: searchParams.get("tool") ?? "cost" });

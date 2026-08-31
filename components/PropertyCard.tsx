@@ -5,6 +5,7 @@ import { formatPrice, formatMileMarker } from "@/lib/format";
 import { savedComparisonListing } from "@/lib/comparison";
 import IdxAttribution from "./IdxAttribution";
 import CompareToggle from "./CompareToggle";
+import SaveListingButton from "./SaveListingButton";
 
 const STATUS_STYLE: Record<Listing["status"], string> = {
   Active: "bg-seagrass text-sand",
@@ -13,9 +14,28 @@ const STATUS_STYLE: Record<Listing["status"], string> = {
   Sold: "bg-ink/70 text-sand",
 };
 
+function engagementBadges(listing: Listing) {
+  const badges: { label: string; className: string }[] = [];
+  if (listing.daysOnMarket >= 0 && listing.daysOnMarket <= 3) {
+    badges.push({ label: "New", className: "bg-hibiscus text-sand" });
+  }
+  if (listing.originalListPrice && listing.originalListPrice > listing.price) {
+    const drop = listing.originalListPrice - listing.price;
+    badges.push({ label: `Price drop ${formatPrice(drop)}`, className: "bg-brass text-tide" });
+  }
+  if (listing.privatePool) badges.push({ label: "Pool", className: "bg-white/95 text-tide" });
+  if (listing.waterfront) badges.push({ label: "Waterfront", className: "bg-white/95 text-tide" });
+  if (listing.association === false) badges.push({ label: "No HOA", className: "bg-white/95 text-tide" });
+  return badges.slice(0, 3);
+}
+
 export default function PropertyCard({ listing }: { listing: Listing }) {
+  const savedListing = savedComparisonListing(listing);
+  const badges = engagementBadges(listing);
+
   return (
-    <article className="overflow-hidden rounded-sm border border-ink/10 bg-white transition-colors hover:border-ink/25">
+    <article className="relative overflow-hidden rounded-sm border border-ink/10 bg-white transition-all hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_18px_45px_-34px_rgba(14,43,48,0.7)]">
+      <SaveListingButton listing={savedListing} />
       <Link href={`/properties/${listing.slug}`} className="group block">
         <div className="relative aspect-[4/3] overflow-hidden">
           <Image
@@ -30,18 +50,22 @@ export default function PropertyCard({ listing }: { listing: Listing }) {
           >
             {listing.status}
           </span>
-          {listing.waterfront && (
-            <span className="absolute top-3 right-3 text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded-sm bg-white/90 text-tide">
-              Waterfront
-            </span>
-          )}
+          {badges.length > 0 ? (
+            <div className="absolute bottom-3 left-3 flex max-w-[72%] flex-wrap gap-1.5">
+              {badges.map((badge) => (
+                <span key={badge.label} className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide shadow ${badge.className}`}>
+                  {badge.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <span className="absolute bottom-3 right-3 rounded-full bg-tide/90 px-2.5 py-1 text-[11px] font-medium text-sand shadow">
             {listing.images.length} {listing.images.length === 1 ? "photo" : "photos"}
           </span>
         </div>
 
         <div className="p-4">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between gap-3">
             <p className="font-display text-xl text-ink">{formatPrice(listing.price)}</p>
             {listing.mileMarker > 0 && <span className="mile-marker text-[11px] text-ink/45">{formatMileMarker(listing.mileMarker)}</span>}
           </div>
@@ -59,7 +83,7 @@ export default function PropertyCard({ listing }: { listing: Listing }) {
           <IdxAttribution attribution={listing.idx} compact />
         </div>
       </Link>
-      <CompareToggle listing={savedComparisonListing(listing)} />
+      <CompareToggle listing={savedListing} />
     </article>
   );
 }

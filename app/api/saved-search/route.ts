@@ -34,6 +34,7 @@ export async function POST(request: Request) {
   try {
     const idxConnection = await checkIdxConnection();
     const idxActive = idxConnection.connected && idxConnection.idxRoleVerified !== false;
+    const customerEmailConfigured = Boolean(process.env.RESEND_API_KEY?.trim());
     const supabase = createSupabasePublicClient();
     const { data: pendingIdx, error } = await supabase.rpc("capture_saved_search", {
       p_full_name: fullName,
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
       saved: true,
       stored: true,
       pendingIdx: pendingIdx === true,
+      customerEmailConfigured,
       notificationConfigured: notification.configured,
       notificationDelivered: notification.delivered,
     });

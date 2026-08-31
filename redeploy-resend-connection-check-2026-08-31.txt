@@ -1,0 +1,1 @@
+Trigger production rebuild after confirming the live florida-southeast-realty project is already connected to the Resend marketplace resource.

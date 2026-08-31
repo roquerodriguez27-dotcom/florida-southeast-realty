@@ -10,6 +10,7 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
   const [pendingIdx, setPendingIdx] = useState(false);
+  const [customerEmailConfigured, setCustomerEmailConfigured] = useState(false);
   const [notificationConfigured, setNotificationConfigured] = useState(false);
   const [notificationDelivered, setNotificationDelivered] = useState(false);
 
@@ -31,6 +32,7 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
       const result = await response.json() as {
         error?: string;
         pendingIdx?: boolean;
+        customerEmailConfigured?: boolean;
         notificationConfigured?: boolean;
         notificationDelivered?: boolean;
       };
@@ -40,6 +42,7 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
         return;
       }
       setPendingIdx(Boolean(result.pendingIdx));
+      setCustomerEmailConfigured(Boolean(result.customerEmailConfigured));
       setNotificationConfigured(Boolean(result.notificationConfigured));
       setNotificationDelivered(Boolean(result.notificationDelivered));
       trackSiteEvent("saved_search_submit", { frequency: String(form.get("frequency") ?? "daily") });
@@ -56,7 +59,9 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
       <p className="text-sm text-ink/60 mt-1">
         {pendingIdx
           ? "Your criteria are in the brokerage CRM. Florida Southeast Realty will follow up while the secure MLS connection is unavailable."
-          : "Your email alert is active against the live BeachesMLS feed. We’ll watch for new matches, price changes, and homes returning to market at your selected frequency."}
+          : customerEmailConfigured
+            ? "Your email alert is active against the live BeachesMLS feed. We’ll watch for new matches, price changes, and homes returning to market at your selected frequency."
+            : "Your criteria are saved in the brokerage CRM and the live BeachesMLS watcher is ready. Direct email delivery is temporarily unavailable, so Florida Southeast Realty can follow up while alerts are being activated."}
       </p>
       {notificationDelivered ? (
         <p className="mt-2 text-xs font-medium text-tide">Florida Southeast Realty was also notified about your saved search.</p>

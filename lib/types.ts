@@ -130,6 +130,8 @@ export interface Listing {
   /** True when the MLS broad property type identifies a lease or rental listing. */
   forLease?: boolean;
   images: string[];
+  /** Total MLS photo count, which can be larger than the images loaded for a search card. */
+  photoCount?: number;
   description: string;
   features: string[];
   lat: number;

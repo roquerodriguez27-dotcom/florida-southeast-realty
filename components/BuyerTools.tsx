@@ -510,16 +510,15 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
 
       <section className="mt-12 grid lg:grid-cols-2 gap-8 items-start border-t border-ink/10 pt-10">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus">Save your work</p>
-          <h2 className="font-display text-3xl mt-2">Ask Roque to review this scenario</h2>
-          <p className="text-ink/65 mt-3 max-w-lg">Send the current assumptions to Florida Southeast Realty. We can help identify missing property costs, compare homes, and connect you with a licensed lender when appropriate.</p>
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus">Keep the scenario</p>
+          <h2 className="font-display text-3xl mt-2">Want Roque to review these numbers?</h2>
+          <p className="text-ink/65 mt-3 max-w-lg">Send the current assumptions to Florida Southeast Realty. We can flag property costs worth verifying, compare homes, or help narrow the search.</p>
           <p className="mt-5 bg-keystone p-4 rounded-sm text-sm text-ink/65"><span className="font-medium text-ink">Current scenario:</span> {scenarioSummary}</p>
         </div>
-        <LeadForm formName="buyer-tools-review" submitLabel="Save & Request a Review" successMessage="Florida Southeast Realty will review your saved buyer scenario and follow up." hiddenContext={{ tool, scenario: scenarioSummary }} fields={[
-          { name: "name", label: "Name", type: "text", required: true },
+        <LeadForm formName="buyer-tools-review" submitLabel="Send This Scenario to Roque" successMessage="Florida Southeast Realty will review your saved buyer scenario and follow up." hiddenContext={{ tool, scenario: scenarioSummary }} fields={[
+          { name: "name", label: "Name", type: "text" },
           { name: "email", label: "Email", type: "email", required: true },
           { name: "phone", label: "Phone", type: "tel" },
-          { name: "notes", label: "What should we know?", type: "textarea", placeholder: "Timing, preferred areas, questions, or deal breakers", colSpan: 2 },
         ]} />
       </section>
     </div>

@@ -24,9 +24,13 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullName: form.get("fullName"), email: form.get("email"), phone: form.get("phone"),
-          frequency: form.get("frequency"), smsConsent: false,
-          honeypot: form.get("companyWebsite"), criteria,
+          fullName: "",
+          email: form.get("email"),
+          phone: "",
+          frequency: "instant",
+          smsConsent: false,
+          honeypot: form.get("companyWebsite"),
+          criteria,
         }),
       });
       const result = await response.json() as {
@@ -45,7 +49,7 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
       setCustomerEmailConfigured(Boolean(result.customerEmailConfigured));
       setNotificationConfigured(Boolean(result.notificationConfigured));
       setNotificationDelivered(Boolean(result.notificationDelivered));
-      trackSiteEvent("saved_search_submit", { frequency: String(form.get("frequency") ?? "daily") });
+      trackSiteEvent("saved_search_submit", { frequency: "instant" });
       setState("saved");
     } catch {
       setState("error");
@@ -60,7 +64,7 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
         {pendingIdx
           ? "Your criteria are in the brokerage CRM. Florida Southeast Realty will follow up while the secure MLS connection is unavailable."
           : customerEmailConfigured
-            ? "Your email alert is active against the live BeachesMLS feed. We’ll watch for new matches, price changes, and homes returning to market at your selected frequency."
+            ? "We’ll watch the live BeachesMLS feed for new matches, price changes, and homes returning to market."
             : "Your criteria are saved in the brokerage CRM and the live BeachesMLS watcher is ready. Direct email delivery is temporarily unavailable, so Florida Southeast Realty can follow up while alerts are being activated."}
       </p>
       {notificationDelivered ? (
@@ -74,20 +78,41 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   );
 
   return (
-    <div className="border border-brass/30 bg-brass/10 rounded-sm p-3.5">
+    <div className="border border-tide/15 bg-white rounded-sm p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="font-display text-lg text-ink">Save this search</p><p className="text-xs text-ink/60">Get new matches, price changes, and back-on-market updates.</p></div>
-        <button type="button" onClick={() => setOpen((value) => !value)} className="bg-tide text-sand px-4 py-2 rounded-sm text-sm font-medium">{open ? "Close" : "Set up alerts"}</button>
+        <div>
+          <p className="font-display text-lg text-ink">Save this search & get alerts</p>
+          <p className="text-xs text-ink/55 mt-0.5">New listings, price changes, and back-on-market updates.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="border border-tide/25 text-tide px-4 py-2 rounded-sm text-sm font-medium hover:bg-tide/5"
+        >
+          {open ? "Close" : "Get listing alerts"}
+        </button>
       </div>
-      {open && <form onSubmit={submit} className="mt-5 grid sm:grid-cols-2 gap-4">
-        <div className="hidden" aria-hidden="true"><label>Company website<input name="companyWebsite" tabIndex={-1} autoComplete="off" /></label></div>
-        <label className="text-sm">Name<input name="fullName" required autoComplete="name" className="mt-1 w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm" /></label>
-        <label className="text-sm">Email<input name="email" type="email" required autoComplete="email" className="mt-1 w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm" /></label>
-        <label className="text-sm">Phone (optional)<input name="phone" type="tel" autoComplete="tel" className="mt-1 w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm" /></label>
-        <label className="text-sm">Alert frequency<select name="frequency" defaultValue="daily" className="mt-1 w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm"><option value="instant">About every 15 minutes</option><option value="daily">Daily summary</option><option value="weekly">Weekly summary</option></select></label>
-        <div className="sm:col-span-2 flex flex-wrap items-center gap-4"><button disabled={state === "saving"} className="bg-hibiscus text-sand px-5 py-3 rounded-sm font-medium disabled:opacity-60">{state === "saving" ? "Saving…" : "Save my search"}</button><p className="text-xs text-ink/50">Alerts are sent by email and include a one-click unsubscribe link.</p></div>
-        {state === "error" && <p className="sm:col-span-2 text-sm text-hibiscus" role="alert">{message}</p>}
-      </form>}
+      {open && (
+        <form onSubmit={submit} className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-start">
+          <div className="hidden" aria-hidden="true"><label>Company website<input name="companyWebsite" tabIndex={-1} autoComplete="off" /></label></div>
+          <label className="flex-1 text-sm">
+            <span className="sr-only">Email</span>
+            <input
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="Email address"
+              className="w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm text-base md:text-sm focus:border-tide outline-none"
+            />
+          </label>
+          <button disabled={state === "saving"} className="bg-hibiscus text-sand px-5 py-2.5 rounded-sm text-sm font-medium disabled:opacity-60">
+            {state === "saving" ? "Saving…" : "Save & alert me"}
+          </button>
+          {state === "error" && <p className="sm:basis-full text-sm text-hibiscus" role="alert">{message}</p>}
+          <p className="sm:basis-full text-[11px] text-ink/45">Email alerts only. Unsubscribe anytime.</p>
+        </form>
+      )}
     </div>
   );
 }

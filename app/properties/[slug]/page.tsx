@@ -19,6 +19,7 @@ import { savedComparisonListing } from "@/lib/comparison";
 import PropertyGallery from "@/components/PropertyGallery";
 import SaveListingButton from "@/components/SaveListingButton";
 import AskRoqueActions from "@/components/AskRoqueActions";
+import PropertyConversionBar from "@/components/PropertyConversionBar";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -95,7 +96,7 @@ export default async function ListingPage({ params }: Props) {
     : null;
 
   return (
-    <div className="pt-16 pb-20">
+    <div className="pt-16 pb-28 md:pb-20">
       {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />}
 
       <PropertyGallery images={listing.images} address={listing.address} />
@@ -159,20 +160,20 @@ export default async function ListingPage({ params }: Props) {
 
         <aside id="property-inquiry" className="lg:col-span-1 scroll-mt-32">
           <div className="bg-white border border-ink/10 rounded-sm p-6 sticky top-28">
-            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1">Ask about this property</p>
-            <p className="font-display text-xl text-ink">Florida Southeast Realty</p>
-            <p className="text-sm text-ink/60 mt-1">Talk directly with a South Florida broker.</p>
+            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1">Tour or ask a question</p>
+            <p className="font-display text-xl text-ink">Talk directly with Roque</p>
+            <p className="text-sm text-ink/60 mt-1">Ask about the home or request a showing without leaving the listing.</p>
             <div className="mt-5">
               <LeadForm
                 formName="property-inquiry"
-                submitLabel="Request Information"
+                submitLabel="Send to Roque"
                 successMessage={`Florida Southeast Realty will follow up about ${listing.address}.`}
                 hiddenContext={{ listingAddress: listing.address, listingId: listing.mlsId }}
                 fields={[
-                  { name: "name", label: "Your Name", type: "text", required: true },
+                  { name: "name", label: "Your Name", type: "text" },
                   { name: "email", label: "Your Email", type: "email", required: true },
                   { name: "phone", label: "Phone", type: "tel" },
-                  { name: "message", label: "Message", type: "textarea", defaultValue: `I'd like more information about ${listing.address}.`, colSpan: 2 },
+                  { name: "message", label: "Message", type: "textarea", defaultValue: `I'd like to ask about or schedule a tour of ${listing.address}.`, colSpan: 2 },
                 ]}
               />
             </div>
@@ -203,6 +204,8 @@ export default async function ListingPage({ params }: Props) {
           <PropertyGrid listings={similar} />
         </div>
       )}
+
+      <PropertyConversionBar mlsId={listing.mlsId} />
     </div>
   );
 }

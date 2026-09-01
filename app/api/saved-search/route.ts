@@ -7,7 +7,7 @@ import { sendBrokerNotification } from "@/lib/broker-notification";
 
 const criteriaValueSchema = z.union([z.string().trim().max(2000), z.boolean()]);
 const savedSearchSchema = z.object({
-  fullName: z.string().trim().min(1).max(120),
+  fullName: z.string().trim().max(120).optional().default(""),
   email: z.email().max(254).transform((value) => value.toLowerCase()),
   phone: z.string().trim().max(40).optional().default(""),
   frequency: z.enum(["instant", "daily", "weekly"]),
@@ -25,11 +25,12 @@ export async function POST(request: Request) {
 
   const parsed = savedSearchSchema.safeParse(body.value);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Please provide your name, a valid email, and an alert frequency." }, { status: 400 });
+    return NextResponse.json({ error: "Please provide a valid email address." }, { status: 400 });
   }
   const { fullName, email, phone, frequency, smsConsent, honeypot, criteria } = parsed.data;
   if (honeypot) return NextResponse.json({ saved: true, pendingIdx: false });
   if (smsConsent && !phone) return NextResponse.json({ error: "A phone number is required for text alerts." }, { status: 400 });
+  const displayName = fullName || "Website visitor";
 
   try {
     const idxConnection = await checkIdxConnection();
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     const customerEmailConfigured = Boolean(process.env.RESEND_API_KEY?.trim());
     const supabase = createSupabasePublicClient();
     const { data: pendingIdx, error } = await supabase.rpc("capture_saved_search", {
-      p_full_name: fullName,
+      p_full_name: displayName,
       p_email: email,
       p_phone: phone || null,
       p_frequency: frequency,
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
       title: "New saved property search",
       replyTo: email,
       fields: {
-        fullName,
+        fullName: displayName,
         email,
         phone,
         frequency,

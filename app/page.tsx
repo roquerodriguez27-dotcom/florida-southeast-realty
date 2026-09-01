@@ -13,7 +13,7 @@ import ResearchLinks from "@/components/ResearchLinks";
 import Tideline from "@/components/Tideline";
 import HomeEngagement from "@/components/HomeEngagement";
 import Link from "next/link";
-import { getAllListings } from "@/lib/listings";
+import { searchListings } from "@/lib/listings";
 import { getAllCommunities } from "@/lib/communities";
 import { getGuides } from "@/lib/content";
 import { IDX_PROVIDER } from "@/lib/idx";
@@ -42,7 +42,7 @@ const POPULAR_HOME_SEARCHES = [
 export default async function HomePage() {
   await connection();
   const [listings, communities, guides] = await Promise.all([
-    getAllListings(),
+    searchListings({ locations: ["Palm Beach County", "Broward County"] }),
     getAllCommunities(),
     getGuides(),
   ]);

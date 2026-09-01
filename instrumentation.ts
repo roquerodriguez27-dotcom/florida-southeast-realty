@@ -90,6 +90,77 @@ function normalizeEntityLookup(url: URL): URL {
   return normalized;
 }
 
+function mediaCollectionPropertyProxy(url: URL): URL | null {
+  if (!/\/Media$/i.test(url.pathname)) return null;
+
+  const filter = url.searchParams.get("$filter") ?? "";
+  const match = filter.match(/ResourceRecordKey\s+eq\s+'((?:''|[^'])+)'/i);
+  if (!match?.[1]) return null;
+
+  const listingKey = match[1].replace(/''/g, "'");
+  if (!listingKey || listingKey.length > 200) return null;
+
+  const requestedTop = Number(url.searchParams.get("$top"));
+  const requestedSkip = Number(url.searchParams.get("$skip"));
+  const top = Number.isFinite(requestedTop) && requestedTop > 0
+    ? Math.min(200, Math.floor(requestedTop))
+    : 25;
+  const skip = Number.isFinite(requestedSkip) && requestedSkip > 0
+    ? Math.floor(requestedSkip)
+    : 0;
+
+  const origin = process.env.IDX_ORIGINATING_SYSTEM_ID?.trim() || "M00000170";
+  const escapedOrigin = origin.replace(/'/g, "''");
+  const escapedKey = listingKey.replace(/'/g, "''");
+  const proxied = new URL(url.toString());
+  proxied.pathname = proxied.pathname.replace(/\/Media$/i, "/Property");
+  proxied.search = "";
+  proxied.searchParams.set(
+    "$filter",
+    `OriginatingSystemID eq '${escapedOrigin}' and ListingKey eq '${escapedKey}'`,
+  );
+  proxied.searchParams.set(
+    "$expand",
+    `Media($top=${top};$skip=${skip};$orderby=Order)`,
+  );
+  proxied.searchParams.set("$top", "1");
+  return proxied;
+}
+
+async function unwrapPropertyMediaResponse(response: Response): Promise<Response> {
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+  headers.set("content-type", "application/json; charset=utf-8");
+
+  if (!response.ok) {
+    return new Response(await response.arrayBuffer(), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  try {
+    const payload = await response.json() as { value?: unknown[] };
+    const firstRecord = payload.value?.[0];
+    const media = firstRecord && typeof firstRecord === "object" && !Array.isArray(firstRecord)
+      ? (firstRecord as { Media?: unknown }).Media
+      : undefined;
+    return new Response(JSON.stringify({ value: Array.isArray(media) ? media : [] }), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch {
+    return new Response(JSON.stringify({ value: [] }), {
+      status: 200,
+      statusText: "OK",
+      headers,
+    });
+  }
+}
+
 function pruneFailures(failureTimes: number[], now: number): void {
   const cutoff = now - FAILURE_WINDOW_MS;
   while (failureTimes.length && failureTimes[0] < cutoff) failureTimes.shift();
@@ -157,6 +228,7 @@ export async function register() {
     }
 
     const normalizedUrl = normalizeEntityLookup(url);
+    const mediaProxyUrl = mediaCollectionPropertyProxy(normalizedUrl);
     const key = normalizedUrl.toString();
     const now = Date.now();
     const cached = cache.get(key);
@@ -192,7 +264,10 @@ export async function register() {
       }
 
       try {
-        const response = await originalFetch(normalizedUrl, init);
+        const upstreamResponse = await originalFetch(mediaProxyUrl ?? normalizedUrl, init);
+        const response = mediaProxyUrl
+          ? await unwrapPropertyMediaResponse(upstreamResponse)
+          : upstreamResponse;
         const body = await response.arrayBuffer();
         const snapshot: ResoSnapshot = {
           body,

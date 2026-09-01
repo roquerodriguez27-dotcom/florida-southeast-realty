@@ -32,6 +32,8 @@ function engagementBadges(listing: Listing) {
 export default function PropertyCard({ listing }: { listing: Listing }) {
   const savedListing = savedComparisonListing(listing);
   const badges = engagementBadges(listing);
+  const photoCount = listing.photoCount
+    ?? (listing.images[0] === "/property-placeholder.svg" ? 0 : listing.images.length);
 
   return (
     <article className="relative overflow-hidden rounded-sm border border-ink/10 bg-white transition-all hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_18px_45px_-34px_rgba(14,43,48,0.7)]">
@@ -59,9 +61,11 @@ export default function PropertyCard({ listing }: { listing: Listing }) {
               ))}
             </div>
           ) : null}
-          <span className="absolute bottom-3 right-3 rounded-full bg-tide/90 px-2.5 py-1 text-[11px] font-medium text-sand shadow">
-            {listing.images.length} {listing.images.length === 1 ? "photo" : "photos"}
-          </span>
+          {photoCount > 0 ? (
+            <span className="absolute bottom-3 right-3 rounded-full bg-tide/90 px-2.5 py-1 text-[11px] font-medium text-sand shadow">
+              {photoCount} {photoCount === 1 ? "photo" : "photos"}
+            </span>
+          ) : null}
         </div>
 
         <div className="p-4">

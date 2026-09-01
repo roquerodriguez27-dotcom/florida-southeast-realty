@@ -19,6 +19,9 @@ const DEFAULT_ORIGINATING_SYSTEM_ID = "M00000170";
 const DEFAULT_MLS_DISCLAIMER =
   "© 2026 Beaches MLS. All Rights Reserved. This information is for your personal, non-commercial use and may not be used for any purpose other than to identify prospective properties you may be interested in purchasing. Display of MLS data is usually deemed reliable but is NOT guaranteed accurate by the MLS. Buyers are responsible for verifying the accuracy of all information and should investigate the data themselves or retain appropriate professionals. Information from sources other than the Listing Agent may have been included in the MLS data. Unless otherwise specified in writing, Broker/Agent has not and will not verify any information obtained from other sources. The Broker/Agent providing the information contained herein may or may not have been the Listing and/or Selling Agent.";
 const LISTING_PAGE_SIZE = 24;
+const SEARCH_MEDIA_LIMIT = 1;
+const DETAIL_MEDIA_PAGE_SIZE = 25;
+const MAX_DETAIL_MEDIA_PAGES = 20;
 const REQUEST_TIMEOUT_MS = 10_000;
 const RESO_MAX_ATTEMPTS = 3;
 const RETRYABLE_RESO_STATUSES = new Set([429, 502, 503, 504]);
@@ -389,8 +392,86 @@ function photoUrls(record: JsonObject): string[] {
       ),
     )
     .filter((url): url is string => Boolean(url))
-    .filter((url, index, urls) => urls.indexOf(url) === index)
-    .slice(0, 24);
+    .filter((url, index, urls) => urls.indexOf(url) === index);
+}
+
+async function fetchCompleteListingMedia(record: JsonObject): Promise<JsonObject> {
+  const listingKey = firstString(record, ["ListingKey", "ListingId"]);
+  const initialMedia = asArray(record.Media);
+  const expectedPhotoCount = firstNumber(record, ["PhotosCount", "PhotoCount"]);
+  const needsMoreMedia = Boolean(
+    listingKey
+      && (
+        expectedPhotoCount > initialMedia.length
+        || (expectedPhotoCount === 0 && initialMedia.length === DETAIL_MEDIA_PAGE_SIZE)
+      ),
+  );
+
+  if (!needsMoreMedia) return record;
+
+  const media = [...initialMedia];
+  let offset = initialMedia.length;
+  const escapedListingKey = odataString(listingKey);
+  const listingOnlyFilter = `ResourceName eq 'Property' and ResourceRecordKey eq ${escapedListingKey}`;
+  const recordKeyFilter = `ResourceRecordKey eq ${escapedListingKey}`;
+  let mediaFilter = listingOnlyFilter;
+  const seenMedia = new Set(initialMedia.map((item) => {
+    const mediaItem = asObject(item);
+    return firstString(mediaItem, ["MediaKey", "MediaObjectID", "MediaURL", "MediaUrl"])
+      || JSON.stringify(mediaItem);
+  }));
+
+  try {
+    for (let page = 0; page < MAX_DETAIL_MEDIA_PAGES; page += 1) {
+      let payload: ResoPayload;
+      try {
+        payload = await resoRequest("Media", {
+          "$filter": mediaFilter,
+          "$orderby": "Order",
+          "$top": DETAIL_MEDIA_PAGE_SIZE,
+          "$skip": offset,
+        }, 300, false);
+      } catch {
+        if (page > 0 || mediaFilter === recordKeyFilter) throw new Error("Media pagination failed.");
+        mediaFilter = recordKeyFilter;
+        payload = await resoRequest("Media", {
+          "$filter": mediaFilter,
+          "$orderby": "Order",
+          "$top": DETAIL_MEDIA_PAGE_SIZE,
+          "$skip": offset,
+        }, 300, false);
+      }
+
+      const rawPageMedia = payload.value;
+      if (!rawPageMedia.length) break;
+      offset += rawPageMedia.length;
+
+      const pageMedia = rawPageMedia.filter((item) => {
+        const mediaItem = asObject(item);
+        const resourceName = firstString(mediaItem, ["ResourceName"]);
+        if (resourceName && resourceName.toLowerCase() !== "property") return false;
+        const identity = firstString(mediaItem, ["MediaKey", "MediaObjectID", "MediaURL", "MediaUrl"])
+          || JSON.stringify(mediaItem);
+        if (seenMedia.has(identity)) return false;
+        seenMedia.add(identity);
+        return true;
+      });
+      if (!pageMedia.length) break;
+      media.push(...pageMedia);
+
+      if (rawPageMedia.length < DETAIL_MEDIA_PAGE_SIZE) break;
+      if (payload.count !== undefined && offset >= payload.count) break;
+      if (expectedPhotoCount > 0 && photoUrls({ Media: media }).length >= expectedPhotoCount) break;
+    }
+  } catch {
+    console.warn("[BeachesMLS RESO] Full media pagination was unavailable; using the expanded gallery.", {
+      expandedMediaCount: initialMedia.length,
+      expectedPhotoCount,
+    });
+    return record;
+  }
+
+  return { ...record, Media: media };
 }
 
 function normalizeStatus(value: string): ListingStatus {
@@ -643,6 +724,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
   const fireplace = truthy(record.FireplaceYN);
   const amenities = listingAmenities(record);
   const photos = photoUrls(record);
+  const providerPhotoCount = optionalNumber(record, ["PhotosCount", "PhotoCount"]);
   const fullBaths = firstNumber(record, ["BathroomsFull", "BathsFull"]);
   const halfBaths = firstNumber(record, ["BathroomsHalf", "BathsHalf"]);
   const totalBaths = firstNumber(record, ["BathroomsTotalInteger", "BathroomsTotal", "BathsTotal"]);
@@ -694,6 +776,7 @@ function normalizeListing(value: unknown, expectedView: "Summary" | "Detail"): L
     propertyType,
     forLease,
     images: photos.length ? photos : ["/property-placeholder.svg"],
+    photoCount: Math.max(photos.length, Math.floor(providerPhotoCount ?? 0)),
     description:
       firstString(record, ["PublicRemarks", "Remarks"]) ||
       "Contact Florida Southeast Realty for current property details.",
@@ -948,6 +1031,10 @@ export async function fetchLiveListingPage(
   if (!getAccessToken()) return null;
 
   const currentPage = Math.max(1, Math.floor(page) || 1);
+  const startedAt = Date.now();
+  const activeFilterCount = Object.values(filters).filter((value) => (
+    Array.isArray(value) ? value.length > 0 : value !== undefined && value !== false && value !== ""
+  )).length;
   // BeachesMLS returns several Boolean amenities in listing records but does
   // not consistently enforce them in `$filter`. Polygon searches also need
   // point-in-shape verification. Pull a wider candidate window for those cases,
@@ -984,14 +1071,30 @@ export async function fetchLiveListingPage(
   const exactPolygonFallback = Boolean(filters.polygon?.length);
   const widerCandidateWindow = exactAmenityFallback || exactPolygonFallback;
   const providerPageSize = widerCandidateWindow ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
-  const payload = await resoRequest("Property", {
-    "$filter": buildResoFilter(providerFilters),
-    "$expand": "Media($top=24;$orderby=Order)",
-    "$top": providerPageSize,
-    "$skip": (currentPage - 1) * providerPageSize,
-    "$count": true,
-    "$orderby": RESO_SORTS[filters.sort ?? "newest"],
+  console.info("[BeachesMLS RESO] Listing search started.", {
+    page: currentPage,
+    activeFilterCount,
+    providerPageSize,
+    mediaPerListing: SEARCH_MEDIA_LIMIT,
   });
+  let payload: ResoPayload;
+  try {
+    payload = await resoRequest("Property", {
+      "$filter": buildResoFilter(providerFilters),
+      "$expand": `Media($top=${SEARCH_MEDIA_LIMIT};$orderby=Order)`,
+      "$top": providerPageSize,
+      "$skip": (currentPage - 1) * providerPageSize,
+      "$count": true,
+      "$orderby": RESO_SORTS[filters.sort ?? "newest"],
+    });
+  } catch (error) {
+    console.error("[BeachesMLS RESO] Listing search failed.", {
+      page: currentPage,
+      activeFilterCount,
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
   const minGarageSpaces = Math.max(
     filters.garageOnly ? 1 : 0,
     Number.isFinite(filters.minGarageSpaces) ? Number(filters.minGarageSpaces) : 0,
@@ -1073,6 +1176,14 @@ export async function fetchLiveListingPage(
       ? currentPage + 1
       : currentPage;
 
+  console.info("[BeachesMLS RESO] Listing search completed.", {
+    page: currentPage,
+    activeFilterCount,
+    providerRows: payload.value.length,
+    resultRows: listings.length,
+    durationMs: Date.now() - startedAt,
+  });
+
   return {
     listings,
     live: true,
@@ -1100,7 +1211,7 @@ export async function fetchLiveListingBySlug(slug: string): Promise<Listing | nu
   let payload: ResoPayload;
   try {
     payload = await resoRequest(`Property('${escapedKey}')`, {
-      "$expand": "Media($top=24;$orderby=Order)",
+      "$expand": `Media($top=${DETAIL_MEDIA_PAGE_SIZE};$orderby=Order)`,
     }, 300, false);
   } catch {
     // A listing can move between provider partitions while the cached search
@@ -1108,11 +1219,13 @@ export async function fetchLiveListingBySlug(slug: string): Promise<Listing | nu
     // a valid card from becoming a transient 404.
     payload = await resoRequest("Property", {
       "$filter": `OriginatingSystemID eq ${odataString(getOriginatingSystemId())} and (ListingKey eq ${odataString(listingKey)} or ListingId eq ${odataString(listingKey)})`,
-      "$expand": "Media($top=24;$orderby=Order)",
+      "$expand": `Media($top=${DETAIL_MEDIA_PAGE_SIZE};$orderby=Order)`,
       "$top": 1,
     });
   }
-  return normalizeListing(payload.value[0], "Detail");
+  const record = asObject(payload.value[0]);
+  const completeRecord = await fetchCompleteListingMedia(record);
+  return normalizeListing(completeRecord, "Detail");
 }
 
 export async function getIdxDisclosure(): Promise<ResoSystemInfo | null> {

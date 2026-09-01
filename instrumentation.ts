@@ -22,10 +22,9 @@ const FRESH_TTL_MS = 60_000;
 const STALE_TTL_MS = 10 * 60_000;
 const MAX_CACHE_ENTRIES = 100;
 const MAX_BACKOFF_MS = 3_000;
-const FAILURE_WINDOW_MS = 20_000;
-const FAILURE_THRESHOLD = 5;
+const FAILURE_WINDOW_MS = 30_000;
+const FAILURE_THRESHOLD = 8;
 const CIRCUIT_OPEN_MS = 3_000;
-const MAX_CIRCUIT_OPEN_MS = 30_000;
 const CIRCUIT_RECOVERY_GRACE_MS = 1_200;
 
 function wait(milliseconds: number): Promise<void> {
@@ -91,20 +90,6 @@ function normalizeEntityLookup(url: URL): URL {
   return normalized;
 }
 
-function retryAfterMilliseconds(value: string | null): number | null {
-  if (!value) return null;
-
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds > 0) {
-    return Math.min(MAX_CIRCUIT_OPEN_MS, seconds * 1_000);
-  }
-
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return null;
-  const delay = timestamp - Date.now();
-  return delay > 0 ? Math.min(MAX_CIRCUIT_OPEN_MS, delay) : null;
-}
-
 function pruneFailures(failureTimes: number[], now: number): void {
   const cutoff = now - FAILURE_WINDOW_MS;
   while (failureTimes.length && failureTimes[0] < cutoff) failureTimes.shift();
@@ -113,18 +98,14 @@ function pruneFailures(failureTimes: number[], now: number): void {
 function recordFailure(
   fsrGlobal: FsrGlobal,
   failureTimes: number[],
-  retryAfter: string | null = null,
-  forceOpen = false,
 ): void {
   const now = Date.now();
   pruneFailures(failureTimes, now);
   failureTimes.push(now);
 
-  const retryDelay = retryAfterMilliseconds(retryAfter);
-  const shouldOpen = forceOpen || retryDelay !== null || failureTimes.length >= FAILURE_THRESHOLD;
-  if (!shouldOpen) return;
+  if (failureTimes.length < FAILURE_THRESHOLD) return;
 
-  const openUntil = now + (retryDelay ?? CIRCUIT_OPEN_MS);
+  const openUntil = now + CIRCUIT_OPEN_MS;
   fsrGlobal.__fsrResoCircuitOpenUntil = Math.max(
     fsrGlobal.__fsrResoCircuitOpenUntil ?? 0,
     openUntil,
@@ -231,15 +212,7 @@ export async function register() {
         }
 
         if (response.status === 429 || response.status >= 500) {
-          const retryAfterHeader = response.status === 429
-            ? response.headers.get("retry-after")
-            : null;
-          recordFailure(
-            fsrGlobal,
-            failureTimes,
-            retryAfterHeader,
-            response.status === 429,
-          );
+          recordFailure(fsrGlobal, failureTimes);
 
           const retryAfter = Number(response.headers.get("retry-after"));
           const delay = Number.isFinite(retryAfter) && retryAfter > 0

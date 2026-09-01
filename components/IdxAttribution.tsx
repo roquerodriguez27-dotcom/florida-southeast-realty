@@ -11,6 +11,29 @@ function IdxLogo({ attribution, compact }: { attribution: IdxAttributionData; co
   return <img src={attribution.logo.value} alt={`${attribution.mlsName ?? "MLS"} IDX`} className={compact ? "max-h-6 max-w-24 object-contain" : "max-h-10 max-w-36 object-contain"} />;
 }
 
+function displayAttributionValue(label: string, value: string): string {
+  if (label !== "Last updated") return value;
+
+  const trimmed = value.trim();
+  if (!trimmed || /\b(?:EST|EDT)\b/.test(trimmed)) return trimmed;
+
+  // The server formats RESO timestamps in UTC before they reach this display component.
+  // Interpret that server-rendered clock time as UTC, then show it in the brokerage's
+  // local South Florida timezone so visitors do not see timestamps four hours ahead.
+  const timestamp = Date.parse(`${trimmed} UTC`);
+  if (Number.isNaN(timestamp)) return trimmed;
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(timestamp);
+}
+
 export default function IdxAttribution({
   attribution,
   compact = false,
@@ -26,7 +49,7 @@ export default function IdxAttribution({
         <IdxLogo attribution={attribution} compact={compact} />
         {attribution.requiredFields.map((field) => (
           <span key={`${field.label}-${field.value}`}>
-            <span className="font-medium text-ink/60">{field.label}:</span> {field.value}
+            <span className="font-medium text-ink/60">{field.label}:</span> {displayAttributionValue(field.label, field.value)}
           </span>
         ))}
       </div>

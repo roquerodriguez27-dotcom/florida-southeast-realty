@@ -53,6 +53,7 @@ export default function AskRoqueActions({
         </button>
         <Link
           href={`/properties?location=${encodeURIComponent(city)}&maxPrice=${similarMax}`}
+          rel="nofollow"
           onClick={() => track("similar_homes")}
           className="rounded-full border border-tide/20 bg-white px-4 py-2 text-sm font-medium text-tide hover:bg-tide/5"
         >

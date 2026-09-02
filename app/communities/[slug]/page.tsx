@@ -136,7 +136,7 @@ export default async function CommunityPage({ params }: Props) {
           <h1 className="font-display text-4xl md:text-6xl text-sand">{community.name}, FL homes for sale & real estate</h1>
           <p className="text-sand/85 mt-2 max-w-2xl">{community.tagline}</p>
           <div className="mt-5 flex flex-col sm:flex-row gap-3">
-            <Link href={propertySearchHref} prefetch={false} className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
+            <Link href={propertySearchHref} prefetch={false} rel="nofollow" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
               Search {community.name} Homes
             </Link>
             <Link href="/buyer-tools" className="border border-white/35 bg-white/10 text-sand font-medium text-center px-5 py-3 rounded-sm hover:bg-white/15 transition-colors">
@@ -198,7 +198,7 @@ export default async function CommunityPage({ params }: Props) {
               <h2 id="community-search-shortcuts" className="mt-1 font-display text-2xl md:text-3xl text-ink">Search homes for sale in {community.name}, FL</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink/55">Start with a focused local search, then change price, beds, baths, square footage, days on market, and other available MLS criteria.</p>
             </div>
-            <Link href={propertySearchHref} prefetch={false} className="text-sm text-tide underline underline-offset-4 shrink-0">View all {community.name} listings</Link>
+            <Link href={propertySearchHref} prefetch={false} rel="nofollow" className="text-sm text-tide underline underline-offset-4 shrink-0">View all {community.name} listings</Link>
           </div>
           <div className="mt-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {COMMUNITY_SEARCH_SHORTCUTS.map((shortcut) => (
@@ -206,6 +206,7 @@ export default async function CommunityPage({ params }: Props) {
                 key={shortcut.label}
                 href={communitySearchHref(community.name, shortcut.filter)}
                 prefetch={false}
+                rel="nofollow"
                 className="rounded-sm border border-ink/10 bg-sand/35 px-4 py-3 text-sm font-medium text-tide transition-colors hover:border-tide/30 hover:bg-tide/5"
               >
                 {shortcut.label} in {community.name} →
@@ -251,7 +252,7 @@ export default async function CommunityPage({ params }: Props) {
             <h2 className="font-display text-2xl md:text-3xl text-ink">Homes for sale in {community.name}, FL</h2>
             <p className="text-sm text-ink/60 mt-2">Browse current inventory, then open the full search for exact filters and saved-search alerts.</p>
           </div>
-          <Link href={propertySearchHref} prefetch={false} className="text-sm text-tide underline underline-offset-4">Search all {community.name} homes</Link>
+          <Link href={propertySearchHref} prefetch={false} rel="nofollow" className="text-sm text-tide underline underline-offset-4">Search all {community.name} homes</Link>
         </div>
         {usingSampleListings && listings.length > 0 && <div className="mb-6"><SampleDataNotice variant="listings" /></div>}
         {listings.length > 0 ? (
@@ -263,7 +264,7 @@ export default async function CommunityPage({ params }: Props) {
               Inventory changes throughout the day. Open the full BeachesMLS search to adjust filters, or save your criteria so new matches and price changes can come to you automatically.
             </p>
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <Link href={propertySearchHref} prefetch={false} className="bg-hibiscus text-sand font-medium text-center px-4 py-2.5 rounded-sm">Search {community.name}</Link>
+              <Link href={propertySearchHref} prefetch={false} rel="nofollow" className="bg-hibiscus text-sand font-medium text-center px-4 py-2.5 rounded-sm">Search {community.name}</Link>
               <Link href="/contact" className="border border-tide/25 text-tide font-medium text-center px-4 py-2.5 rounded-sm hover:bg-tide/5">Ask Roque for Help</Link>
             </div>
           </div>

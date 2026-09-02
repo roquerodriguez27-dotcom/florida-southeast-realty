@@ -83,7 +83,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
     description:
       "Search South Florida homes, condos, waterfront properties, and single-family listings across Broward and Palm Beach counties.",
     alternates: { canonical: "/properties" },
-    robots: { index: idxLive && !filteredSearch, follow: true },
+    robots: { index: idxLive && !filteredSearch, follow: !filteredSearch },
   };
 }
 
@@ -454,12 +454,12 @@ export default async function PropertiesPage({ searchParams }: Props) {
             <IdxPageDisclaimer attribution={listings[0]?.idx} />
             {result.pagination.totalPages > 1 && (
               <nav className="mt-8 flex items-center justify-between gap-4" aria-label="Listing results pages">
-                {result.pagination.page > 1 ? <Link href={pageHref(params, result.pagination.page - 1)} prefetch={false} className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Previous</Link> : <span />}
+                {result.pagination.page > 1 ? <Link href={pageHref(params, result.pagination.page - 1)} prefetch={false} rel="nofollow" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Previous</Link> : <span />}
                 <span className="text-sm text-ink/55">
                   Page {result.pagination.page}
                   {result.pagination.totalRowsExact === false ? "" : ` of ${result.pagination.totalPages}`}
                 </span>
-                {result.pagination.page < result.pagination.totalPages ? <Link href={pageHref(params, result.pagination.page + 1)} prefetch={false} className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Next</Link> : <span />}
+                {result.pagination.page < result.pagination.totalPages ? <Link href={pageHref(params, result.pagination.page + 1)} prefetch={false} rel="nofollow" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Next</Link> : <span />}
               </nav>
             )}
           </section>

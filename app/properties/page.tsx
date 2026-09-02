@@ -73,8 +73,9 @@ interface Props {
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const params = await searchParams;
-  const filteredSearch = Object.values(params).some((value) => (
-    Array.isArray(value) ? value.some(Boolean) : Boolean(value)
+  const filteredSearch = Object.entries(params).some(([key, value]) => (
+    !key.startsWith("_")
+    && (Array.isArray(value) ? value.some(Boolean) : Boolean(value))
   ));
 
   return {

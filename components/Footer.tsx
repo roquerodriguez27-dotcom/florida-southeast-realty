@@ -31,8 +31,8 @@ export default async function Footer() {
             <h3 className="font-mono text-xs uppercase tracking-[0.15em] text-brass mb-4">Search</h3>
             <ul className="space-y-2 text-sm">
               <li><Link href="/properties" prefetch={false} className="hover:text-sand">Search Homes</Link></li>
-              <li><Link href="/properties?waterfront=1" prefetch={false} className="hover:text-sand">Waterfront Homes</Link></li>
-              <li><Link href="/properties?type=Condo" prefetch={false} className="hover:text-sand">Condos</Link></li>
+              <li><Link href="/properties?waterfront=1" prefetch={false} rel="nofollow" className="hover:text-sand">Waterfront Homes</Link></li>
+              <li><Link href="/properties?type=Condo" prefetch={false} rel="nofollow" className="hover:text-sand">Condos</Link></li>
               <li><Link href="/homes-for-sale/palm-beach-county" className="hover:text-sand">Palm Beach County Homes</Link></li>
               <li><Link href="/homes-for-sale/broward-county" className="hover:text-sand">Broward County Homes</Link></li>
               <li><Link href="/homes-for-sale/33467" className="hover:text-sand">33467 Homes for Sale</Link></li>

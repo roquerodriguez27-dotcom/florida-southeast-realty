@@ -49,6 +49,18 @@ interface ResoPayload {
   nextLink?: string;
 }
 
+class ResoRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | "network_error" | "invalid_payload",
+    readonly code?: string,
+    readonly locallyProtected = false,
+  ) {
+    super(message);
+    this.name = "ResoRequestError";
+  }
+}
+
 interface ResoSystemInfo {
   mlsId?: string;
   mlsName: string;
@@ -228,7 +240,12 @@ async function resoRequest(
   const url = new URL(`${getApiBase()}/${path.replace(/^\/+/, "")}`);
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, String(value));
 
-  let lastFailure: { status: number | "network_error" | "invalid_payload"; code?: string; message?: string } = {
+  let lastFailure: {
+    status: number | "network_error" | "invalid_payload";
+    code?: string;
+    message?: string;
+    locallyProtected?: boolean;
+  } = {
     status: "network_error",
   };
 
@@ -298,13 +315,14 @@ async function resoRequest(
     } catch {
       // The HTTP status remains sufficient for safe diagnostics.
     }
+    const localFallback = response.headers.get("x-fsr-reso-fallback");
     lastFailure = {
       status: response.status,
       ...(code ? { code } : {}),
       ...(message ? { message: message.slice(0, 240) } : {}),
+      ...(localFallback ? { locallyProtected: true } : {}),
     };
 
-    const localFallback = response.headers.get("x-fsr-reso-fallback");
     if (
       !localFallback
       && RETRYABLE_RESO_STATUSES.has(response.status)
@@ -316,16 +334,19 @@ async function resoRequest(
     break;
   }
 
-  if (reportFailures) {
+  if (reportFailures && !lastFailure.locallyProtected) {
     console.error("[BeachesMLS RESO] API request failed after bounded retries.", {
       resource: path.split("?")[0],
       ...lastFailure,
     });
   }
-  throw new Error(
+  throw new ResoRequestError(
     typeof lastFailure.status === "number"
       ? `RESO Web API request failed with status ${lastFailure.status}.`
       : "RESO Web API request failed.",
+    lastFailure.status,
+    lastFailure.code,
+    lastFailure.locallyProtected,
   );
 }
 
@@ -439,7 +460,17 @@ async function fetchCompleteListingMedia(record: JsonObject): Promise<JsonObject
           "$top": DETAIL_MEDIA_PAGE_SIZE,
           "$skip": offset,
         }, 300, false);
-      } catch {
+      } catch (error) {
+        if (
+          error instanceof ResoRequestError
+          && (
+            error.locallyProtected
+            || error.status === "network_error"
+            || (typeof error.status === "number" && (error.status === 429 || error.status >= 500))
+          )
+        ) {
+          throw error;
+        }
         if (page > 0 || mediaFilter === recordKeyFilter) throw new Error("Media pagination failed.");
         mediaFilter = recordKeyFilter;
         payload = await resoRequest("Media", {
@@ -1101,12 +1132,14 @@ async function fetchUncachedLiveListingPage(
       "$orderby": RESO_SORTS[filters.sort ?? "newest"],
     });
   } catch (error) {
-    console.error("[BeachesMLS RESO] Listing search failed.", {
-      page: currentPage,
-      activeFilterCount: activeFilterKeys.length,
-      activeFilterKeys,
-      durationMs: Date.now() - startedAt,
-    });
+    if (!(error instanceof ResoRequestError && error.locallyProtected)) {
+      console.error("[BeachesMLS RESO] Listing search failed.", {
+        page: currentPage,
+        activeFilterCount: activeFilterKeys.length,
+        activeFilterKeys,
+        durationMs: Date.now() - startedAt,
+      });
+    }
     throw error;
   }
   const hasMoreProviderRows = Boolean(
@@ -1194,6 +1227,62 @@ async function fetchUncachedLiveListingPage(
   };
 }
 
+function normalizedListingFilters(filters: ListingFilters): ListingFilters {
+  const normalized: Record<string, unknown> = {};
+
+  for (const [key, rawValue] of Object.entries(filters).sort(([left], [right]) => (
+    left.localeCompare(right)
+  ))) {
+    if (rawValue === undefined || rawValue === false || rawValue === "") continue;
+    if (key === "sort" && rawValue === "newest") continue;
+
+    if (key === "locations" && Array.isArray(rawValue)) {
+      const locations = [...new Map(rawValue
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .map((value) => [value.toLowerCase(), value] as const)).values()]
+        .sort((left, right) => left.localeCompare(right));
+      if (locations.length) normalized[key] = locations;
+      continue;
+    }
+
+    if (key === "amenities" && Array.isArray(rawValue)) {
+      const amenities = [...new Set(rawValue)].sort();
+      if (amenities.length) normalized[key] = amenities;
+      continue;
+    }
+
+    if (key === "polygon" && Array.isArray(rawValue)) {
+      const polygon = rawValue.map((point) => ({
+        lat: Math.round(point.lat * 100_000) / 100_000,
+        lng: Math.round(point.lng * 100_000) / 100_000,
+      }));
+      if (polygon.length) normalized[key] = polygon;
+      continue;
+    }
+
+    if (key === "bounds" && rawValue && typeof rawValue === "object") {
+      const bounds = rawValue as NonNullable<ListingFilters["bounds"]>;
+      normalized[key] = {
+        north: Math.round(bounds.north * 100_000) / 100_000,
+        south: Math.round(bounds.south * 100_000) / 100_000,
+        east: Math.round(bounds.east * 100_000) / 100_000,
+        west: Math.round(bounds.west * 100_000) / 100_000,
+      };
+      continue;
+    }
+
+    if (Array.isArray(rawValue)) {
+      if (rawValue.length) normalized[key] = rawValue;
+      continue;
+    }
+
+    normalized[key] = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+  }
+
+  return normalized as ListingFilters;
+}
+
 const fetchCachedLiveListingPage = unstable_cache(
   async (filters: ListingFilters, page: number) => fetchUncachedLiveListingPage(filters, page),
   ["beaches-mls-listing-page-v2"],
@@ -1208,7 +1297,10 @@ export async function fetchLiveListingPage(
   page = 1,
 ): Promise<ListingSearchPage | null> {
   if (!getAccessToken()) return null;
-  return fetchCachedLiveListingPage(filters, Math.max(1, Math.floor(page) || 1));
+  return fetchCachedLiveListingPage(
+    normalizedListingFilters(filters),
+    Math.max(1, Math.floor(page) || 1),
+  );
 }
 
 export async function fetchLiveListings(): Promise<Listing[] | null> {
@@ -1229,7 +1321,17 @@ async function fetchUncachedLiveListingBySlug(
     payload = await resoRequest(`Property('${escapedKey}')`, {
       "$expand": `Media($top=${DETAIL_MEDIA_PAGE_SIZE};$orderby=Order)`,
     }, LISTING_DETAIL_REVALIDATE_SECONDS, false);
-  } catch {
+  } catch (error) {
+    if (
+      error instanceof ResoRequestError
+      && (
+        error.locallyProtected
+        || error.status === "network_error"
+        || (typeof error.status === "number" && error.status !== 400 && error.status !== 404)
+      )
+    ) {
+      throw error;
+    }
     // A listing can move between provider partitions while the cached search
     // result is still visible. Retrying through the collection endpoint keeps
     // a valid card from becoming a transient 404.

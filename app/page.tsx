@@ -75,7 +75,7 @@ export default async function HomePage() {
                 <Link href={`/communities/${area.slug}`} className="block text-sm font-semibold text-tide hover:underline underline-offset-4">
                   {area.name} homes for sale
                 </Link>
-                <Link href={`/properties?location=${encodeURIComponent(area.name)}`} prefetch={false} className="mt-1 block text-xs text-ink/50 hover:text-tide">
+                <Link href={`/properties?location=${encodeURIComponent(area.name)}`} prefetch={false} rel="nofollow" className="mt-1 block text-xs text-ink/50 hover:text-tide">
                   Live BeachesMLS search →
                 </Link>
               </div>

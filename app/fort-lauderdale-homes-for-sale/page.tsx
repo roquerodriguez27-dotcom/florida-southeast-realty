@@ -71,7 +71,7 @@ export default async function FortLauderdaleHomesPage() {
           property type, waterfront, private pool, HOA, square footage, time on market, and other available MLS criteria.
         </p>
         <div className="mt-6 flex flex-col sm:flex-row gap-3">
-          <Link href="/properties?location=Fort%20Lauderdale" prefetch={false} className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
+          <Link href="/properties?location=Fort%20Lauderdale" prefetch={false} rel="nofollow" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
             Search All Fort Lauderdale Homes
           </Link>
           <Link href="/buyer-tools" className="border border-tide/25 text-tide font-medium text-center px-5 py-3 rounded-sm hover:bg-tide/5 transition-colors">
@@ -91,7 +91,7 @@ export default async function FortLauderdaleHomesPage() {
           </div>
           <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {SEARCH_SHORTCUTS.map((shortcut) => (
-              <Link key={shortcut.label} href={shortcut.href} prefetch={false} className="rounded-sm border border-ink/10 bg-sand/35 px-4 py-3 text-sm font-medium text-tide hover:border-tide/30 hover:bg-tide/5">
+              <Link key={shortcut.label} href={shortcut.href} prefetch={false} rel="nofollow" className="rounded-sm border border-ink/10 bg-sand/35 px-4 py-3 text-sm font-medium text-tide hover:border-tide/30 hover:bg-tide/5">
                 {shortcut.label} in Fort Lauderdale →
               </Link>
             ))}
@@ -108,7 +108,7 @@ export default async function FortLauderdaleHomesPage() {
             </h2>
             <p className="text-sm text-ink/55 mt-1">Newest and recently updated listings are shown first.</p>
           </div>
-          <Link href="/properties?location=Fort%20Lauderdale" prefetch={false} className="text-sm text-tide underline underline-offset-4">Open full Fort Lauderdale search</Link>
+          <Link href="/properties?location=Fort%20Lauderdale" prefetch={false} rel="nofollow" className="text-sm text-tide underline underline-offset-4">Open full Fort Lauderdale search</Link>
         </div>
 
         <div className="mt-6">

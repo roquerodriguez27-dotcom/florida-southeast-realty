@@ -51,7 +51,7 @@ export default async function BuyerToolsPage({ searchParams }: { searchParams: P
             <p className="text-sm text-ink/60 mt-2">Open current BeachesMLS inventory, refine the search, then save it for new listings and price changes.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-            <Link href={similarHomesHref} className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
+            <Link href={similarHomesHref} rel="nofollow" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
               See Matching Homes
             </Link>
             <Link href="/contact" className="border border-tide/25 text-tide font-medium text-center px-5 py-3 rounded-sm hover:bg-white transition-colors">

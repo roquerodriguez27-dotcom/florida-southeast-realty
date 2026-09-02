@@ -12,6 +12,7 @@ type FsrGlobal = typeof globalThis & {
   __fsrResoInflight?: Map<string, Promise<ResoSnapshot>>;
   __fsrResoCache?: Map<string, ResoSnapshot>;
   __fsrResoBackoffUntil?: Map<string, number>;
+  __fsrResoProviderBackoffUntil?: number;
   __fsrResoFailureTimes?: number[];
   __fsrResoCircuitOpenUntil?: number;
   __fsrResoCircuitLoggedAt?: number;
@@ -26,7 +27,7 @@ const DEFAULT_THROTTLE_BACKOFF_MS = 60_000;
 const MAX_THROTTLE_BACKOFF_MS = 5 * 60_000;
 const FAILURE_WINDOW_MS = 30_000;
 const FAILURE_THRESHOLD = 8;
-const CIRCUIT_OPEN_MS = 3_000;
+const CIRCUIT_OPEN_MS = 30_000;
 const CIRCUIT_RECOVERY_GRACE_MS = 1_200;
 
 function wait(milliseconds: number): Promise<void> {
@@ -231,6 +232,7 @@ export async function register() {
   fsrGlobal.__fsrResoInflight = inflight;
   fsrGlobal.__fsrResoCache = cache;
   fsrGlobal.__fsrResoBackoffUntil = backoffUntil;
+  fsrGlobal.__fsrResoProviderBackoffUntil ??= 0;
   fsrGlobal.__fsrResoFailureTimes = failureTimes;
   fsrGlobal.__fsrResoCircuitOpenUntil ??= 0;
   fsrGlobal.__fsrResoCircuitLoggedAt ??= 0;
@@ -258,6 +260,18 @@ export async function register() {
 
     if (cached && cached.freshUntil > now) {
       return responseFromSnapshot(cached);
+    }
+
+    // A BeachesMLS 429 applies to the feed/account, not only to the exact URL
+    // that happened to trigger it. Pause every new upstream query during that
+    // cooldown so a crawler cannot bypass the throttle by changing filters.
+    const providerBackoffUntil = fsrGlobal.__fsrResoProviderBackoffUntil ?? 0;
+    if (providerBackoffUntil > now) {
+      if (cached && cached.staleUntil > now) return responseFromSnapshot(cached);
+      return temporaryResoFailureResponse(
+        "throttled",
+        Math.ceil((providerBackoffUntil - now) / 1_000),
+      );
     }
 
     const circuitOpenUntil = fsrGlobal.__fsrResoCircuitOpenUntil ?? 0;
@@ -336,6 +350,12 @@ export async function register() {
               ?? DEFAULT_THROTTLE_BACKOFF_MS
             : MAX_BACKOFF_MS;
           backoffUntil.set(key, Date.now() + delay);
+          if (response.status === 429) {
+            fsrGlobal.__fsrResoProviderBackoffUntil = Math.max(
+              fsrGlobal.__fsrResoProviderBackoffUntil ?? 0,
+              Date.now() + delay,
+            );
+          }
 
           const stale = cache.get(key);
           if (stale && stale.staleUntil > Date.now()) return stale;

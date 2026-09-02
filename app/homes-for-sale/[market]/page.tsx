@@ -137,6 +137,7 @@ export default async function SearchMarketPage({ params }: Props) {
           <Link
             href={liveSearchHref}
             prefetch={false}
+            rel="nofollow"
             className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-semibold text-center px-5 py-3 rounded-sm transition-colors"
           >
             Search Current {market.name} Listings
@@ -177,7 +178,7 @@ export default async function SearchMarketPage({ params }: Props) {
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus">Live BeachesMLS Search</p>
             <h2 id="market-search-shortcuts" className="mt-1 font-display text-2xl md:text-3xl text-ink">Search {market.name} by home type and features</h2>
           </div>
-          <Link href={liveSearchHref} prefetch={false} className="text-sm text-tide underline underline-offset-4">Open all {market.name} listings</Link>
+          <Link href={liveSearchHref} prefetch={false} rel="nofollow" className="text-sm text-tide underline underline-offset-4">Open all {market.name} listings</Link>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SEARCH_SHORTCUTS.map((shortcut) => (
@@ -185,6 +186,7 @@ export default async function SearchMarketPage({ params }: Props) {
               key={shortcut.label}
               href={searchHref(market.searchValue, shortcut.filter)}
               prefetch={false}
+              rel="nofollow"
               className="rounded-sm border border-ink/10 bg-white p-5 transition-colors hover:border-tide/35 hover:bg-tide/[0.03]"
             >
               <h3 className="font-display text-xl text-ink">{shortcut.label} in {market.name}</h3>

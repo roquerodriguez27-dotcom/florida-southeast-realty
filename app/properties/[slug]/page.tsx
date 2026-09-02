@@ -202,7 +202,7 @@ export default async function ListingPage({ params }: Props) {
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-hibiscus">Keep exploring</p>
               <h2 className="font-display text-2xl text-ink">More homes in {listing.community}</h2>
             </div>
-            <Link href={`/properties?location=${encodeURIComponent(listing.city)}`} className="text-sm text-tide underline underline-offset-4">See more in {listing.city}</Link>
+            <Link href={`/properties?location=${encodeURIComponent(listing.city)}`} rel="nofollow" className="text-sm text-tide underline underline-offset-4">See more in {listing.city}</Link>
           </div>
           <PropertyGrid listings={similar} />
         </div>

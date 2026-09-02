@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 const AREAS = [
+  ["Palm Beach County", "/homes-for-sale/palm-beach-county"],
+  ["Broward County", "/homes-for-sale/broward-county"],
   ["Fort Lauderdale", "/fort-lauderdale-homes-for-sale"],
   ["Boca Raton", "/communities/boca-raton"],
   ["Delray Beach", "/communities/delray-beach"],

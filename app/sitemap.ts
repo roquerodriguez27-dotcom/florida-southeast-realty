@@ -4,6 +4,7 @@ import { getAllCommunities } from "@/lib/communities";
 import { getGuides, getBlogPosts } from "@/lib/content";
 import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
+import { SEARCH_MARKETS } from "@/lib/seo/search-markets";
 
 export const revalidate = 3600;
 
@@ -56,8 +57,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const communityRoutes: MetadataRoute.Sitemap = communities.map((community) => ({
     url: `${SITE.url}/communities/${community.slug}`,
-    changeFrequency: "monthly",
+    changeFrequency: "weekly",
     priority: 0.9,
+  }));
+
+  const searchMarketRoutes: MetadataRoute.Sitemap = SEARCH_MARKETS.map((market) => ({
+    url: `${SITE.url}/homes-for-sale/${market.slug}`,
+    changeFrequency: "weekly",
+    priority: market.kind === "county" ? 0.95 : 0.85,
   }));
 
   const guideRoutes: MetadataRoute.Sitemap = guides.map((guide) => ({
@@ -72,5 +79,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticRoutes, ...communityRoutes, ...listingRoutes, ...guideRoutes, ...postRoutes];
+  return [...staticRoutes, ...searchMarketRoutes, ...communityRoutes, ...listingRoutes, ...guideRoutes, ...postRoutes];
 }

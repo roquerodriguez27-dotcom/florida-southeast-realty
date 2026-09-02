@@ -18,6 +18,7 @@ import { getGuides } from "@/lib/content";
 import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
 import { savedComparisonListing } from "@/lib/comparison";
+import { FEATURED_SEARCH_MARKETS } from "@/lib/seo/search-markets";
 import Image from "next/image";
 
 export const metadata: Metadata = {
@@ -71,14 +72,29 @@ export default async function HomePage() {
           <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-2.5">
             {POPULAR_HOME_SEARCHES.map((area) => (
               <div key={area.slug} className="rounded-sm border border-ink/10 bg-sand/35 p-3.5">
-                <Link href={`/properties?location=${encodeURIComponent(area.name)}`} className="block text-sm font-semibold text-tide hover:underline underline-offset-4">
+                <Link href={`/communities/${area.slug}`} className="block text-sm font-semibold text-tide hover:underline underline-offset-4">
                   {area.name} homes for sale
                 </Link>
-                <Link href={`/communities/${area.slug}`} className="mt-1 block text-xs text-ink/50 hover:text-tide">
-                  Real estate & neighborhood guide →
+                <Link href={`/properties?location=${encodeURIComponent(area.name)}`} prefetch={false} className="mt-1 block text-xs text-ink/50 hover:text-tide">
+                  Live BeachesMLS search →
                 </Link>
               </div>
             ))}
+          </div>
+          <div className="mt-6 border-t border-ink/10 pt-5">
+            <h3 className="font-display text-xl text-ink">Homes for sale by county and ZIP code</h3>
+            <p className="mt-1 text-xs leading-relaxed text-ink/50">Open a permanent local guide, then continue into current MLS inventory with the same location selected.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {FEATURED_SEARCH_MARKETS.map((market) => (
+                <Link
+                  key={market.slug}
+                  href={`/homes-for-sale/${market.slug}`}
+                  className="rounded-full border border-tide/20 bg-tide/5 px-3.5 py-2 text-sm font-medium text-tide hover:bg-tide/10"
+                >
+                  {market.kind === "zip" ? `${market.name} homes for sale` : `${market.name} homes`}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </section>

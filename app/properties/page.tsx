@@ -24,14 +24,6 @@ import { MAX_SEARCH_LOCATIONS } from "@/lib/south-florida-locations";
 
 const idxLive = IDX_PROVIDER !== "not_connected";
 
-export const metadata: Metadata = {
-  title: "South Florida Homes for Sale | Property Search",
-  description:
-    "Search South Florida homes, condos, waterfront properties, and single-family listings across Broward and Palm Beach counties.",
-  alternates: { canonical: "/properties" },
-  robots: { index: idxLive, follow: true },
-};
-
 interface Props {
   searchParams: Promise<{
     q?: string;
@@ -77,6 +69,21 @@ interface Props {
     sort?: string;
     shape?: string;
   }>;
+}
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const params = await searchParams;
+  const filteredSearch = Object.values(params).some((value) => (
+    Array.isArray(value) ? value.some(Boolean) : Boolean(value)
+  ));
+
+  return {
+    title: "South Florida Homes for Sale | Property Search",
+    description:
+      "Search South Florida homes, condos, waterfront properties, and single-family listings across Broward and Palm Beach counties.",
+    alternates: { canonical: "/properties" },
+    robots: { index: idxLive && !filteredSearch, follow: true },
+  };
 }
 
 const PROPERTY_TYPES: PropertyType[] = ["Single Family", "Condo", "Townhome", "Estate", "Multi-Family", "Land", "Commercial", "Other"];

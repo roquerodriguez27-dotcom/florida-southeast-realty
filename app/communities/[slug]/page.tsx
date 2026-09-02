@@ -13,12 +13,28 @@ import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
 import CommunityIntelligence from "@/components/CommunityIntelligence";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
+import { COMMUNITY_ZIP_MARKETS, getSearchMarket } from "@/lib/seo/search-markets";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
+const COMMUNITY_SEARCH_SHORTCUTS = [
+  { label: "Single-family homes", filter: { key: "type", value: "Single Family" } },
+  { label: "Condos", filter: { key: "type", value: "Condo" } },
+  { label: "Homes with pools", filter: { key: "pool", value: "1" } },
+  { label: "Waterfront homes", filter: { key: "waterfront", value: "1" } },
+  { label: "55+ communities", filter: { key: "senior", value: "only" } },
+  { label: "No-HOA homes", filter: { key: "noHoa", value: "1" } },
+] as const;
+
 export const revalidate = 600;
+
+function communitySearchHref(name: string, filter?: { key: string; value: string }) {
+  const searchParams = new URLSearchParams({ location: name });
+  if (filter) searchParams.set(filter.key, filter.value);
+  return `/properties?${searchParams.toString()}`;
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -26,7 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!community) return {};
   return {
     title: `${community.name} FL Homes for Sale & Real Estate Guide`,
-    description: `Browse homes for sale in ${community.name}, Florida from the live BeachesMLS feed and research neighborhoods, flood maps, schools, property records, HOA considerations, and buyer costs.`,
+    description: `Search ${community.name}, FL homes for sale on live BeachesMLS. Compare property types, neighborhoods, ownership costs, flood information, HOAs, and local records.`,
     alternates: { canonical: `/communities/${community.slug}` },
     openGraph: {
       title: `${community.name} FL Homes for Sale & Real Estate Guide`,
@@ -43,7 +59,10 @@ export default async function CommunityPage({ params }: Props) {
 
   const listings = await searchListings({ community: community.slug });
   const usingSampleListings = IDX_PROVIDER === "not_connected";
-  const propertySearchHref = `/properties?location=${encodeURIComponent(community.name)}`;
+  const propertySearchHref = communitySearchHref(community.name);
+  const zipMarkets = (COMMUNITY_ZIP_MARKETS[community.slug] ?? [])
+    .map((zipSlug) => getSearchMarket(zipSlug))
+    .filter((market) => market !== undefined);
 
   const faqItems = [
     {
@@ -63,6 +82,15 @@ export default async function CommunityPage({ params }: Props) {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
+      {
+        "@type": "CollectionPage",
+        name: `${community.name} FL Homes for Sale & Real Estate Guide`,
+        description: community.overview,
+        url: `${SITE.url}/communities/${community.slug}`,
+        about: { "@type": "Place", name: `${community.name}, Florida` },
+        isPartOf: { "@id": `${SITE.url}/#website` },
+        provider: { "@id": `${SITE.url}/#real-estate-agent` },
+      },
       {
         "@type": "Place",
         name: `${community.name}, Florida`,
@@ -105,10 +133,10 @@ export default async function CommunityPage({ params }: Props) {
         <div className="absolute inset-0 bg-gradient-to-t from-tide/95 via-tide/30 to-tide/35" />
         <div className="relative h-full container-fsre flex flex-col justify-end pb-10 pt-24">
           <p className="font-mono text-xs uppercase tracking-[0.14em] text-brass mb-2">{community.county} · South Florida</p>
-          <h1 className="font-display text-4xl md:text-6xl text-sand">{community.name} homes & real estate</h1>
+          <h1 className="font-display text-4xl md:text-6xl text-sand">{community.name}, FL homes for sale & real estate</h1>
           <p className="text-sand/85 mt-2 max-w-2xl">{community.tagline}</p>
           <div className="mt-5 flex flex-col sm:flex-row gap-3">
-            <Link href={propertySearchHref} className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
+            <Link href={propertySearchHref} prefetch={false} className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-5 py-3 rounded-sm transition-colors">
               Search {community.name} Homes
             </Link>
             <Link href="/buyer-tools" className="border border-white/35 bg-white/10 text-sand font-medium text-center px-5 py-3 rounded-sm hover:bg-white/15 transition-colors">
@@ -162,6 +190,43 @@ export default async function CommunityPage({ params }: Props) {
         )}
       </section>
 
+      <section className="container-fsre mt-12" aria-labelledby="community-search-shortcuts">
+        <div className="rounded-sm border border-tide/15 bg-white p-5 md:p-7">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-hibiscus">Live BeachesMLS Search</p>
+              <h2 id="community-search-shortcuts" className="mt-1 font-display text-2xl md:text-3xl text-ink">Search homes for sale in {community.name}, FL</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink/55">Start with a focused local search, then change price, beds, baths, square footage, days on market, and other available MLS criteria.</p>
+            </div>
+            <Link href={propertySearchHref} prefetch={false} className="text-sm text-tide underline underline-offset-4 shrink-0">View all {community.name} listings</Link>
+          </div>
+          <div className="mt-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {COMMUNITY_SEARCH_SHORTCUTS.map((shortcut) => (
+              <Link
+                key={shortcut.label}
+                href={communitySearchHref(community.name, shortcut.filter)}
+                prefetch={false}
+                className="rounded-sm border border-ink/10 bg-sand/35 px-4 py-3 text-sm font-medium text-tide transition-colors hover:border-tide/30 hover:bg-tide/5"
+              >
+                {shortcut.label} in {community.name} →
+              </Link>
+            ))}
+          </div>
+          {zipMarkets.length > 0 && (
+            <div className="mt-5 border-t border-ink/10 pt-4">
+              <h3 className="font-display text-lg text-ink">Nearby ZIP-code home searches</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {zipMarkets.map((market) => (
+                  <Link key={market.slug} href={`/homes-for-sale/${market.slug}`} className="rounded-full border border-tide/20 px-3 py-1.5 text-xs font-medium text-tide hover:bg-tide/5">
+                    {market.name} homes for sale
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
       <CommunityIntelligence slug={community.slug} name={community.name} />
 
       <div className="container-fsre my-12"><Tideline /></div>
@@ -186,7 +251,7 @@ export default async function CommunityPage({ params }: Props) {
             <h2 className="font-display text-2xl md:text-3xl text-ink">Homes for sale in {community.name}, FL</h2>
             <p className="text-sm text-ink/60 mt-2">Browse current inventory, then open the full search for exact filters and saved-search alerts.</p>
           </div>
-          <Link href={propertySearchHref} className="text-sm text-tide underline underline-offset-4">Search all {community.name} homes</Link>
+          <Link href={propertySearchHref} prefetch={false} className="text-sm text-tide underline underline-offset-4">Search all {community.name} homes</Link>
         </div>
         {usingSampleListings && listings.length > 0 && <div className="mb-6"><SampleDataNotice variant="listings" /></div>}
         {listings.length > 0 ? (
@@ -198,7 +263,7 @@ export default async function CommunityPage({ params }: Props) {
               Inventory changes throughout the day. Open the full BeachesMLS search to adjust filters, or save your criteria so new matches and price changes can come to you automatically.
             </p>
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <Link href={propertySearchHref} className="bg-hibiscus text-sand font-medium text-center px-4 py-2.5 rounded-sm">Search {community.name}</Link>
+              <Link href={propertySearchHref} prefetch={false} className="bg-hibiscus text-sand font-medium text-center px-4 py-2.5 rounded-sm">Search {community.name}</Link>
               <Link href="/contact" className="border border-tide/25 text-tide font-medium text-center px-4 py-2.5 rounded-sm hover:bg-tide/5">Ask Roque for Help</Link>
             </div>
           </div>

@@ -18,10 +18,12 @@ type FsrGlobal = typeof globalThis & {
 };
 
 const RESO_HOST = "replication.sparkapi.com";
-const FRESH_TTL_MS = 60_000;
-const STALE_TTL_MS = 10 * 60_000;
+const FRESH_TTL_MS = 5 * 60_000;
+const STALE_TTL_MS = 30 * 60_000;
 const MAX_CACHE_ENTRIES = 100;
 const MAX_BACKOFF_MS = 3_000;
+const DEFAULT_THROTTLE_BACKOFF_MS = 60_000;
+const MAX_THROTTLE_BACKOFF_MS = 5 * 60_000;
 const FAILURE_WINDOW_MS = 30_000;
 const FAILURE_THRESHOLD = 8;
 const CIRCUIT_OPEN_MS = 3_000;
@@ -29,6 +31,20 @@ const CIRCUIT_RECOVERY_GRACE_MS = 1_200;
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function retryAfterMilliseconds(value: string | null): number | null {
+  if (!value) return null;
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(MAX_THROTTLE_BACKOFF_MS, seconds * 1_000);
+  }
+
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  const delay = timestamp - Date.now();
+  return delay > 0 ? Math.min(MAX_THROTTLE_BACKOFF_MS, delay) : null;
 }
 
 function responseFromSnapshot(snapshot: ResoSnapshot): Response {
@@ -40,21 +56,28 @@ function responseFromSnapshot(snapshot: ResoSnapshot): Response {
 }
 
 function temporaryResoFailureResponse(
-  reason: "circuit_open" | "network_error",
+  reason: "circuit_open" | "network_error" | "throttled",
   retryAfterSeconds = 5,
 ): Response {
-  const code = reason === "circuit_open" ? "RESO_CIRCUIT_OPEN" : "RESO_NETWORK_ERROR";
+  const code = reason === "circuit_open"
+    ? "RESO_CIRCUIT_OPEN"
+    : reason === "throttled"
+      ? "RESO_THROTTLED"
+      : "RESO_NETWORK_ERROR";
   const message = reason === "circuit_open"
     ? "BeachesMLS RESO is temporarily protected by a circuit breaker."
-    : "BeachesMLS RESO is temporarily unreachable.";
+    : reason === "throttled"
+      ? "BeachesMLS RESO asked this search to pause before trying again."
+      : "BeachesMLS RESO is temporarily unreachable.";
+  const status = reason === "throttled" ? 429 : 503;
 
   return new Response(JSON.stringify({ error: { code, message } }), {
-    status: 503,
-    statusText: "Service Unavailable",
+    status,
+    statusText: status === 429 ? "Too Many Requests" : "Service Unavailable",
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
-      "Retry-After": String(Math.max(1, Math.min(30, Math.ceil(retryAfterSeconds)))),
+      "Retry-After": String(Math.max(1, Math.min(300, Math.ceil(retryAfterSeconds)))),
       "X-FSR-RESO-Fallback": reason,
     },
   });
@@ -260,7 +283,26 @@ export async function register() {
     const requestPromise = (async (): Promise<ResoSnapshot> => {
       const delayUntil = backoffUntil.get(key) ?? 0;
       if (delayUntil > Date.now()) {
-        await wait(Math.min(MAX_BACKOFF_MS, delayUntil - Date.now()));
+        const stale = cache.get(key);
+        if (stale && stale.staleUntil > Date.now()) return stale;
+
+        const remainingMs = delayUntil - Date.now();
+        if (remainingMs > MAX_BACKOFF_MS) {
+          const fallback = temporaryResoFailureResponse(
+            "throttled",
+            Math.ceil(remainingMs / 1_000),
+          );
+          const body = await fallback.arrayBuffer();
+          return {
+            body,
+            status: fallback.status,
+            statusText: fallback.statusText,
+            headers: Array.from(fallback.headers.entries()),
+            freshUntil: Date.now(),
+            staleUntil: Date.now(),
+          };
+        }
+        await wait(remainingMs);
       }
 
       try {
@@ -289,9 +331,9 @@ export async function register() {
         if (response.status === 429 || response.status >= 500) {
           recordFailure(fsrGlobal, failureTimes);
 
-          const retryAfter = Number(response.headers.get("retry-after"));
-          const delay = Number.isFinite(retryAfter) && retryAfter > 0
-            ? Math.min(MAX_BACKOFF_MS, retryAfter * 1_000)
+          const delay = response.status === 429
+            ? retryAfterMilliseconds(response.headers.get("retry-after"))
+              ?? DEFAULT_THROTTLE_BACKOFF_MS
             : MAX_BACKOFF_MS;
           backoffUntil.set(key, Date.now() + delay);
 

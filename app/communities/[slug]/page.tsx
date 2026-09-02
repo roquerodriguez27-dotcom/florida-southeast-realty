@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { connection } from "next/server";
 import { getCommunityBySlug } from "@/lib/communities";
 import { searchListings } from "@/lib/listings";
 import PropertyGrid from "@/components/PropertyGrid";
@@ -18,6 +17,8 @@ import { serializeJsonLd } from "@/lib/seo/json-ld";
 interface Props {
   params: Promise<{ slug: string }>;
 }
+
+export const revalidate = 600;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -36,7 +37,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CommunityPage({ params }: Props) {
-  await connection();
   const { slug } = await params;
   const community = await getCommunityBySlug(slug);
   if (!community) notFound();

@@ -165,9 +165,12 @@ export async function getAllListings(): Promise<Listing[]> {
   return (await searchListingPage()).listings;
 }
 
-export async function getListingBySlug(slug: string): Promise<Listing | undefined> {
+export async function getListingBySlug(
+  slug: string,
+  includeCompleteMedia = true,
+): Promise<Listing | undefined> {
   try {
-    const live = await fetchLiveListingBySlug(slug);
+    const live = await fetchLiveListingBySlug(slug, includeCompleteMedia);
     if (live) return live;
   } catch {
     return undefined;

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { connection } from "next/server";
 import Hero from "@/components/Hero";
 import ValuePropsBar from "@/components/ValuePropsBar";
 import AreasWeServe from "@/components/AreasWeServe";
@@ -27,6 +26,7 @@ export const metadata: Metadata = {
     "Search live South Florida homes for sale across Broward and Palm Beach counties, compare neighborhoods and ownership costs, or sell with Florida Southeast Realty's 0.5% listing-side fee.",
   alternates: { canonical: "/" },
 };
+export const revalidate = 600;
 
 const POPULAR_HOME_SEARCHES = [
   { name: "Boca Raton", slug: "boca-raton" },
@@ -40,7 +40,6 @@ const POPULAR_HOME_SEARCHES = [
 ];
 
 export default async function HomePage() {
-  await connection();
   const [listings, communities, guides] = await Promise.all([
     searchListings({ locations: ["Palm Beach County", "Broward County"] }),
     getAllCommunities(),

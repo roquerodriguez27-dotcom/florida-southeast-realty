@@ -29,6 +29,9 @@ const idxLive = IDX_PROVIDER !== "not_connected";
 const getCachedListingBySlug = cache(getListingBySlug);
 const INVALID_PROPERTY_SLUGS = new Set(["null", "undefined", "false", "nan"]);
 const CRAWLER_USER_AGENT = /(bot|crawler|spider|slurp|bingpreview|facebookexternalhit|linkedinbot|twitterbot|googleother|google-inspectiontool|semrush|ahrefs|mj12bot|dotbot)/i;
+const isCrawlerRequest = cache(async () => (
+  CRAWLER_USER_AGENT.test((await headers()).get("user-agent") ?? "")
+));
 export const revalidate = 300;
 
 function validPropertySlug(slug: string) {
@@ -39,7 +42,8 @@ function validPropertySlug(slug: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   if (!validPropertySlug(slug)) return { robots: { index: false, follow: false } };
-  const listing = await getCachedListingBySlug(slug);
+  const crawlerRequest = await isCrawlerRequest();
+  const listing = await getCachedListingBySlug(slug, !crawlerRequest);
   if (!listing) return {};
   return {
     title: `${listing.address}, ${listing.city} FL | ${formatFullPrice(listing.price)}`,
@@ -53,11 +57,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ListingPage({ params }: Props) {
   const { slug } = await params;
   if (!validPropertySlug(slug)) notFound();
-  const listing = await getCachedListingBySlug(slug);
+  const crawlerRequest = await isCrawlerRequest();
+  const listing = await getCachedListingBySlug(slug, !crawlerRequest);
   if (!listing) notFound();
   const isLiveListing = Boolean(listing.idx);
-  const requestHeaders = await headers();
-  const crawlerRequest = CRAWLER_USER_AGENT.test(requestHeaders.get("user-agent") ?? "");
   const savedListing = savedComparisonListing(listing);
 
   // The property itself remains indexable for legitimate search engines, but

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import { SITE } from "./site-config";
 import { southFloridaCountyValue } from "./south-florida-locations";
 import type {
@@ -23,8 +24,10 @@ const SEARCH_MEDIA_LIMIT = 1;
 const DETAIL_MEDIA_PAGE_SIZE = 25;
 const MAX_DETAIL_MEDIA_PAGES = 20;
 const REQUEST_TIMEOUT_MS = 10_000;
-const RESO_MAX_ATTEMPTS = 3;
-const RETRYABLE_RESO_STATUSES = new Set([429, 502, 503, 504]);
+const RESO_MAX_ATTEMPTS = 2;
+const RETRYABLE_RESO_STATUSES = new Set([502, 503, 504]);
+const LISTING_SEARCH_REVALIDATE_SECONDS = 600;
+const LISTING_DETAIL_REVALIDATE_SECONDS = 600;
 const CURRENT_YEAR = new Date().getUTCFullYear();
 
 const RESO_SORTS: Record<ListingSort, string> = {
@@ -216,7 +219,7 @@ function wait(milliseconds: number): Promise<void> {
 async function resoRequest(
   path: string,
   query: Record<string, string | number | boolean> = {},
-  revalidate = 300,
+  revalidate = LISTING_SEARCH_REVALIDATE_SECONDS,
   reportFailures = true,
 ): Promise<ResoPayload> {
   const accessToken = getAccessToken();
@@ -301,7 +304,12 @@ async function resoRequest(
       ...(message ? { message: message.slice(0, 240) } : {}),
     };
 
-    if (RETRYABLE_RESO_STATUSES.has(response.status) && attempt < RESO_MAX_ATTEMPTS - 1) {
+    const localFallback = response.headers.get("x-fsr-reso-fallback");
+    if (
+      !localFallback
+      && RETRYABLE_RESO_STATUSES.has(response.status)
+      && attempt < RESO_MAX_ATTEMPTS - 1
+    ) {
       await wait(retryDelayMilliseconds(attempt, response.headers.get("retry-after")));
       continue;
     }
@@ -1024,7 +1032,7 @@ function buildResoFilter(filters: ListingFilters): string {
   return conditions.join(" and ");
 }
 
-export async function fetchLiveListingPage(
+async function fetchUncachedLiveListingPage(
   filters: ListingFilters = {},
   page = 1,
 ): Promise<ListingSearchPage | null> {
@@ -1032,9 +1040,12 @@ export async function fetchLiveListingPage(
 
   const currentPage = Math.max(1, Math.floor(page) || 1);
   const startedAt = Date.now();
-  const activeFilterCount = Object.values(filters).filter((value) => (
-    Array.isArray(value) ? value.length > 0 : value !== undefined && value !== false && value !== ""
-  )).length;
+  const activeFilterKeys = Object.entries(filters)
+    .filter(([, value]) => (
+      Array.isArray(value) ? value.length > 0 : value !== undefined && value !== false && value !== ""
+    ))
+    .map(([key]) => key)
+    .sort();
   // BeachesMLS returns several Boolean amenities in listing records but does
   // not consistently enforce them in `$filter`. Polygon searches also need
   // point-in-shape verification. Pull a wider candidate window for those cases,
@@ -1071,35 +1082,42 @@ export async function fetchLiveListingPage(
   const exactPolygonFallback = Boolean(filters.polygon?.length);
   const widerCandidateWindow = exactAmenityFallback || exactPolygonFallback;
   const providerPageSize = widerCandidateWindow ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
+  const providerRequestSize = providerPageSize + 1;
   console.info("[BeachesMLS RESO] Listing search started.", {
     page: currentPage,
-    activeFilterCount,
+    activeFilterCount: activeFilterKeys.length,
+    activeFilterKeys,
     providerPageSize,
     mediaPerListing: SEARCH_MEDIA_LIMIT,
+    requestsExactCount: false,
   });
   let payload: ResoPayload;
   try {
     payload = await resoRequest("Property", {
       "$filter": buildResoFilter(providerFilters),
       "$expand": `Media($top=${SEARCH_MEDIA_LIMIT};$orderby=Order)`,
-      "$top": providerPageSize,
+      "$top": providerRequestSize,
       "$skip": (currentPage - 1) * providerPageSize,
-      "$count": true,
       "$orderby": RESO_SORTS[filters.sort ?? "newest"],
     });
   } catch (error) {
     console.error("[BeachesMLS RESO] Listing search failed.", {
       page: currentPage,
-      activeFilterCount,
+      activeFilterCount: activeFilterKeys.length,
+      activeFilterKeys,
       durationMs: Date.now() - startedAt,
     });
     throw error;
   }
+  const hasMoreProviderRows = Boolean(
+    payload.nextLink || payload.value.length > providerPageSize,
+  );
+  const providerRecords = payload.value.slice(0, providerPageSize);
   const minGarageSpaces = Math.max(
     filters.garageOnly ? 1 : 0,
     Number.isFinite(filters.minGarageSpaces) ? Number(filters.minGarageSpaces) : 0,
   );
-  const listings = payload.value
+  const listings = providerRecords
     .map((record) => normalizeListing(record, "Summary"))
     .filter((listing): listing is Listing => Boolean(listing))
     .filter((listing) => !listing.forLease)
@@ -1145,41 +1163,19 @@ export async function fetchLiveListingPage(
     .filter((listing) => !filters.maxDaysOnMarket || listing.daysOnMarket <= filters.maxDaysOnMarket)
     .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon))
     .slice(0, LISTING_PAGE_SIZE);
-  const providerTotalRows = payload.count ?? ((currentPage - 1) * providerPageSize + payload.value.length);
-  const locallyVerifiedBoolean = Boolean(
-    filters.privatePoolOnly
-      || filters.fireplaceOnly
-      || filters.newConstructionOnly
-      || filters.seniorCommunityMode
-      || filters.maxHoaMonthly
-      || filters.priceReducedOnly
-      || filters.maxAnnualTaxes
-      || filters.architecturalStyle
-      || filters.viewType
-      || filters.coolingType
-      || filters.heatingType
-      || filters.amenities?.length,
-  );
-  const totalRowsExact = !exactPolygonFallback && !locallyVerifiedBoolean;
-  const totalRows = totalRowsExact ? providerTotalRows : listings.length;
-  const hasMoreProviderRows = Boolean(
-    payload.nextLink
-      || (payload.count !== undefined && currentPage * providerPageSize < providerTotalRows),
-  );
-  const totalPages = totalRowsExact
-    ? payload.count !== undefined
-      ? Math.max(1, Math.ceil(providerTotalRows / providerPageSize))
-      : hasMoreProviderRows
-        ? currentPage + 1
-        : currentPage
-    : hasMoreProviderRows
-      ? currentPage + 1
-      : currentPage;
+  // BeachesMLS can spend most of a request calculating @odata.count for broad
+  // searches. Asking for one extra row gives us reliable Previous/Next paging
+  // without forcing that expensive full-dataset count on every visitor.
+  const totalRows = listings.length;
+  const totalRowsExact = false;
+  const totalPages = hasMoreProviderRows ? currentPage + 1 : currentPage;
 
   console.info("[BeachesMLS RESO] Listing search completed.", {
     page: currentPage,
-    activeFilterCount,
-    providerRows: payload.value.length,
+    activeFilterCount: activeFilterKeys.length,
+    activeFilterKeys,
+    providerRows: providerRecords.length,
+    providerHasMore: hasMoreProviderRows,
     resultRows: listings.length,
     durationMs: Date.now() - startedAt,
   });
@@ -1198,11 +1194,31 @@ export async function fetchLiveListingPage(
   };
 }
 
+const fetchCachedLiveListingPage = unstable_cache(
+  async (filters: ListingFilters, page: number) => fetchUncachedLiveListingPage(filters, page),
+  ["beaches-mls-listing-page-v2"],
+  {
+    revalidate: LISTING_SEARCH_REVALIDATE_SECONDS,
+    tags: ["beaches-mls-listing-pages"],
+  },
+);
+
+export async function fetchLiveListingPage(
+  filters: ListingFilters = {},
+  page = 1,
+): Promise<ListingSearchPage | null> {
+  if (!getAccessToken()) return null;
+  return fetchCachedLiveListingPage(filters, Math.max(1, Math.floor(page) || 1));
+}
+
 export async function fetchLiveListings(): Promise<Listing[] | null> {
   return (await fetchLiveListingPage())?.listings ?? null;
 }
 
-export async function fetchLiveListingBySlug(slug: string): Promise<Listing | null> {
+async function fetchUncachedLiveListingBySlug(
+  slug: string,
+  includeCompleteMedia: boolean,
+): Promise<Listing | null> {
   if (!getAccessToken()) return null;
   const listingKey = decodeListingKey(slug);
   if (!listingKey) return null;
@@ -1212,7 +1228,7 @@ export async function fetchLiveListingBySlug(slug: string): Promise<Listing | nu
   try {
     payload = await resoRequest(`Property('${escapedKey}')`, {
       "$expand": `Media($top=${DETAIL_MEDIA_PAGE_SIZE};$orderby=Order)`,
-    }, 300, false);
+    }, LISTING_DETAIL_REVALIDATE_SECONDS, false);
   } catch {
     // A listing can move between provider partitions while the cached search
     // result is still visible. Retrying through the collection endpoint keeps
@@ -1224,8 +1240,29 @@ export async function fetchLiveListingBySlug(slug: string): Promise<Listing | nu
     });
   }
   const record = asObject(payload.value[0]);
-  const completeRecord = await fetchCompleteListingMedia(record);
+  const completeRecord = includeCompleteMedia
+    ? await fetchCompleteListingMedia(record)
+    : record;
   return normalizeListing(completeRecord, "Detail");
+}
+
+const fetchCachedLiveListingBySlug = unstable_cache(
+  async (slug: string, includeCompleteMedia: boolean) => (
+    fetchUncachedLiveListingBySlug(slug, includeCompleteMedia)
+  ),
+  ["beaches-mls-listing-detail-v2"],
+  {
+    revalidate: LISTING_DETAIL_REVALIDATE_SECONDS,
+    tags: ["beaches-mls-listing-details"],
+  },
+);
+
+export async function fetchLiveListingBySlug(
+  slug: string,
+  includeCompleteMedia = true,
+): Promise<Listing | null> {
+  if (!getAccessToken()) return null;
+  return fetchCachedLiveListingBySlug(slug, includeCompleteMedia);
 }
 
 export async function getIdxDisclosure(): Promise<ResoSystemInfo | null> {

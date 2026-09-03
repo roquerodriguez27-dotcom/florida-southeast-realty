@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type {
@@ -111,7 +109,6 @@ export default function ListingsMap({
     locations: string[];
     status: "ready" | "unavailable";
   } | null>(null);
-  const [selectedSlug, setSelectedSlug] = useState(listings[0]?.slug ?? "");
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
   const router = useRouter();
@@ -454,15 +451,11 @@ export default function ListingsMap({
           maxWidth: 280,
           autoPan: false,
         });
-      const previewListing = () => {
-        setSelectedSlug(listing.slug);
-        marker.openPopup();
-      };
+      const previewListing = () => marker.openPopup();
       marker.on("mouseover", previewListing);
       marker.on("click", previewListing);
       marker.getElement()?.addEventListener("focus", previewListing);
     }
-    setSelectedSlug((current) => listings.some((listing) => listing.slug === current) ? current : listings[0]?.slug ?? "");
   }, [listings, ready, router]);
 
   useEffect(() => {
@@ -557,8 +550,6 @@ export default function ListingsMap({
     startTransition(() => router.push(`${pathname}?${query.toString()}#property-results`, { scroll: false }));
   }
 
-  const selected = listings.find((listing) => listing.slug === selectedSlug) ?? listings[0];
-
   return (
     <div className="rounded-sm border border-ink/10 bg-white p-3 md:p-4" aria-busy={isPending}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -614,29 +605,6 @@ export default function ListingsMap({
           </div>
         ) : null}
       </div>
-      {selected ? (
-        <Link
-          href={`/properties/${selected.slug}`}
-          prefetch={false}
-          className="group mt-3 flex overflow-hidden rounded-sm bg-keystone/60 transition-colors hover:bg-keystone focus-visible:outline-hibiscus"
-          aria-label={`View ${selected.address}, ${selected.city}`}
-        >
-          <Image
-            src={selected.image || "/property-placeholder.svg"}
-            alt=""
-            width={132}
-            height={96}
-            className="h-24 w-28 shrink-0 object-cover sm:w-32"
-          />
-          <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4">
-            <div className="min-w-0">
-              <p className="font-display text-lg text-ink">{formatPrice(selected.price)}</p>
-              <p className="truncate text-sm text-ink/70">{selected.address}, {selected.city}</p>
-            </div>
-            <span className="mt-1 text-sm font-medium text-tide underline underline-offset-4 group-hover:text-hibiscus sm:mt-0 sm:shrink-0">View photos &amp; details</span>
-          </div>
-        </Link>
-      ) : null}
     </div>
   );
 }

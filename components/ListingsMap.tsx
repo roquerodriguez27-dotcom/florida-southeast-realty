@@ -408,9 +408,25 @@ export default function ListingsMap({
     const markerLayer = markerLayerRef.current;
     if (!ready || !L || !map || !markerLayer) return;
 
+    const currentPropertyHref = (slug: string) => {
+      const query = new URLSearchParams(searchParams.toString());
+      query.set("view", "map");
+
+      const visibleBounds = viewportRef.current;
+      if (visibleBounds) {
+        query.set("north", visibleBounds.getNorth().toFixed(6));
+        query.set("south", visibleBounds.getSouth().toFixed(6));
+        query.set("east", visibleBounds.getEast().toFixed(6));
+        query.set("west", visibleBounds.getWest().toFixed(6));
+      }
+
+      const returnTo = `${pathname}?${query.toString()}#property-results`;
+      return `/properties/${encodeURIComponent(slug)}?returnTo=${encodeURIComponent(returnTo)}`;
+    };
+
     markerLayer.clearLayers();
     for (const listing of listings) {
-      const propertyHref = `/properties/${encodeURIComponent(listing.slug)}`;
+      const initialPropertyHref = currentPropertyHref(listing.slug);
       const markerIcon = L.divIcon({
         className: "listing-map-marker",
         html: `<span>${formatPrice(listing.price)}</span>`,
@@ -419,7 +435,7 @@ export default function ListingsMap({
       });
       const popupLink = document.createElement("a");
       popupLink.className = "listing-map-popup";
-      popupLink.href = propertyHref;
+      popupLink.href = initialPropertyHref;
       popupLink.setAttribute("aria-label", `View ${listing.address}, ${listing.city}`);
 
       const thumbnail = document.createElement("img");
@@ -444,8 +460,11 @@ export default function ListingsMap({
       details.append(price, address, callToAction);
       popupLink.append(thumbnail, details);
       popupLink.addEventListener("click", (event) => {
+        const nextHref = currentPropertyHref(listing.slug);
+        popupLink.href = nextHref;
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
-        router.push(propertyHref);
+        router.push(nextHref);
       });
 
       const marker = L.marker([listing.lat, listing.lng], {
@@ -464,12 +483,15 @@ export default function ListingsMap({
           autoPanPaddingBottomRight: [28, 28],
           keepInView: true,
         });
-      const previewListing = () => marker.openPopup();
+      const previewListing = () => {
+        popupLink.href = currentPropertyHref(listing.slug);
+        marker.openPopup();
+      };
       marker.on("mouseover", previewListing);
       marker.on("click", previewListing);
       marker.getElement()?.addEventListener("focus", previewListing);
     }
-  }, [listings, ready, router]);
+  }, [listings, pathname, ready, router, searchParams]);
 
   useEffect(() => {
     const L = leafletRef.current;

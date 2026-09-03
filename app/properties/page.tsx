@@ -209,6 +209,17 @@ function pageHref(params: Awaited<Props["searchParams"]>, page: number): string 
   return `/properties?${query.toString()}`;
 }
 
+function propertySearchReturnUrl(params: Awaited<Props["searchParams"]>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (!value || key.startsWith("_")) continue;
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item) query.append(key, item);
+    }
+  }
+  return `/properties${query.size ? `?${query.toString()}` : ""}#property-results`;
+}
+
 function withoutMapBoundsHref(params: Awaited<Props["searchParams"]>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -222,6 +233,7 @@ function withoutMapBoundsHref(params: Awaited<Props["searchParams"]>): string {
 
 export default async function PropertiesPage({ searchParams }: Props) {
   const params = await searchParams;
+  const returnTo = propertySearchReturnUrl(params);
   const rawQuery = params.q?.trim().slice(0, 200) || undefined;
   const requestedLocations = normalizeLocations(params.location);
   const propertyQuery = requestedLocations.length > 0 || looksLikePropertyLookup(rawQuery)
@@ -451,7 +463,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
               initialShape={polygon}
               initialSort={sort}
             >
-              <PropertyGrid listings={listings} compact={params.view === "map"} />
+              <PropertyGrid listings={listings} compact={params.view === "map"} returnTo={returnTo} />
             </PropertyResultsView>
             <IdxPageDisclaimer attribution={listings[0]?.idx} />
             {result.pagination.totalPages > 1 && (

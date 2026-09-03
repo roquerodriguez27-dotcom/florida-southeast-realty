@@ -20,12 +20,15 @@ import PropertyGallery from "@/components/PropertyGallery";
 import SaveListingButton from "@/components/SaveListingButton";
 import AskRoqueActions from "@/components/AskRoqueActions";
 import PropertyConversionBar from "@/components/PropertyConversionBar";
+import BackToResultsLink from "@/components/BackToResultsLink";
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ returnTo?: string | string[] }>;
 }
 
 const idxLive = IDX_PROVIDER !== "not_connected";
+const siteOrigin = new URL(SITE.url).origin;
 const getCachedListingBySlug = cache(getListingBySlug);
 const INVALID_PROPERTY_SLUGS = new Set(["null", "undefined", "false", "nan"]);
 const CRAWLER_USER_AGENT = /(bot|crawler|spider|slurp|bingpreview|facebookexternalhit|linkedinbot|twitterbot|googleother|google-inspectiontool|semrush|ahrefs|mj12bot|dotbot)/i;
@@ -37,6 +40,25 @@ export const revalidate = 300;
 function validPropertySlug(slug: string) {
   const normalized = slug.trim().toLowerCase();
   return normalized.length >= 4 && normalized.length <= 300 && !INVALID_PROPERTY_SLUGS.has(normalized);
+}
+
+function getReturnContext(value: string | string[] | undefined) {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  const fallback = { href: "/properties", label: "Back to property search", fromResults: false };
+  if (!candidate) return fallback;
+
+  try {
+    const url = new URL(candidate, SITE.url);
+    if (url.origin !== siteOrigin || url.pathname !== "/properties") return fallback;
+
+    return {
+      href: `${url.pathname}${url.search}${url.hash || "#property-results"}`,
+      label: url.searchParams.get("view") === "map" ? "Back to map results" : "Back to search results",
+      fromResults: true,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -54,8 +76,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ListingPage({ params }: Props) {
-  const { slug } = await params;
+export default async function ListingPage({ params, searchParams }: Props) {
+  const [{ slug }, search] = await Promise.all([params, searchParams]);
+  const returnContext = getReturnContext(search.returnTo);
   if (!validPropertySlug(slug)) notFound();
   const crawlerRequest = await isCrawlerRequest();
   const listing = await getCachedListingBySlug(slug, !crawlerRequest);
@@ -102,6 +125,14 @@ export default async function ListingPage({ params }: Props) {
     <div className="pt-16 pb-28 md:pb-20">
       {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />}
 
+      <div className="container-fsre py-4 sm:py-5">
+        <BackToResultsLink
+          href={returnContext.href}
+          label={returnContext.label}
+          preferHistory={returnContext.fromResults}
+        />
+      </div>
+
       <PropertyGallery images={listing.images} address={listing.address} />
 
       {!isLiveListing && <div className="container-fsre mt-6"><SampleDataNotice variant="listings" /></div>}
@@ -124,7 +155,7 @@ export default async function ListingPage({ params }: Props) {
             <Link href={`/buyer-tools?listing=${listing.slug}&tool=cost`} className="bg-tide text-sand px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide-light transition-colors">Calculate true monthly cost</Link>
             <SaveListingButton listing={savedListing} variant="detail" />
             <CompareToggle listing={savedListing} variant="detail" />
-            <Link href="/properties" className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">Choose more homes</Link>
+            <Link href={returnContext.href} className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">Choose more homes</Link>
           </div>
           <p className="mt-2 text-xs text-ink/50">Save favorites for later, or select up to three homes to compare side-by-side.</p>
 

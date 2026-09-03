@@ -29,16 +29,19 @@ function engagementBadges(listing: Listing) {
   return badges.slice(0, 3);
 }
 
-export default function PropertyCard({ listing }: { listing: Listing }) {
+export default function PropertyCard({ listing, returnTo }: { listing: Listing; returnTo?: string }) {
   const savedListing = savedComparisonListing(listing);
   const badges = engagementBadges(listing);
+  const propertyHref = `/properties/${encodeURIComponent(listing.slug)}${
+    returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""
+  }`;
   const photoCount = listing.photoCount
     ?? (listing.images[0] === "/property-placeholder.svg" ? 0 : listing.images.length);
 
   return (
     <article className="relative overflow-hidden rounded-sm border border-ink/10 bg-white transition-all hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_18px_45px_-34px_rgba(14,43,48,0.7)]">
       <SaveListingButton listing={savedListing} />
-      <Link href={`/properties/${listing.slug}`} prefetch={false} className="group block">
+      <Link href={propertyHref} prefetch={false} className="group block">
         <div className="relative aspect-[4/3] overflow-hidden">
           <Image
             src={listing.images[0]}

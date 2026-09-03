@@ -252,6 +252,16 @@ export default function ListingsMap({
         setDrawMessage("Map moved. Press “Search this area” to refresh the homes.");
       });
 
+      map.on("autopanstart", () => {
+        if (suppressMoveEndTimerRef.current) clearTimeout(suppressMoveEndTimerRef.current);
+        suppressNextMoveEndRef.current = true;
+        suppressMoveEndTimerRef.current = setTimeout(() => {
+          suppressNextMoveEndRef.current = false;
+          suppressMoveEndTimerRef.current = null;
+          viewportRef.current = map.getBounds();
+        }, 1_000);
+      });
+
       map.on("click", (event) => {
         if (!drawRef.current.enabled) return;
         const points = [...drawRef.current.points, event.latlng].slice(0, 20);
@@ -449,7 +459,10 @@ export default function ListingsMap({
           className: "listing-map-popup-shell",
           minWidth: 230,
           maxWidth: 280,
-          autoPan: false,
+          autoPan: true,
+          autoPanPaddingTopLeft: [28, 28],
+          autoPanPaddingBottomRight: [28, 28],
+          keepInView: true,
         });
       const previewListing = () => marker.openPopup();
       marker.on("mouseover", previewListing);

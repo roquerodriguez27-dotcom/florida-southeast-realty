@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type {
   CircleMarker,
+  LayerGroup,
   LatLng,
   LatLngBounds,
   Map as LeafletMap,
@@ -61,20 +62,19 @@ export default function ListingsMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<LeafletModule | null>(null);
+  const markerLayerRef = useRef<LayerGroup | null>(null);
   const viewportRef = useRef<LatLngBounds | null>(null);
   const areaLayerRef = useRef<Polygon | Rectangle | null>(null);
   const draftLineRef = useRef<Polyline | null>(null);
   const draftMarkersRef = useRef<CircleMarker[]>([]);
   const drawRef = useRef<{ enabled: boolean; points: LatLng[] }>({ enabled: false, points: [] });
-  const autoSearchRef = useRef(true);
-  const searchBoundsRef = useRef<(bounds: MapBounds, options?: { replace?: boolean; shape?: MapPoint[] }) => void>(() => undefined);
-  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startupListingsRef = useRef(listings);
+  const startupBoundsRef = useRef(initialBounds);
+  const startupShapeRef = useRef(initialShape);
   const [ready, setReady] = useState(false);
   const [drawing, setDrawing] = useState(false);
   const [pointCount, setPointCount] = useState(0);
-  const [areaSelected, setAreaSelected] = useState(Boolean(initialBounds));
   const [viewportChanged, setViewportChanged] = useState(false);
-  const [autoSearch, setAutoSearch] = useState(true);
   const [drawMessage, setDrawMessage] = useState("");
   const [selectedSlug, setSelectedSlug] = useState(listings[0]?.slug ?? "");
   const [isPending, startTransition] = useTransition();
@@ -120,10 +120,6 @@ export default function ListingsMap({
       else router.push(target, { scroll: false });
     });
   }
-  useEffect(() => {
-    searchBoundsRef.current = searchBounds;
-  });
-
   function clearDraft() {
     draftLineRef.current?.remove();
     draftLineRef.current = null;
@@ -145,7 +141,7 @@ export default function ListingsMap({
 
       const map = L.map(containerRef.current, {
         zoomControl: true,
-        scrollWheelZoom: true,
+        scrollWheelZoom: false,
         doubleClickZoom: true,
       });
       mapRef.current = map;
@@ -155,42 +151,25 @@ export default function ListingsMap({
         maxZoom: 19,
       }).addTo(map);
 
-      for (const listing of listings) {
-        const markerIcon = L.divIcon({
-          className: "listing-map-marker",
-          html: `<span>${formatPrice(listing.price)}</span>`,
-          iconSize: [86, 30],
-          iconAnchor: [43, 15],
-        });
-        L.marker([listing.lat, listing.lng], { icon: markerIcon })
-          .addTo(map)
-          .on("click", () => setSelectedSlug(listing.slug));
-      }
+      markerLayerRef.current = L.layerGroup().addTo(map);
 
-      if (initialShape && initialShape.length >= 3) {
-        areaLayerRef.current = L.polygon(initialShape.map(({ lat, lng }) => [lat, lng]), {
-          color: "#c8402f",
-          weight: 3,
-          fillColor: "#c8402f",
-          fillOpacity: 0.1,
-        }).addTo(map);
-        map.fitBounds(areaLayerRef.current.getBounds(), { padding: [24, 24] });
-        setAreaSelected(true);
+      const startupShape = startupShapeRef.current;
+      const startupBounds = startupBoundsRef.current;
+      const startupListings = startupListingsRef.current;
+      if (startupShape && startupShape.length >= 3) {
+        map.fitBounds(L.latLngBounds(startupShape.map(({ lat, lng }) => [lat, lng])), { padding: [24, 24] });
         setDrawMessage("Showing homes inside the drawn area. Move or zoom the map to search a different view.");
-      } else if (initialBounds) {
-        areaLayerRef.current = L.rectangle([
-          [initialBounds.south, initialBounds.west],
-          [initialBounds.north, initialBounds.east],
-        ], { color: "#c8402f", weight: 2, fillColor: "#c8402f", fillOpacity: 0.06 }).addTo(map);
-        map.fitBounds(areaLayerRef.current.getBounds(), { padding: [24, 24] });
-        setAreaSelected(true);
-        setDrawMessage("Showing homes in this map area. Pan or zoom and the results will update automatically.");
-      } else if (listings.length > 0) {
-        const listingBounds = L.latLngBounds(listings.map((listing) => [listing.lat, listing.lng]));
-        if (listings.length === 1) map.setView(listingBounds.getCenter(), 14);
+      } else if (startupBounds) {
+        map.fitBounds([
+          [startupBounds.south, startupBounds.west],
+          [startupBounds.north, startupBounds.east],
+        ], { padding: [24, 24] });
+        setDrawMessage("Showing homes in this map area. Move the map, then press “Search this area” to update.");
+      } else if (startupListings.length > 0) {
+        const listingBounds = L.latLngBounds(startupListings.map((listing) => [listing.lat, listing.lng]));
+        if (startupListings.length === 1) map.setView(listingBounds.getCenter(), 14);
         else map.fitBounds(listingBounds, { padding: [32, 32], maxZoom: 14 });
-        setAreaSelected(false);
-        setDrawMessage("Pan or zoom the map and the homes will update automatically.");
+        setDrawMessage("Move the map, then press “Search this area” to update the homes.");
       } else {
         map.setView([26.2, -80.13], 9);
       }
@@ -200,16 +179,7 @@ export default function ListingsMap({
         viewportRef.current = map.getBounds();
         if (drawRef.current.enabled) return;
         setViewportChanged(true);
-        if (!autoSearchRef.current) {
-          setDrawMessage("Map moved. Press “Search this map area” to refresh the homes.");
-          return;
-        }
-        if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
-        setDrawMessage("Map moved. Updating homes…");
-        autoTimerRef.current = setTimeout(() => {
-          const viewport = viewportRef.current;
-          if (viewport) searchBoundsRef.current(asMapBounds(viewport), { replace: true });
-        }, 700);
+        setDrawMessage("Map moved. Press “Search this area” to refresh the homes.");
       });
 
       map.on("click", (event) => {
@@ -238,21 +208,68 @@ export default function ListingsMap({
     void initializeMap();
     return () => {
       cancelled = true;
-      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
       mapRef.current?.remove();
       mapRef.current = null;
       leafletRef.current = null;
+      markerLayerRef.current = null;
       areaLayerRef.current = null;
       draftLineRef.current = null;
       draftMarkersRef.current = [];
     };
-  // The map is deliberately rebuilt when the server returns a new set of MLS markers.
-  }, [initialBounds, initialShape, listings]);
+  // Keep the Leaflet instance stable while refreshed MLS results replace only its markers.
+  }, []);
+
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    const markerLayer = markerLayerRef.current;
+    if (!ready || !L || !map || !markerLayer) return;
+
+    markerLayer.clearLayers();
+    for (const listing of listings) {
+      const markerIcon = L.divIcon({
+        className: "listing-map-marker",
+        html: `<span>${formatPrice(listing.price)}</span>`,
+        iconSize: [86, 30],
+        iconAnchor: [43, 15],
+      });
+      L.marker([listing.lat, listing.lng], {
+        icon: markerIcon,
+        keyboard: true,
+        riseOnHover: true,
+        title: `${formatPrice(listing.price)} — ${listing.address}, ${listing.city}`,
+      })
+        .addTo(markerLayer)
+        .on("click", () => setSelectedSlug(listing.slug));
+    }
+    setSelectedSlug((current) => listings.some((listing) => listing.slug === current) ? current : listings[0]?.slug ?? "");
+  }, [listings, ready]);
+
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!ready || !L || !map) return;
+
+    areaLayerRef.current?.remove();
+    areaLayerRef.current = null;
+    if (initialShape && initialShape.length >= 3) {
+      areaLayerRef.current = L.polygon(initialShape.map(({ lat, lng }) => [lat, lng]), {
+        color: "#c8402f",
+        weight: 3,
+        fillColor: "#c8402f",
+        fillOpacity: 0.1,
+      }).addTo(map);
+    } else if (initialBounds) {
+      areaLayerRef.current = L.rectangle([
+        [initialBounds.south, initialBounds.west],
+        [initialBounds.north, initialBounds.east],
+      ], { color: "#c8402f", weight: 2, fillColor: "#c8402f", fillOpacity: 0.06 }).addTo(map);
+    }
+  }, [initialBounds, initialShape, ready]);
 
   function beginDrawing() {
     const map = mapRef.current;
     if (!map) return;
-    if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     clearDraft();
     drawRef.current = { enabled: true, points: [] };
     map.dragging.disable();
@@ -269,7 +286,7 @@ export default function ListingsMap({
     map.dragging.enable();
     map.doubleClickZoom.enable();
     setDrawing(false);
-    setDrawMessage(areaSelected ? "The current map-area filter is still active." : "Pan or zoom the map and the homes will update automatically.");
+    setDrawMessage(initialBounds || initialShape ? "The current map-area filter is still active." : "Move the map, then press “Search this area” to update the homes.");
   }
 
   function undoPoint() {
@@ -302,7 +319,6 @@ export default function ListingsMap({
     map.dragging.enable();
     map.doubleClickZoom.enable();
     setDrawing(false);
-    setAreaSelected(true);
     searchBounds(asMapBounds(areaLayerRef.current.getBounds()), { shape });
   }
 
@@ -317,7 +333,6 @@ export default function ListingsMap({
     query.set("view", "map");
     areaLayerRef.current?.remove();
     areaLayerRef.current = null;
-    setAreaSelected(false);
     setDrawMessage("Map-area filter cleared. Pan or zoom to search a new view.");
     startTransition(() => router.push(`${pathname}?${query.toString()}#property-results`, { scroll: false }));
   }
@@ -327,40 +342,25 @@ export default function ListingsMap({
   return (
     <div className="rounded-sm border border-ink/10 bg-white p-3 md:p-4" aria-busy={isPending}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={drawing ? cancelDrawing : beginDrawing} disabled={!ready || isPending} className="rounded-sm border border-tide/25 px-3 py-2 text-sm font-medium text-tide hover:bg-tide/5 disabled:opacity-50">
-          {drawing ? "Cancel drawing" : "Draw a search area"}
+        <button type="button" onClick={drawing ? cancelDrawing : beginDrawing} disabled={!ready || isPending} className="min-h-11 rounded-sm border border-tide/25 px-3 py-2 text-sm font-medium text-tide hover:bg-tide/5 disabled:opacity-50">
+          {drawing ? "Cancel drawing" : "Draw area"}
         </button>
         {drawing ? (
           <>
-            <button type="button" onClick={undoPoint} disabled={pointCount === 0} className="rounded-sm border border-ink/15 px-3 py-2 text-sm text-ink/65 disabled:opacity-40">Undo point</button>
-            <button type="button" onClick={finishDrawing} disabled={pointCount < 3} className="rounded-sm bg-hibiscus px-3 py-2 text-sm font-medium text-sand disabled:opacity-40">Finish area ({pointCount})</button>
+            <button type="button" onClick={undoPoint} disabled={pointCount === 0} className="min-h-11 rounded-sm border border-ink/15 px-3 py-2 text-sm text-ink/65 disabled:opacity-40">Undo point</button>
+            <button type="button" onClick={finishDrawing} disabled={pointCount < 3} className="min-h-11 rounded-sm bg-hibiscus px-3 py-2 text-sm font-medium text-sand disabled:opacity-40">Finish area ({pointCount})</button>
           </>
         ) : (
-          <button type="button" onClick={searchVisibleArea} disabled={!ready || isPending || (!viewportChanged && Boolean(initialBounds))} className="rounded-sm bg-hibiscus px-3 py-2 text-sm font-medium text-sand hover:bg-hibiscus-dark disabled:opacity-50">
-            {isPending ? "Updating homes…" : "Search this map area"}
+          <button type="button" onClick={searchVisibleArea} disabled={!ready || isPending || !viewportChanged} className="min-h-11 rounded-sm bg-hibiscus px-3 py-2 text-sm font-medium text-sand hover:bg-hibiscus-dark disabled:cursor-default disabled:bg-tide/10 disabled:text-ink/45">
+            {isPending ? "Updating homes…" : viewportChanged ? "Search this area" : "Move map to update"}
           </button>
         )}
-        {initialBounds || areaSelected ? <button type="button" onClick={clearArea} className="px-2 py-2 text-sm text-tide underline underline-offset-4">Clear area</button> : null}
-        <label className="ml-auto flex items-center gap-2 rounded-full bg-tide/5 px-3 py-2 text-xs font-medium text-tide">
-          <input
-            type="checkbox"
-            checked={autoSearch}
-            onChange={(event) => {
-              const checked = event.target.checked;
-              setAutoSearch(checked);
-              autoSearchRef.current = checked;
-              if (!checked && autoTimerRef.current) clearTimeout(autoTimerRef.current);
-              if (checked && viewportChanged) searchVisibleArea();
-            }}
-            className="h-4 w-4 accent-hibiscus"
-          />
-          Update as map moves
-        </label>
+        {initialBounds || initialShape ? <button type="button" onClick={clearArea} className="ml-auto min-h-11 px-2 py-2 text-sm text-tide underline underline-offset-4">Clear area</button> : null}
       </div>
       <p className="mb-3 min-h-5 text-xs text-ink/55" aria-live="polite">
-        {drawMessage || "Pan or zoom the map and the homes will update automatically."}
+        {drawMessage || "Move the map, then press “Search this area” to update the homes."}
       </p>
-      <div ref={containerRef} className="h-[60vh] min-h-[440px] w-full rounded-sm bg-keystone xl:h-[68vh]" aria-label="Interactive map of property search results" />
+      <div ref={containerRef} className="h-[52svh] min-h-[360px] max-h-[620px] w-full rounded-sm bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px]" aria-label="Interactive map of property search results" />
       {selected ? (
         <div className="mt-3 flex flex-col justify-between gap-2 rounded-sm bg-keystone/60 p-3 sm:flex-row sm:items-center">
           <div><p className="font-display text-lg text-ink">{formatPrice(selected.price)}</p><p className="text-sm text-ink/70">{selected.address}, {selected.city}</p></div>

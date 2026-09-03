@@ -13,6 +13,7 @@ import type {
   Polygon,
   Polyline,
   Rectangle,
+  TileLayer,
 } from "leaflet";
 import type { Feature, MultiPolygon, Polygon as GeoJsonPolygon } from "geojson";
 import { formatPrice } from "@/lib/format";
@@ -32,6 +33,7 @@ export interface MapListing {
 type MapBounds = NonNullable<ListingFilters["bounds"]>;
 type MapPoint = NonNullable<ListingFilters["polygon"]>[number];
 type LeafletModule = typeof import("leaflet");
+type MapView = "street" | "satellite";
 const CENSUS_BOUNDARY_ATTRIBUTION = '<a href="https://tigerweb.geo.census.gov/">U.S. Census Bureau</a>';
 type BoundaryFeature = Feature<GeoJsonPolygon | MultiPolygon, {
   kind: "ZIP" | "County" | "City";
@@ -82,6 +84,7 @@ export default function ListingsMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<LeafletModule | null>(null);
+  const baseLayersRef = useRef<Record<MapView, TileLayer> | null>(null);
   const markerLayerRef = useRef<LayerGroup | null>(null);
   const locationBoundaryLayerRef = useRef<LayerGroup | null>(null);
   const viewportRef = useRef<LatLngBounds | null>(null);
@@ -98,6 +101,7 @@ export default function ListingsMap({
   const suppressMoveEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userMovedMapRef = useRef(false);
   const [ready, setReady] = useState(false);
+  const [mapView, setMapView] = useState<MapView>("street");
   const [drawing, setDrawing] = useState(false);
   const [pointCount, setPointCount] = useState(0);
   const [viewportChanged, setViewportChanged] = useState(false);
@@ -131,6 +135,20 @@ export default function ListingsMap({
     return Object.values(bounds).every(Number.isFinite) && bounds.north > bounds.south && bounds.east > bounds.west
       ? bounds
       : null;
+  }
+
+  function selectMapView(nextView: MapView) {
+    const map = mapRef.current;
+    const layers = baseLayersRef.current;
+    if (!map || !layers || mapView === nextView) return;
+
+    const nextLayer = layers[nextView];
+    for (const layer of Object.values(layers)) {
+      if (layer !== nextLayer && map.hasLayer(layer)) map.removeLayer(layer);
+    }
+    if (!map.hasLayer(nextLayer)) nextLayer.addTo(map);
+    nextLayer.bringToBack();
+    setMapView(nextView);
   }
 
   function searchBounds(bounds: MapBounds, options: { replace?: boolean; shape?: MapPoint[] } = {}) {
@@ -187,10 +205,17 @@ export default function ListingsMap({
       });
       mapRef.current = map;
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
-      }).addTo(map);
+      });
+      const satelliteLayer = L.tileLayer("https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}", {
+        attribution: 'Imagery: <a href="https://www.usgs.gov/programs/national-geospatial-program/national-map">USGS The National Map</a> / USDA',
+        maxNativeZoom: 16,
+        maxZoom: 19,
+      });
+      baseLayersRef.current = { street: streetLayer, satellite: satelliteLayer };
+      streetLayer.addTo(map);
 
       markerLayerRef.current = L.layerGroup().addTo(map);
 
@@ -199,18 +224,18 @@ export default function ListingsMap({
       const startupListings = startupListingsRef.current;
       if (startupShape && startupShape.length >= 3) {
         map.fitBounds(L.latLngBounds(startupShape.map(({ lat, lng }) => [lat, lng])), { padding: [24, 24] });
-        setDrawMessage("Showing homes inside the drawn area. Move or zoom the map to search a different view.");
+        setDrawMessage("Showing homes inside the drawn area. Hover over a price marker for a quick preview.");
       } else if (startupBounds) {
         map.fitBounds([
           [startupBounds.south, startupBounds.west],
           [startupBounds.north, startupBounds.east],
         ], { padding: [24, 24] });
-        setDrawMessage("Showing homes in this map area. Move the map, then press “Search this area” to update.");
+        setDrawMessage("Showing homes in this map area. Hover over a price marker for a quick preview.");
       } else if (startupListings.length > 0) {
         const listingBounds = L.latLngBounds(startupListings.map((listing) => [listing.lat, listing.lng]));
         if (startupListings.length === 1) map.setView(listingBounds.getCenter(), 14);
         else map.fitBounds(listingBounds, { padding: [32, 32], maxZoom: 14 });
-        setDrawMessage("Use the mouse wheel or + / − buttons to zoom. Move the map, then search this area to update the homes.");
+        setDrawMessage("Hover over a price marker for a quick preview. Use the mouse wheel or + / − buttons to zoom.");
       } else {
         map.setView([26.2, -80.13], 9);
       }
@@ -260,6 +285,7 @@ export default function ListingsMap({
       mapRef.current?.remove();
       mapRef.current = null;
       leafletRef.current = null;
+      baseLayersRef.current = null;
       markerLayerRef.current = null;
       locationBoundaryLayerRef.current = null;
       areaLayerRef.current = null;
@@ -415,7 +441,7 @@ export default function ListingsMap({
         router.push(propertyHref);
       });
 
-      L.marker([listing.lat, listing.lng], {
+      const marker = L.marker([listing.lat, listing.lng], {
         icon: markerIcon,
         keyboard: true,
         riseOnHover: true,
@@ -426,9 +452,15 @@ export default function ListingsMap({
           className: "listing-map-popup-shell",
           minWidth: 230,
           maxWidth: 280,
-          autoPanPadding: [28, 28],
-        })
-        .on("click", () => setSelectedSlug(listing.slug));
+          autoPan: false,
+        });
+      const previewListing = () => {
+        setSelectedSlug(listing.slug);
+        marker.openPopup();
+      };
+      marker.on("mouseover", previewListing);
+      marker.on("click", previewListing);
+      marker.getElement()?.addEventListener("focus", previewListing);
     }
     setSelectedSlug((current) => listings.some((listing) => listing.slug === current) ? current : listings[0]?.slug ?? "");
   }, [listings, ready, router]);
@@ -543,10 +575,31 @@ export default function ListingsMap({
             {isPending ? "Updating homes…" : viewportChanged ? "Search this area" : "Move map to update"}
           </button>
         )}
-        {initialBounds || initialShape ? <button type="button" onClick={clearArea} className="ml-auto min-h-11 px-2 py-2 text-sm text-tide underline underline-offset-4">Clear area</button> : null}
+        {initialBounds || initialShape ? <button type="button" onClick={clearArea} className="min-h-11 px-2 py-2 text-sm text-tide underline underline-offset-4">Clear area</button> : null}
+        <div className="ml-auto flex items-center gap-1" role="group" aria-label="Map view">
+          <span className="mr-1 hidden text-xs font-medium text-ink/55 sm:inline">Map view</span>
+          <button
+            type="button"
+            aria-pressed={mapView === "street"}
+            disabled={!ready}
+            onClick={() => selectMapView("street")}
+            className={`min-h-11 rounded-sm border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${mapView === "street" ? "border-tide bg-tide text-sand" : "border-ink/15 bg-white text-tide hover:bg-tide/5"}`}
+          >
+            Street
+          </button>
+          <button
+            type="button"
+            aria-pressed={mapView === "satellite"}
+            disabled={!ready}
+            onClick={() => selectMapView("satellite")}
+            className={`min-h-11 rounded-sm border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${mapView === "satellite" ? "border-tide bg-tide text-sand" : "border-ink/15 bg-white text-tide hover:bg-tide/5"}`}
+          >
+            Satellite
+          </button>
+        </div>
       </div>
       <p className="mb-3 min-h-5 text-xs text-ink/55" aria-live="polite">
-        {drawMessage || "Move the map, then press “Search this area” to update the homes."}
+        {drawMessage || "Hover over a price marker for a quick preview. Move the map, then search this area to update the homes."}
       </p>
       <div className="relative overflow-hidden rounded-sm border border-tide/10 bg-keystone">
         <div ref={containerRef} className="h-[52svh] min-h-[360px] max-h-[620px] w-full bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px]" aria-label="Interactive map of property search results" />

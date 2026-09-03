@@ -369,8 +369,19 @@ function decodeListingKey(slug: string): string | null {
   if (!encoded || !/^[A-Za-z0-9_-]{4,300}$/.test(encoded)) return null;
 
   try {
-    const value = Buffer.from(encoded, "base64url").toString("utf8");
-    if (!value || value.length > 200 || /[\u0000-\u001f\u007f]/.test(value)) return null;
+    const bytes = Buffer.from(encoded, "base64url");
+    if (bytes.toString("base64url") !== encoded) return null;
+
+    // Listing-key slugs are case-sensitive. Some crawlers lowercase entire
+    // URLs, and Buffer's permissive UTF-8 decoder used to turn those corrupted
+    // bytes into replacement characters. Those characters then reached the
+    // OData fallback filter and BeachesMLS correctly rejected it as malformed.
+    const value = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    if (
+      !value
+      || value.length > 200
+      || !/^[\x20-\x7e]+$/.test(value)
+    ) return null;
     return value;
   } catch {
     return null;

@@ -59,7 +59,7 @@ export default function PropertyResultsView({
     for (const key of ["north", "south", "east", "west", "shape", "page"]) query.delete(key);
     if (view === "map") query.set("view", "map");
     else query.delete("view");
-    startTransition(() => router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`));
+    startTransition(() => router.push(`${pathname}${query.size ? `?${query.toString()}` : ""}#property-results`, { scroll: false }));
   }
 
   function selectSort(nextSort: ListingSort) {
@@ -134,7 +134,7 @@ export default function PropertyResultsView({
             <div className="xl:sticky xl:top-28">
               <ListingsMap listings={mappableListings} initialBounds={initialBounds} initialShape={initialShape} />
             </div>
-            <div className="xl:max-h-[76vh] xl:overflow-y-auto xl:pr-1" aria-label="Homes in the current map area">
+            <div aria-label="Homes in the current map area">
               {children}
             </div>
           </div>

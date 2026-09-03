@@ -152,8 +152,8 @@ function mapBounds(params: Awaited<Props["searchParams"]>) {
 }
 
 function mapPolygon(value?: string): NonNullable<import("@/lib/types").ListingFilters["polygon"]> | undefined {
-  if (!value?.trim() || value.length > 1200) return undefined;
-  const points = value.split(";").slice(0, 20).map((pair) => {
+  if (!value?.trim() || value.length > 2400) return undefined;
+  const points = value.split(";").slice(0, 40).map((pair) => {
     const [rawLat, rawLng] = pair.split(",");
     return { lat: Number(rawLat), lng: Number(rawLng) };
   });

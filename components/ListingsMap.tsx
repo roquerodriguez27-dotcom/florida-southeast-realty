@@ -2,8 +2,8 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type {
-  CircleMarker,
   LayerGroup,
   LatLng,
   LatLngBounds,
@@ -32,7 +32,17 @@ type MapBounds = NonNullable<ListingFilters["bounds"]>;
 type MapPoint = NonNullable<ListingFilters["polygon"]>[number];
 type LeafletModule = typeof import("leaflet");
 type MapView = "street" | "satellite";
+type PlaceCategory = "schools" | "shopping" | "parks" | "healthcare" | "worship";
 const CENSUS_BOUNDARY_ATTRIBUTION = '<a href="https://tigerweb.geo.census.gov/">U.S. Census Bureau</a>';
+const NEARBY_PLACE_ATTRIBUTION = 'Nearby places: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const MAX_SHAPE_POINTS = 40;
+const PLACE_CATEGORIES: Array<{ category: PlaceCategory; label: string; shortLabel: string; color: string }> = [
+  { category: "schools", label: "Schools", shortLabel: "S", color: "#316c91" },
+  { category: "shopping", label: "Shopping", shortLabel: "$", color: "#9a5d25" },
+  { category: "parks", label: "Parks", shortLabel: "P", color: "#3f6f4e" },
+  { category: "healthcare", label: "Healthcare", shortLabel: "+", color: "#a63838" },
+  { category: "worship", label: "Places of worship", shortLabel: "W", color: "#72548f" },
+];
 type BoundaryFeature = Feature<GeoJsonPolygon | MultiPolygon, {
   kind: "ZIP" | "County" | "City";
   label: string;
@@ -46,6 +56,20 @@ interface BoundaryResponse {
     location: string;
   }>;
   unavailable?: string[];
+}
+
+interface MapPlace {
+  id: string;
+  name: string;
+  category: PlaceCategory;
+  lat: number;
+  lng: number;
+  detail?: string;
+}
+
+interface PlacesResponse {
+  places?: MapPlace[];
+  message?: string;
 }
 
 function asMapBounds(bounds: LatLngBounds): MapBounds {
@@ -65,7 +89,15 @@ function sameBounds(left: MapBounds, right: MapBounds) {
 }
 
 function serializeShape(points: MapPoint[]) {
-  return points.slice(0, 20).map(({ lat, lng }) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join(";");
+  return points.slice(0, MAX_SHAPE_POINTS).map(({ lat, lng }) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join(";");
+}
+
+function sampleShapePoints(points: LatLng[]): MapPoint[] {
+  if (points.length <= MAX_SHAPE_POINTS) return points.map(({ lat, lng }) => ({ lat, lng }));
+  return Array.from({ length: MAX_SHAPE_POINTS }, (_, index) => {
+    const point = points[Math.round((index * (points.length - 1)) / (MAX_SHAPE_POINTS - 1))];
+    return { lat: point.lat, lng: point.lng };
+  });
 }
 
 export default function ListingsMap({
@@ -84,12 +116,17 @@ export default function ListingsMap({
   const leafletRef = useRef<LeafletModule | null>(null);
   const baseLayersRef = useRef<Record<MapView, TileLayer> | null>(null);
   const markerLayerRef = useRef<LayerGroup | null>(null);
+  const placeLayerRef = useRef<LayerGroup | null>(null);
   const locationBoundaryLayerRef = useRef<LayerGroup | null>(null);
   const viewportRef = useRef<LatLngBounds | null>(null);
   const areaLayerRef = useRef<Polygon | Rectangle | null>(null);
   const draftLineRef = useRef<Polyline | null>(null);
-  const draftMarkersRef = useRef<CircleMarker[]>([]);
-  const drawRef = useRef<{ enabled: boolean; points: LatLng[] }>({ enabled: false, points: [] });
+  const drawRef = useRef<{ enabled: boolean; active: boolean; pointerId: number | null; points: LatLng[] }>({
+    enabled: false,
+    active: false,
+    pointerId: null,
+    points: [],
+  });
   const startupListingsRef = useRef(listings);
   const startupBoundsRef = useRef(initialBounds);
   const startupShapeRef = useRef(initialShape);
@@ -101,9 +138,12 @@ export default function ListingsMap({
   const [ready, setReady] = useState(false);
   const [mapView, setMapView] = useState<MapView>("street");
   const [drawing, setDrawing] = useState(false);
-  const [pointCount, setPointCount] = useState(0);
   const [viewportChanged, setViewportChanged] = useState(false);
   const [drawMessage, setDrawMessage] = useState("");
+  const [activePlaceCategories, setActivePlaceCategories] = useState<PlaceCategory[]>([]);
+  const [places, setPlaces] = useState<MapPlace[]>([]);
+  const [placesStatus, setPlacesStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+  const [placesMessage, setPlacesMessage] = useState("");
   const [boundaryResult, setBoundaryResult] = useState<{
     key: string;
     locations: string[];
@@ -121,6 +161,12 @@ export default function ListingsMap({
       ? boundaryResult.status
       : "loading";
   const outlinedLocations = boundaryResult?.key === locationKey ? boundaryResult.locations : [];
+  const nearbyEnabled = activePlaceCategories.length > 0;
+  const areaRequestKey = initialBounds
+    ? `${initialBounds.north},${initialBounds.south},${initialBounds.east},${initialBounds.west}`
+    : initialShape?.length
+      ? serializeShape(initialShape)
+      : "initial";
 
   function currentUrlBounds(): MapBounds | null {
     const bounds = {
@@ -177,10 +223,7 @@ export default function ListingsMap({
   function clearDraft() {
     draftLineRef.current?.remove();
     draftLineRef.current = null;
-    for (const marker of draftMarkersRef.current) marker.remove();
-    draftMarkersRef.current = [];
-    drawRef.current = { enabled: false, points: [] };
-    setPointCount(0);
+    drawRef.current = { enabled: false, active: false, pointerId: null, points: [] };
   }
 
   useEffect(() => {
@@ -262,26 +305,6 @@ export default function ListingsMap({
         }, 1_000);
       });
 
-      map.on("click", (event) => {
-        if (!drawRef.current.enabled) return;
-        const points = [...drawRef.current.points, event.latlng].slice(0, 20);
-        drawRef.current.points = points;
-        const pointMarker = L.circleMarker(event.latlng, {
-          radius: 5,
-          color: "#c8402f",
-          fillColor: "#c8402f",
-          fillOpacity: 1,
-          interactive: false,
-        }).addTo(map);
-        draftMarkersRef.current.push(pointMarker);
-        draftLineRef.current?.remove();
-        draftLineRef.current = L.polyline(points, { color: "#c8402f", weight: 3, dashArray: "7 6", interactive: false }).addTo(map);
-        setPointCount(points.length);
-        setDrawMessage(points.length < 3
-          ? `Add ${3 - points.length} more ${3 - points.length === 1 ? "point" : "points"} to make an area.`
-          : "Keep adding boundary points, or press “Finish area”.");
-      });
-
       setReady(true);
     }
 
@@ -294,10 +317,10 @@ export default function ListingsMap({
       leafletRef.current = null;
       baseLayersRef.current = null;
       markerLayerRef.current = null;
+      placeLayerRef.current = null;
       locationBoundaryLayerRef.current = null;
       areaLayerRef.current = null;
       draftLineRef.current = null;
-      draftMarkersRef.current = [];
     };
   // Keep the Leaflet instance stable while refreshed MLS results replace only its markers.
   }, []);
@@ -401,6 +424,111 @@ export default function ListingsMap({
       map.attributionControl.removeAttribution(CENSUS_BOUNDARY_ATTRIBUTION);
     };
   }, [hasExplicitArea, locationKey, ready]);
+
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!ready || !L || !map || !nearbyEnabled) {
+      setPlaces([]);
+      setPlacesStatus("idle");
+      setPlacesMessage("");
+      return;
+    }
+
+    if (map.getZoom() < 12) {
+      setPlaces([]);
+      setPlacesStatus("unavailable");
+      setPlacesMessage("Zoom in closer, then choose a nearby layer again.");
+      return;
+    }
+
+    const bounds = viewportRef.current ?? map.getBounds();
+    const query = new URLSearchParams({
+      north: bounds.getNorth().toFixed(4),
+      south: bounds.getSouth().toFixed(4),
+      east: bounds.getEast().toFixed(4),
+      west: bounds.getWest().toFixed(4),
+    });
+    const controller = new AbortController();
+    let cancelled = false;
+    setPlacesStatus("loading");
+    setPlacesMessage("Loading nearby places…");
+
+    void fetch(`/api/map-places?${query.toString()}`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json() as PlacesResponse;
+        if (!response.ok) throw new Error(payload.message || `Nearby-place request failed with HTTP ${response.status}.`);
+        return payload;
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setPlaces(payload.places ?? []);
+        setPlacesStatus("ready");
+        setPlacesMessage(payload.places?.length
+          ? "Showing nearby places in this map view."
+          : "No nearby places in the selected categories were found here.");
+      })
+      .catch((error: unknown) => {
+        if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
+        setPlaces([]);
+        setPlacesStatus("unavailable");
+        setPlacesMessage(error instanceof Error ? error.message : "Nearby places are temporarily unavailable.");
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [areaRequestKey, nearbyEnabled, ready]);
+
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!ready || !L || !map) return;
+
+    placeLayerRef.current?.remove();
+    placeLayerRef.current = null;
+    map.attributionControl.removeAttribution(NEARBY_PLACE_ATTRIBUTION);
+    if (!nearbyEnabled || places.length === 0) return;
+
+    const group = L.layerGroup().addTo(map);
+    for (const place of places) {
+      if (!activePlaceCategories.includes(place.category)) continue;
+      const category = PLACE_CATEGORIES.find((option) => option.category === place.category);
+      if (!category) continue;
+      const marker = L.circleMarker([place.lat, place.lng], {
+        radius: 8,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: category.color,
+        fillOpacity: 0.95,
+      });
+      const popup = document.createElement("div");
+      popup.className = "nearby-place-popup";
+      const label = document.createElement("span");
+      label.textContent = category.label;
+      const name = document.createElement("strong");
+      name.textContent = place.name;
+      popup.append(label, name);
+      if (place.detail) {
+        const detail = document.createElement("small");
+        detail.textContent = place.detail;
+        popup.append(detail);
+      }
+      marker.bindTooltip(place.name, { direction: "top", sticky: true }).bindPopup(popup).addTo(group);
+    }
+    placeLayerRef.current = group;
+    map.attributionControl.addAttribution(NEARBY_PLACE_ATTRIBUTION);
+
+    return () => {
+      group.remove();
+      if (placeLayerRef.current === group) placeLayerRef.current = null;
+      map.attributionControl.removeAttribution(NEARBY_PLACE_ATTRIBUTION);
+    };
+  }, [activePlaceCategories, nearbyEnabled, places, ready]);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -519,12 +647,12 @@ export default function ListingsMap({
     const map = mapRef.current;
     if (!map) return;
     clearDraft();
-    drawRef.current = { enabled: true, points: [] };
+    drawRef.current = { enabled: true, active: false, pointerId: null, points: [] };
     map.dragging.disable();
     map.doubleClickZoom.disable();
     setDrawing(true);
     setViewportChanged(false);
-    setDrawMessage("Click around the boundary. Use at least three points, then press “Finish area”.");
+    setDrawMessage("Hold the mouse button and draw around the area. Release to search.");
   }
 
   function cancelDrawing() {
@@ -537,25 +665,17 @@ export default function ListingsMap({
     setDrawMessage(initialBounds || initialShape ? "The current map-area filter is still active." : "Move the map, then press “Search this area” to update the homes.");
   }
 
-  function undoPoint() {
-    const L = leafletRef.current;
-    if (!L || drawRef.current.points.length === 0) return;
-    drawRef.current.points = drawRef.current.points.slice(0, -1);
-    draftMarkersRef.current.pop()?.remove();
-    draftLineRef.current?.remove();
-    draftLineRef.current = drawRef.current.points.length
-      ? L.polyline(drawRef.current.points, { color: "#c8402f", weight: 3, dashArray: "7 6", interactive: false }).addTo(mapRef.current!)
-      : null;
-    setPointCount(drawRef.current.points.length);
-    setDrawMessage("Boundary point removed. Continue drawing or finish the area.");
-  }
-
-  function finishDrawing() {
+  function finishDrawing(points: LatLng[]) {
     const L = leafletRef.current;
     const map = mapRef.current;
-    const points = drawRef.current.points;
-    if (!L || !map || points.length < 3) return;
-    const shape = points.map(({ lat, lng }) => ({ lat, lng }));
+    if (!L || !map) return;
+    if (points.length < 3) {
+      clearDraft();
+      drawRef.current = { enabled: true, active: false, pointerId: null, points: [] };
+      setDrawMessage("That area was too small. Hold the mouse button and draw a larger loop.");
+      return;
+    }
+    const shape = sampleShapePoints(points);
     clearDraft();
     areaLayerRef.current?.remove();
     areaLayerRef.current = L.polygon(shape.map(({ lat, lng }) => [lat, lng]), {
@@ -568,6 +688,55 @@ export default function ListingsMap({
     map.doubleClickZoom.enable();
     setDrawing(false);
     searchBounds(asMapBounds(areaLayerRef.current.getBounds()), { shape });
+  }
+
+  function handleDrawStart(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!drawRef.current.enabled || (event.pointerType === "mouse" && event.button !== 0)) return;
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!L || !map) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = map.mouseEventToLatLng(event.nativeEvent as unknown as MouseEvent);
+    drawRef.current = { enabled: true, active: true, pointerId: event.pointerId, points: [point] };
+    draftLineRef.current?.remove();
+    draftLineRef.current = L.polyline([point], {
+      color: "#c8402f",
+      weight: 4,
+      opacity: 0.95,
+      interactive: false,
+    }).addTo(map);
+    setDrawMessage("Keep holding and trace the area. Release when the loop is complete.");
+  }
+
+  function handleDrawMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const drawState = drawRef.current;
+    const map = mapRef.current;
+    if (!drawState.enabled || !drawState.active || drawState.pointerId !== event.pointerId || !map) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = map.mouseEventToLatLng(event.nativeEvent as unknown as MouseEvent);
+    const previous = drawState.points.at(-1);
+    if (previous && map.latLngToContainerPoint(previous).distanceTo(map.latLngToContainerPoint(point)) < 6) return;
+    const points = [...drawState.points, point].slice(0, 600);
+    drawRef.current.points = points;
+    draftLineRef.current?.setLatLngs(points);
+  }
+
+  function handleDrawEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    const drawState = drawRef.current;
+    if (!drawState.enabled || !drawState.active || drawState.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    finishDrawing(drawState.points);
+  }
+
+  function togglePlaceCategory(category: PlaceCategory) {
+    setActivePlaceCategories((current) => current.includes(category)
+      ? current.filter((value) => value !== category)
+      : [...current, category]);
   }
 
   function searchVisibleArea() {
@@ -591,16 +760,11 @@ export default function ListingsMap({
         <button type="button" onClick={drawing ? cancelDrawing : beginDrawing} disabled={!ready || isPending} className="min-h-11 rounded-sm border border-tide/25 px-3 py-2 text-sm font-medium text-tide hover:bg-tide/5 disabled:opacity-50">
           {drawing ? "Cancel drawing" : "Draw area"}
         </button>
-        {drawing ? (
-          <>
-            <button type="button" onClick={undoPoint} disabled={pointCount === 0} className="min-h-11 rounded-sm border border-ink/15 px-3 py-2 text-sm text-ink/65 disabled:opacity-40">Undo point</button>
-            <button type="button" onClick={finishDrawing} disabled={pointCount < 3} className="min-h-11 rounded-sm bg-hibiscus px-3 py-2 text-sm font-medium text-sand disabled:opacity-40">Finish area ({pointCount})</button>
-          </>
-        ) : (
+        {!drawing ? (
           <button type="button" onClick={searchVisibleArea} disabled={!ready || isPending || !viewportChanged} className="min-h-11 rounded-sm bg-hibiscus px-3 py-2 text-sm font-medium text-sand hover:bg-hibiscus-dark disabled:cursor-default disabled:bg-tide/10 disabled:text-ink/45">
             {isPending ? "Updating homes…" : viewportChanged ? "Search this area" : "Move map to update"}
           </button>
-        )}
+        ) : null}
         {initialBounds || initialShape ? <button type="button" onClick={clearArea} className="min-h-11 px-2 py-2 text-sm text-tide underline underline-offset-4">Clear area</button> : null}
         <div className="ml-auto flex items-center gap-1" role="group" aria-label="Map view">
           <span className="mr-1 hidden text-xs font-medium text-ink/55 sm:inline">Map view</span>
@@ -624,11 +788,43 @@ export default function ListingsMap({
           </button>
         </div>
       </div>
+      <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="Nearby places">
+        <span className="mr-1 text-xs font-semibold uppercase tracking-[0.12em] text-ink/55">Nearby</span>
+        {PLACE_CATEGORIES.map((option) => {
+          const active = activePlaceCategories.includes(option.category);
+          return (
+            <button
+              key={option.category}
+              type="button"
+              aria-pressed={active}
+              disabled={!ready || drawing}
+              onClick={() => togglePlaceCategory(option.category)}
+              className={`nearby-layer-button ${active ? "is-active" : ""}`}
+            >
+              <span aria-hidden style={{ backgroundColor: option.color }}>{option.shortLabel}</span>
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
       <p className="mb-3 min-h-5 text-xs text-ink/55" aria-live="polite">
         {drawMessage || "Hover over a price marker for a quick preview. Move the map, then search this area to update the homes."}
       </p>
+      {nearbyEnabled ? (
+        <p className={`mb-3 text-xs ${placesStatus === "unavailable" ? "text-hibiscus" : "text-ink/55"}`} aria-live="polite">
+          {placesMessage} Nearby-place data may be incomplete; school markers are not attendance boundaries or ratings.
+        </p>
+      ) : null}
       <div className="relative overflow-hidden rounded-sm border border-tide/10 bg-keystone">
-        <div ref={containerRef} className="h-[52svh] min-h-[360px] max-h-[620px] w-full bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px]" aria-label="Interactive map of property search results" />
+        <div
+          ref={containerRef}
+          className={`h-[52svh] min-h-[360px] max-h-[620px] w-full bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px] ${drawing ? "map-freehand-active" : ""}`}
+          aria-label={drawing ? "Draw a property search area" : "Interactive map of property search results"}
+          onPointerDownCapture={handleDrawStart}
+          onPointerMoveCapture={handleDrawMove}
+          onPointerUpCapture={handleDrawEnd}
+          onPointerCancelCapture={handleDrawEnd}
+        />
         {boundaryStatus !== "idle" ? (
           <div className="map-boundary-status" aria-live="polite">
             <span aria-hidden className={boundaryStatus === "loading" ? "is-loading" : ""} />

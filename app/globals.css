@@ -123,6 +123,47 @@ input.price-field-input:focus-visible {
   justify-content: center;
 }
 
+.map-boundary-status {
+  position: absolute;
+  z-index: 500;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  max-width: calc(100% - 1.5rem);
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(14, 43, 48, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(14, 43, 48, 0.16);
+  color: rgba(14, 43, 48, 0.78);
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.2;
+  backdrop-filter: blur(10px);
+}
+
+.map-boundary-status > span {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex: 0 0 auto;
+  border: 2px solid #d13d32;
+  border-radius: 999px;
+  background: rgba(209, 61, 50, 0.12);
+}
+
+.map-boundary-status > span.is-loading {
+  border-right-color: transparent;
+  animation: map-boundary-spin 700ms linear infinite;
+}
+
+@keyframes map-boundary-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* iOS Safari auto-zooms focused controls below 16px. Keep mobile forms at 16px. */
 @media (max-width: 767px) {
   input,

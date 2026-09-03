@@ -93,6 +93,7 @@ export default function ListingsMap({
   const fittedLocationKeyRef = useRef("");
   const boundaryRequestKeyRef = useRef("");
   const suppressNextMoveEndRef = useRef(false);
+  const suppressMoveEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userMovedMapRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [drawing, setDrawing] = useState(false);
@@ -217,6 +218,8 @@ export default function ListingsMap({
         viewportRef.current = map.getBounds();
         if (suppressNextMoveEndRef.current) {
           suppressNextMoveEndRef.current = false;
+          if (suppressMoveEndTimerRef.current) clearTimeout(suppressMoveEndTimerRef.current);
+          suppressMoveEndTimerRef.current = null;
           return;
         }
         if (drawRef.current.enabled) return;
@@ -251,6 +254,7 @@ export default function ListingsMap({
     void initializeMap();
     return () => {
       cancelled = true;
+      if (suppressMoveEndTimerRef.current) clearTimeout(suppressMoveEndTimerRef.current);
       mapRef.current?.remove();
       mapRef.current = null;
       leafletRef.current = null;
@@ -336,12 +340,14 @@ export default function ListingsMap({
           && fittedLocationKeyRef.current !== locationKey
         ) {
           fittedLocationKeyRef.current = locationKey;
+          if (suppressMoveEndTimerRef.current) clearTimeout(suppressMoveEndTimerRef.current);
           suppressNextMoveEndRef.current = true;
           map.fitBounds(combinedBounds, { padding: [30, 30], maxZoom: 14 });
-          setTimeout(() => {
+          suppressMoveEndTimerRef.current = setTimeout(() => {
             suppressNextMoveEndRef.current = false;
+            suppressMoveEndTimerRef.current = null;
             viewportRef.current = map.getBounds();
-          }, 0);
+          }, 1_000);
         }
       })
       .catch((error: unknown) => {
@@ -352,6 +358,9 @@ export default function ListingsMap({
     return () => {
       cancelled = true;
       controller.abort();
+      if (suppressMoveEndTimerRef.current) clearTimeout(suppressMoveEndTimerRef.current);
+      suppressMoveEndTimerRef.current = null;
+      suppressNextMoveEndRef.current = false;
       locationBoundaryLayerRef.current?.remove();
       locationBoundaryLayerRef.current = null;
       map.attributionControl.removeAttribution(CENSUS_BOUNDARY_ATTRIBUTION);

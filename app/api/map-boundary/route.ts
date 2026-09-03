@@ -81,18 +81,20 @@ async function findBoundary(location: string): Promise<BoundaryResult | null> {
   const countyMatch = location.match(/^(.+?)\s+County$/i);
   if (countyMatch) {
     const county = countyMatch[1].trim();
+    const countyLookup = censusLiteral(county.toUpperCase());
     const feature = await queryLayer(
       "State_County/MapServer/1",
-      `STATE='${FLORIDA_STATE_FIPS}' AND BASENAME='${censusLiteral(county)}'`,
+      `STATE='${FLORIDA_STATE_FIPS}' AND UPPER(BASENAME)='${countyLookup}'`,
     );
     return feature?.geometry ? { kind: "County", label: `${county} County`, geometry: feature.geometry } : null;
   }
 
-  const place = censusLiteral(location === "Lake Worth" ? "Lake Worth Beach" : location);
+  const placeName = location.toLowerCase() === "lake worth" ? "Lake Worth Beach" : location;
+  const place = censusLiteral(placeName.toUpperCase());
   for (const layer of [4, 5]) {
     const feature = await queryLayer(
       `Places_CouSub_ConCity_SubMCD/MapServer/${layer}`,
-      `STATE='${FLORIDA_STATE_FIPS}' AND BASENAME='${place}'`,
+      `STATE='${FLORIDA_STATE_FIPS}' AND UPPER(BASENAME)='${place}'`,
     );
     if (feature?.geometry) {
       return { kind: "City/Town", label: location, geometry: feature.geometry };

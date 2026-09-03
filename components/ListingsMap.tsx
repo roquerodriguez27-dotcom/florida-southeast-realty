@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type {
   CircleMarker,
+  GeoJSON as LeafletGeoJSON,
   LayerGroup,
   LatLng,
   LatLngBounds,
@@ -13,6 +14,7 @@ import type {
   Polyline,
   Rectangle,
 } from "leaflet";
+import type { FeatureCollection, Geometry } from "geojson";
 import { formatPrice } from "@/lib/format";
 import type { ListingFilters } from "@/lib/types";
 
@@ -29,6 +31,12 @@ export interface MapListing {
 type MapBounds = NonNullable<ListingFilters["bounds"]>;
 type MapPoint = NonNullable<ListingFilters["polygon"]>[number];
 type LeafletModule = typeof import("leaflet");
+
+type BoundaryResponse = {
+  kind: "ZIP" | "City/Town" | "County";
+  label: string;
+  geometry: Geometry;
+};
 
 function asMapBounds(bounds: LatLngBounds): MapBounds {
   return {
@@ -54,20 +62,25 @@ export default function ListingsMap({
   listings,
   initialBounds,
   initialShape,
+  boundaryLocations = [],
 }: {
   listings: MapListing[];
   initialBounds?: MapBounds;
   initialShape?: MapPoint[];
+  boundaryLocations?: string[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<LeafletModule | null>(null);
   const markerLayerRef = useRef<LayerGroup | null>(null);
+  const boundaryLayerRef = useRef<LeafletGeoJSON | null>(null);
   const viewportRef = useRef<LatLngBounds | null>(null);
   const areaLayerRef = useRef<Polygon | Rectangle | null>(null);
   const draftLineRef = useRef<Polyline | null>(null);
   const draftMarkersRef = useRef<CircleMarker[]>([]);
   const drawRef = useRef<{ enabled: boolean; points: LatLng[] }>({ enabled: false, points: [] });
+  const programmaticMoveRef = useRef(false);
+  const interactionVersionRef = useRef(0);
   const startupListingsRef = useRef(listings);
   const startupBoundsRef = useRef(initialBounds);
   const startupShapeRef = useRef(initialShape);
@@ -76,11 +89,17 @@ export default function ListingsMap({
   const [pointCount, setPointCount] = useState(0);
   const [viewportChanged, setViewportChanged] = useState(false);
   const [drawMessage, setDrawMessage] = useState("");
+  const [boundaryLabels, setBoundaryLabels] = useState<string[]>([]);
   const [selectedSlug, setSelectedSlug] = useState(listings[0]?.slug ?? "");
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const boundaryKey = boundaryLocations
+    .map((location) => location.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+    .join("\u001f");
 
   function currentUrlBounds(): MapBounds | null {
     const bounds = {
@@ -140,7 +159,7 @@ export default function ListingsMap({
       leafletRef.current = L;
 
       const map = L.map(containerRef.current, {
-        zoomControl: true,
+        zoomControl: false,
         scrollWheelZoom: false,
         doubleClickZoom: true,
       });
@@ -177,6 +196,8 @@ export default function ListingsMap({
       viewportRef.current = map.getBounds();
       map.on("moveend", () => {
         viewportRef.current = map.getBounds();
+        if (programmaticMoveRef.current) return;
+        interactionVersionRef.current += 1;
         if (drawRef.current.enabled) return;
         setViewportChanged(true);
         setDrawMessage("Map moved. Press “Search this area” to refresh the homes.");
@@ -212,6 +233,7 @@ export default function ListingsMap({
       mapRef.current = null;
       leafletRef.current = null;
       markerLayerRef.current = null;
+      boundaryLayerRef.current = null;
       areaLayerRef.current = null;
       draftLineRef.current = null;
       draftMarkersRef.current = [];
@@ -248,6 +270,76 @@ export default function ListingsMap({
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
+    if (!ready || !L || !map || !boundaryKey) return;
+
+    const leaflet = L;
+    const leafletMap = map;
+    const controller = new AbortController();
+    const interactionVersion = interactionVersionRef.current;
+    const locations = boundaryKey.split("\u001f");
+
+    async function loadBoundaries() {
+      const responses = await Promise.all(locations.map(async (location) => {
+        try {
+          const response = await fetch(`/api/map-boundary?location=${encodeURIComponent(location)}`, {
+            signal: controller.signal,
+          });
+          if (!response.ok) return null;
+          const result = await response.json() as BoundaryResponse;
+          return result.geometry && result.label ? result : null;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return null;
+          return null;
+        }
+      }));
+      if (controller.signal.aborted) return;
+
+      const boundaries = responses.filter((response): response is BoundaryResponse => response !== null);
+      if (boundaries.length === 0) return;
+
+      boundaryLayerRef.current?.remove();
+      const collection: FeatureCollection = {
+        type: "FeatureCollection",
+        features: boundaries.map((boundary) => ({
+          type: "Feature",
+          properties: { label: boundary.label },
+          geometry: boundary.geometry,
+        })),
+      };
+      const layer = leaflet.geoJSON(collection, {
+        interactive: false,
+        style: {
+          className: "location-boundary-outline",
+          color: "#c8402f",
+          weight: 4,
+          opacity: 0.95,
+          fillColor: "#c8402f",
+          fillOpacity: 0.035,
+        },
+      }).addTo(leafletMap);
+      boundaryLayerRef.current = layer;
+      setBoundaryLabels(boundaries.map((boundary) => boundary.label));
+
+      if (!initialBounds && !initialShape && interactionVersionRef.current === interactionVersion) {
+        const bounds = layer.getBounds();
+        if (bounds.isValid()) {
+          programmaticMoveRef.current = true;
+          leafletMap.fitBounds(bounds, { animate: false, padding: [28, 28], maxZoom: 13 });
+          programmaticMoveRef.current = false;
+          viewportRef.current = leafletMap.getBounds();
+          setViewportChanged(false);
+          setDrawMessage("The red line shows the selected search boundary. Move or zoom, then press “Search this area” to change the map search.");
+        }
+      }
+    }
+
+    void loadBoundaries();
+    return () => controller.abort();
+  }, [boundaryKey, initialBounds, initialShape, ready]);
+
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
     if (!ready || !L || !map) return;
 
     areaLayerRef.current?.remove();
@@ -256,6 +348,7 @@ export default function ListingsMap({
       areaLayerRef.current = L.polygon(initialShape.map(({ lat, lng }) => [lat, lng]), {
         color: "#c8402f",
         weight: 3,
+        dashArray: "8 6",
         fillColor: "#c8402f",
         fillOpacity: 0.1,
       }).addTo(map);
@@ -263,7 +356,7 @@ export default function ListingsMap({
       areaLayerRef.current = L.rectangle([
         [initialBounds.south, initialBounds.west],
         [initialBounds.north, initialBounds.east],
-      ], { color: "#c8402f", weight: 2, fillColor: "#c8402f", fillOpacity: 0.06 }).addTo(map);
+      ], { color: "#c8402f", weight: 2, dashArray: "8 6", fillColor: "#c8402f", fillOpacity: 0.06 }).addTo(map);
     }
   }, [initialBounds, initialShape, ready]);
 
@@ -313,6 +406,7 @@ export default function ListingsMap({
     areaLayerRef.current = L.polygon(shape.map(({ lat, lng }) => [lat, lng]), {
       color: "#c8402f",
       weight: 3,
+      dashArray: "8 6",
       fillColor: "#c8402f",
       fillOpacity: 0.1,
     }).addTo(map);
@@ -325,6 +419,13 @@ export default function ListingsMap({
   function searchVisibleArea() {
     const bounds = viewportRef.current ?? mapRef.current?.getBounds();
     if (bounds) searchBounds(asMapBounds(bounds));
+  }
+
+  function zoomMap(direction: "in" | "out") {
+    const map = mapRef.current;
+    if (!map) return;
+    if (direction === "in") map.zoomIn();
+    else map.zoomOut();
   }
 
   function clearArea() {
@@ -355,11 +456,25 @@ export default function ListingsMap({
             {isPending ? "Updating homes…" : viewportChanged ? "Search this area" : "Move map to update"}
           </button>
         )}
+        <div className="inline-flex min-h-11 overflow-hidden rounded-sm border border-tide/25 bg-white" role="group" aria-label="Map zoom controls">
+          <button type="button" onClick={() => zoomMap("out")} disabled={!ready} className="min-h-11 border-r border-tide/15 px-3 py-2 text-sm font-medium text-tide hover:bg-tide/5 disabled:opacity-50" aria-label="Zoom map out">
+            <span aria-hidden="true" className="mr-1.5 text-lg leading-none">−</span> Zoom out
+          </button>
+          <button type="button" onClick={() => zoomMap("in")} disabled={!ready} className="min-h-11 px-3 py-2 text-sm font-medium text-tide hover:bg-tide/5 disabled:opacity-50" aria-label="Zoom map in">
+            <span aria-hidden="true" className="mr-1.5 text-lg leading-none">+</span> Zoom in
+          </button>
+        </div>
         {initialBounds || initialShape ? <button type="button" onClick={clearArea} className="ml-auto min-h-11 px-2 py-2 text-sm text-tide underline underline-offset-4">Clear area</button> : null}
       </div>
       <p className="mb-3 min-h-5 text-xs text-ink/55" aria-live="polite">
         {drawMessage || "Move the map, then press “Search this area” to update the homes."}
       </p>
+      {boundaryLabels.length > 0 ? (
+        <p className="mb-3 flex items-center gap-2 text-xs font-medium text-ink/65">
+          <span className="h-0 w-7 shrink-0 border-t-[3px] border-hibiscus" aria-hidden="true" />
+          Red outline: {boundaryLabels.join(" + ")} boundary · U.S. Census Bureau
+        </p>
+      ) : null}
       <div ref={containerRef} className="h-[52svh] min-h-[360px] max-h-[620px] w-full rounded-sm bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px]" aria-label="Interactive map of property search results" />
       {selected ? (
         <div className="mt-3 flex flex-col justify-between gap-2 rounded-sm bg-keystone/60 p-3 sm:flex-row sm:items-center">

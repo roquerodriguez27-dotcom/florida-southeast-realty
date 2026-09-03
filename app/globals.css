@@ -112,6 +112,69 @@ input.price-field-input:focus-visible {
   white-space: nowrap;
 }
 
+.listing-map-popup-shell .leaflet-popup-content-wrapper {
+  overflow: hidden;
+  border-radius: 0.3rem;
+  box-shadow: 0 16px 38px rgba(14, 43, 48, 0.28);
+}
+
+.listing-map-popup-shell .leaflet-popup-content {
+  width: auto !important;
+  margin: 0;
+}
+
+.listing-map-popup {
+  display: block;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.listing-map-popup > img {
+  display: block;
+  width: 100%;
+  height: 9rem;
+  object-fit: cover;
+  background: var(--color-keystone);
+}
+
+.listing-map-popup-details {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.8rem 0.9rem 0.9rem;
+}
+
+.listing-map-popup-details strong {
+  color: var(--color-ink);
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.listing-map-popup-details > span:not(.listing-map-popup-cta) {
+  color: rgba(14, 43, 48, 0.72);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.listing-map-popup .listing-map-popup-cta {
+  margin-top: 0.25rem;
+  color: var(--color-tide);
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.listing-map-popup:hover .listing-map-popup-cta {
+  color: var(--color-hibiscus);
+}
+
+.listing-map-popup:focus-visible {
+  outline: 2px solid var(--color-hibiscus);
+  outline-offset: -3px;
+}
+
 .leaflet-container {
   z-index: 0;
   font-family: var(--font-sans);

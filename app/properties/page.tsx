@@ -435,7 +435,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
         {listings.length > 0 ? (
           <section id="property-results" className="scroll-mt-32" aria-label="Property search results">
             <PropertyResultsView
-              listings={listings.map(({ slug, address, city, price, lat, lng, status }) => ({
+              listings={listings.map(({ slug, address, city, price, lat, lng, status, images }) => ({
                 slug,
                 address,
                 city,
@@ -443,6 +443,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
                 lat,
                 lng,
                 status,
+                image: images[0] || "/property-placeholder.svg",
               }))}
               locations={locations}
               initialView={params.view === "map" ? "map" : "list"}

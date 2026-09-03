@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -25,6 +26,7 @@ export interface MapListing {
   lat: number;
   lng: number;
   status: string;
+  image: string;
 }
 
 type MapBounds = NonNullable<ListingFilters["bounds"]>;
@@ -375,12 +377,44 @@ export default function ListingsMap({
 
     markerLayer.clearLayers();
     for (const listing of listings) {
+      const propertyHref = `/properties/${encodeURIComponent(listing.slug)}`;
       const markerIcon = L.divIcon({
         className: "listing-map-marker",
         html: `<span>${formatPrice(listing.price)}</span>`,
         iconSize: [86, 30],
         iconAnchor: [43, 15],
       });
+      const popupLink = document.createElement("a");
+      popupLink.className = "listing-map-popup";
+      popupLink.href = propertyHref;
+      popupLink.setAttribute("aria-label", `View ${listing.address}, ${listing.city}`);
+
+      const thumbnail = document.createElement("img");
+      thumbnail.src = listing.image || "/property-placeholder.svg";
+      thumbnail.alt = `${listing.address}, ${listing.city}`;
+      thumbnail.width = 280;
+      thumbnail.height = 158;
+      thumbnail.loading = "lazy";
+      thumbnail.addEventListener("error", () => {
+        thumbnail.src = "/property-placeholder.svg";
+      }, { once: true });
+
+      const details = document.createElement("span");
+      details.className = "listing-map-popup-details";
+      const price = document.createElement("strong");
+      price.textContent = formatPrice(listing.price);
+      const address = document.createElement("span");
+      address.textContent = `${listing.address}, ${listing.city}`;
+      const callToAction = document.createElement("span");
+      callToAction.className = "listing-map-popup-cta";
+      callToAction.textContent = "View photos & details →";
+      details.append(price, address, callToAction);
+      popupLink.append(thumbnail, details);
+      popupLink.addEventListener("click", (event) => {
+        event.preventDefault();
+        router.push(propertyHref);
+      });
+
       L.marker([listing.lat, listing.lng], {
         icon: markerIcon,
         keyboard: true,
@@ -388,10 +422,16 @@ export default function ListingsMap({
         title: `${formatPrice(listing.price)} — ${listing.address}, ${listing.city}`,
       })
         .addTo(markerLayer)
+        .bindPopup(popupLink, {
+          className: "listing-map-popup-shell",
+          minWidth: 230,
+          maxWidth: 280,
+          autoPanPadding: [28, 28],
+        })
         .on("click", () => setSelectedSlug(listing.slug));
     }
     setSelectedSlug((current) => listings.some((listing) => listing.slug === current) ? current : listings[0]?.slug ?? "");
-  }, [listings, ready]);
+  }, [listings, ready, router]);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -522,10 +562,27 @@ export default function ListingsMap({
         ) : null}
       </div>
       {selected ? (
-        <div className="mt-3 flex flex-col justify-between gap-2 rounded-sm bg-keystone/60 p-3 sm:flex-row sm:items-center">
-          <div><p className="font-display text-lg text-ink">{formatPrice(selected.price)}</p><p className="text-sm text-ink/70">{selected.address}, {selected.city}</p></div>
-          <Link href={`/properties/${selected.slug}`} className="text-sm font-medium text-tide underline underline-offset-4">View photos &amp; details</Link>
-        </div>
+        <Link
+          href={`/properties/${selected.slug}`}
+          prefetch={false}
+          className="group mt-3 flex overflow-hidden rounded-sm bg-keystone/60 transition-colors hover:bg-keystone focus-visible:outline-hibiscus"
+          aria-label={`View ${selected.address}, ${selected.city}`}
+        >
+          <Image
+            src={selected.image || "/property-placeholder.svg"}
+            alt=""
+            width={132}
+            height={96}
+            className="h-24 w-28 shrink-0 object-cover sm:w-32"
+          />
+          <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4">
+            <div className="min-w-0">
+              <p className="font-display text-lg text-ink">{formatPrice(selected.price)}</p>
+              <p className="truncate text-sm text-ink/70">{selected.address}, {selected.city}</p>
+            </div>
+            <span className="mt-1 text-sm font-medium text-tide underline underline-offset-4 group-hover:text-hibiscus sm:mt-0 sm:shrink-0">View photos &amp; details</span>
+          </div>
+        </Link>
       ) : null}
     </div>
   );

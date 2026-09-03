@@ -448,6 +448,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
               initialBounds={bounds}
               initialShape={polygon}
               initialSort={sort}
+              boundaryLocations={locations}
             >
               <PropertyGrid listings={listings} compact={params.view === "map"} />
             </PropertyResultsView>

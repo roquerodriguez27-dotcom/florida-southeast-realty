@@ -444,6 +444,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
                 lng,
                 status,
               }))}
+              locations={locations}
               initialView={params.view === "map" ? "map" : "list"}
               initialBounds={bounds}
               initialShape={polygon}

@@ -13,6 +13,7 @@ import type {
   Polyline,
   Rectangle,
 } from "leaflet";
+import type { Feature, MultiPolygon, Polygon as GeoJsonPolygon } from "geojson";
 import { formatPrice } from "@/lib/format";
 import type { ListingFilters } from "@/lib/types";
 
@@ -29,6 +30,21 @@ export interface MapListing {
 type MapBounds = NonNullable<ListingFilters["bounds"]>;
 type MapPoint = NonNullable<ListingFilters["polygon"]>[number];
 type LeafletModule = typeof import("leaflet");
+const CENSUS_BOUNDARY_ATTRIBUTION = '<a href="https://tigerweb.geo.census.gov/">U.S. Census Bureau</a>';
+type BoundaryFeature = Feature<GeoJsonPolygon | MultiPolygon, {
+  kind: "ZIP" | "County" | "City";
+  label: string;
+  source: string;
+}>;
+
+interface BoundaryResponse {
+  boundaries?: Array<{
+    feature: BoundaryFeature;
+    kind: "ZIP" | "County" | "City";
+    location: string;
+  }>;
+  unavailable?: string[];
+}
 
 function asMapBounds(bounds: LatLngBounds): MapBounds {
   return {
@@ -52,10 +68,12 @@ function serializeShape(points: MapPoint[]) {
 
 export default function ListingsMap({
   listings,
+  locations,
   initialBounds,
   initialShape,
 }: {
   listings: MapListing[];
+  locations?: string[];
   initialBounds?: MapBounds;
   initialShape?: MapPoint[];
 }) {
@@ -63,6 +81,7 @@ export default function ListingsMap({
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<LeafletModule | null>(null);
   const markerLayerRef = useRef<LayerGroup | null>(null);
+  const locationBoundaryLayerRef = useRef<LayerGroup | null>(null);
   const viewportRef = useRef<LatLngBounds | null>(null);
   const areaLayerRef = useRef<Polygon | Rectangle | null>(null);
   const draftLineRef = useRef<Polyline | null>(null);
@@ -71,16 +90,33 @@ export default function ListingsMap({
   const startupListingsRef = useRef(listings);
   const startupBoundsRef = useRef(initialBounds);
   const startupShapeRef = useRef(initialShape);
+  const fittedLocationKeyRef = useRef("");
+  const boundaryRequestKeyRef = useRef("");
+  const suppressNextMoveEndRef = useRef(false);
+  const userMovedMapRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [drawing, setDrawing] = useState(false);
   const [pointCount, setPointCount] = useState(0);
   const [viewportChanged, setViewportChanged] = useState(false);
   const [drawMessage, setDrawMessage] = useState("");
+  const [boundaryResult, setBoundaryResult] = useState<{
+    key: string;
+    locations: string[];
+    status: "ready" | "unavailable";
+  } | null>(null);
   const [selectedSlug, setSelectedSlug] = useState(listings[0]?.slug ?? "");
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const locationKey = (locations ?? []).map((location) => location.trim()).filter(Boolean).join("\u0000");
+  const hasExplicitArea = Boolean(initialBounds || initialShape);
+  const boundaryStatus = !locationKey
+    ? "idle"
+    : boundaryResult?.key === locationKey
+      ? boundaryResult.status
+      : "loading";
+  const outlinedLocations = boundaryResult?.key === locationKey ? boundaryResult.locations : [];
 
   function currentUrlBounds(): MapBounds | null {
     const bounds = {
@@ -141,8 +177,10 @@ export default function ListingsMap({
 
       const map = L.map(containerRef.current, {
         zoomControl: true,
-        scrollWheelZoom: false,
+        scrollWheelZoom: true,
         doubleClickZoom: true,
+        boxZoom: true,
+        keyboard: true,
       });
       mapRef.current = map;
 
@@ -169,7 +207,7 @@ export default function ListingsMap({
         const listingBounds = L.latLngBounds(startupListings.map((listing) => [listing.lat, listing.lng]));
         if (startupListings.length === 1) map.setView(listingBounds.getCenter(), 14);
         else map.fitBounds(listingBounds, { padding: [32, 32], maxZoom: 14 });
-        setDrawMessage("Move the map, then press “Search this area” to update the homes.");
+        setDrawMessage("Use the mouse wheel or + / − buttons to zoom. Move the map, then search this area to update the homes.");
       } else {
         map.setView([26.2, -80.13], 9);
       }
@@ -177,7 +215,12 @@ export default function ListingsMap({
       viewportRef.current = map.getBounds();
       map.on("moveend", () => {
         viewportRef.current = map.getBounds();
+        if (suppressNextMoveEndRef.current) {
+          suppressNextMoveEndRef.current = false;
+          return;
+        }
         if (drawRef.current.enabled) return;
+        userMovedMapRef.current = true;
         setViewportChanged(true);
         setDrawMessage("Map moved. Press “Search this area” to refresh the homes.");
       });
@@ -212,12 +255,108 @@ export default function ListingsMap({
       mapRef.current = null;
       leafletRef.current = null;
       markerLayerRef.current = null;
+      locationBoundaryLayerRef.current = null;
       areaLayerRef.current = null;
       draftLineRef.current = null;
       draftMarkersRef.current = [];
     };
   // Keep the Leaflet instance stable while refreshed MLS results replace only its markers.
   }, []);
+
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!ready || !L || !map) return;
+
+    const requestedLocations = locationKey ? locationKey.split("\u0000") : [];
+    const controller = new AbortController();
+    let cancelled = false;
+    if (boundaryRequestKeyRef.current !== locationKey) {
+      boundaryRequestKeyRef.current = locationKey;
+      userMovedMapRef.current = false;
+    }
+    locationBoundaryLayerRef.current?.remove();
+    locationBoundaryLayerRef.current = null;
+
+    if (requestedLocations.length === 0) {
+      fittedLocationKeyRef.current = "";
+      boundaryRequestKeyRef.current = "";
+      return () => controller.abort();
+    }
+
+    const query = new URLSearchParams();
+    for (const location of requestedLocations) query.append("location", location);
+
+    void fetch(`/api/map-boundaries?${query.toString()}`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Boundary request failed with HTTP ${response.status}.`);
+        return response.json() as Promise<BoundaryResponse>;
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        const boundaries = payload.boundaries ?? [];
+        if (boundaries.length === 0) {
+          setBoundaryResult({ key: locationKey, locations: [], status: "unavailable" });
+          return;
+        }
+
+        const group = L.layerGroup().addTo(map);
+        const combinedBounds = L.latLngBounds([]);
+        for (const boundary of boundaries) {
+          const layer = L.geoJSON(boundary.feature, {
+            interactive: true,
+            style: {
+              color: "#d13d32",
+              fillColor: "#d13d32",
+              fillOpacity: 0.055,
+              opacity: 0.95,
+              weight: 4,
+            },
+          }).bindTooltip(boundary.location, {
+            direction: "top",
+            sticky: true,
+          }).addTo(group);
+          combinedBounds.extend(layer.getBounds());
+        }
+        locationBoundaryLayerRef.current = group;
+        map.attributionControl.addAttribution(CENSUS_BOUNDARY_ATTRIBUTION);
+        setBoundaryResult({
+          key: locationKey,
+          locations: boundaries.map((boundary) => boundary.location),
+          status: "ready",
+        });
+
+        if (
+          combinedBounds.isValid()
+          && !hasExplicitArea
+          && !userMovedMapRef.current
+          && fittedLocationKeyRef.current !== locationKey
+        ) {
+          fittedLocationKeyRef.current = locationKey;
+          suppressNextMoveEndRef.current = true;
+          map.fitBounds(combinedBounds, { padding: [30, 30], maxZoom: 14 });
+          setTimeout(() => {
+            suppressNextMoveEndRef.current = false;
+            viewportRef.current = map.getBounds();
+          }, 0);
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
+        setBoundaryResult({ key: locationKey, locations: [], status: "unavailable" });
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      locationBoundaryLayerRef.current?.remove();
+      locationBoundaryLayerRef.current = null;
+      map.attributionControl.removeAttribution(CENSUS_BOUNDARY_ATTRIBUTION);
+    };
+  }, [hasExplicitArea, locationKey, ready]);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -360,7 +499,19 @@ export default function ListingsMap({
       <p className="mb-3 min-h-5 text-xs text-ink/55" aria-live="polite">
         {drawMessage || "Move the map, then press “Search this area” to update the homes."}
       </p>
-      <div ref={containerRef} className="h-[52svh] min-h-[360px] max-h-[620px] w-full rounded-sm bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px]" aria-label="Interactive map of property search results" />
+      <div className="relative overflow-hidden rounded-sm border border-tide/10 bg-keystone">
+        <div ref={containerRef} className="h-[52svh] min-h-[360px] max-h-[620px] w-full bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px]" aria-label="Interactive map of property search results" />
+        {boundaryStatus !== "idle" ? (
+          <div className="map-boundary-status" aria-live="polite">
+            <span aria-hidden className={boundaryStatus === "loading" ? "is-loading" : ""} />
+            {boundaryStatus === "loading"
+              ? "Loading area outline…"
+              : boundaryStatus === "ready"
+                ? `Red outline: ${outlinedLocations.join(", ")}`
+                : "Official area outline unavailable"}
+          </div>
+        ) : null}
+      </div>
       {selected ? (
         <div className="mt-3 flex flex-col justify-between gap-2 rounded-sm bg-keystone/60 p-3 sm:flex-row sm:items-center">
           <div><p className="font-display text-lg text-ink">{formatPrice(selected.price)}</p><p className="text-sm text-ink/70">{selected.address}, {selected.city}</p></div>

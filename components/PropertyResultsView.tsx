@@ -11,6 +11,7 @@ type MapBounds = NonNullable<ListingFilters["bounds"]>;
 export default function PropertyResultsView({
   children,
   listings,
+  locations,
   initialView,
   initialBounds,
   initialShape,
@@ -18,6 +19,7 @@ export default function PropertyResultsView({
 }: {
   children: ReactNode;
   listings: MapListing[];
+  locations?: string[];
   initialView?: "list" | "map";
   initialBounds?: MapBounds;
   initialShape?: NonNullable<ListingFilters["polygon"]>;
@@ -132,7 +134,7 @@ export default function PropertyResultsView({
         mappableListings.length > 0 ? (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,.8fr)] xl:items-start">
             <div className="xl:sticky xl:top-28">
-              <ListingsMap listings={mappableListings} initialBounds={initialBounds} initialShape={initialShape} />
+              <ListingsMap listings={mappableListings} locations={locations} initialBounds={initialBounds} initialShape={initialShape} />
             </div>
             <div aria-label="Homes in the current map area">
               {children}

@@ -15,6 +15,7 @@ export default function PropertyResultsView({
   initialBounds,
   initialShape,
   initialSort,
+  boundaryLocations = [],
 }: {
   children: ReactNode;
   listings: MapListing[];
@@ -22,6 +23,7 @@ export default function PropertyResultsView({
   initialBounds?: MapBounds;
   initialShape?: NonNullable<ListingFilters["polygon"]>;
   initialSort?: ListingSort;
+  boundaryLocations?: string[];
 }) {
   const [view, setView] = useState<"list" | "map">(initialView ?? "list");
   const [isPending, startTransition] = useTransition();
@@ -132,7 +134,13 @@ export default function PropertyResultsView({
         mappableListings.length > 0 ? (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,.8fr)] xl:items-start">
             <div className="xl:sticky xl:top-28">
-              <ListingsMap listings={mappableListings} initialBounds={initialBounds} initialShape={initialShape} />
+              <ListingsMap
+                key={boundaryLocations.join("|")}
+                listings={mappableListings}
+                initialBounds={initialBounds}
+                initialShape={initialShape}
+                boundaryLocations={boundaryLocations}
+              />
             </div>
             <div aria-label="Homes in the current map area">
               {children}

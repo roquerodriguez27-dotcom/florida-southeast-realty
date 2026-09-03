@@ -135,6 +135,8 @@ export default function ListingsMap({
   const suppressNextMoveEndRef = useRef(false);
   const suppressMoveEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userMovedMapRef = useRef(false);
+  const mapInteractionRef = useRef(false);
+  const lastMapPointerMoveAtRef = useRef(0);
   const [ready, setReady] = useState(false);
   const [mapView, setMapView] = useState<MapView>("street");
   const [drawing, setDrawing] = useState(false);
@@ -293,6 +295,15 @@ export default function ListingsMap({
         userMovedMapRef.current = true;
         setViewportChanged(true);
         setDrawMessage("Map moved. Press “Search this area” to refresh the homes.");
+      });
+
+      map.on("dragstart zoomstart", () => {
+        mapInteractionRef.current = true;
+        lastMapPointerMoveAtRef.current = 0;
+        map.closePopup();
+      });
+      map.on("dragend zoomend", () => {
+        mapInteractionRef.current = false;
       });
 
       map.on("autopanstart", () => {
@@ -552,6 +563,7 @@ export default function ListingsMap({
       return `/properties/${encodeURIComponent(slug)}?returnTo=${encodeURIComponent(returnTo)}`;
     };
 
+    const hoverTimers = new Set<ReturnType<typeof setTimeout>>();
     markerLayer.clearLayers();
     for (const listing of listings) {
       const initialPropertyHref = currentPropertyHref(listing.slug);
@@ -609,17 +621,40 @@ export default function ListingsMap({
           autoPan: true,
           autoPanPaddingTopLeft: [28, 28],
           autoPanPaddingBottomRight: [28, 28],
-          keepInView: true,
         });
       const previewListing = () => {
-        if (drawRef.current.enabled) return;
+        if (drawRef.current.enabled || mapInteractionRef.current) return;
         popupLink.href = currentPropertyHref(listing.slug);
         marker.openPopup();
       };
-      marker.on("mouseover", previewListing);
-      marker.on("click", previewListing);
-      marker.getElement()?.addEventListener("focus", previewListing);
+      let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+      marker.on("mouseover", () => {
+        if (hoverTimer) clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => {
+          if (hoverTimer) hoverTimers.delete(hoverTimer);
+          hoverTimer = null;
+          if (performance.now() - lastMapPointerMoveAtRef.current <= 350) previewListing();
+        }, 160);
+        hoverTimers.add(hoverTimer);
+      });
+      marker.on("mouseout", () => {
+        if (hoverTimer) {
+          clearTimeout(hoverTimer);
+          hoverTimers.delete(hoverTimer);
+        }
+        hoverTimer = null;
+      });
+      marker.on("click", () => {
+        if (hoverTimer) {
+          clearTimeout(hoverTimer);
+          hoverTimers.delete(hoverTimer);
+          hoverTimer = null;
+        }
+        previewListing();
+      });
     }
+
+    return () => hoverTimers.forEach((timer) => clearTimeout(timer));
   }, [listings, pathname, ready, router, searchParams]);
 
   useEffect(() => {
@@ -734,6 +769,7 @@ export default function ListingsMap({
   }
 
   function handleDrawMove(event: ReactPointerEvent<HTMLDivElement>) {
+    lastMapPointerMoveAtRef.current = performance.now();
     const drawState = drawRef.current;
     const map = mapRef.current;
     if (!drawState.enabled || !drawState.active || drawState.pointerId !== event.pointerId || !map) return;
@@ -767,13 +803,40 @@ export default function ListingsMap({
     if (bounds) searchBounds(asMapBounds(bounds));
   }
 
-  function clearArea() {
+  function resetMap() {
+    const map = mapRef.current;
     const query = new URLSearchParams(searchParams.toString());
-    for (const key of ["north", "south", "east", "west", "shape", "page"]) query.delete(key);
+    for (const key of ["location", "q", "north", "south", "east", "west", "shape", "page"]) query.delete(key);
     query.set("view", "map");
+    clearDraft();
+    setDrawingMode(false);
+    map?.dragging.enable();
+    map?.doubleClickZoom.enable();
+    map?.closePopup();
+    map?.stop();
     areaLayerRef.current?.remove();
     areaLayerRef.current = null;
-    setDrawMessage("Map-area filter cleared. Pan or zoom to search a new view.");
+    locationBoundaryLayerRef.current?.remove();
+    locationBoundaryLayerRef.current = null;
+    fittedLocationKeyRef.current = "";
+    boundaryRequestKeyRef.current = "";
+    userMovedMapRef.current = false;
+    lastMapPointerMoveAtRef.current = 0;
+    setDrawing(false);
+    setViewportChanged(false);
+    setActivePlaceCategories([]);
+    setDrawMessage("Map reset. Move or zoom, then search this area, or draw a new area.");
+    if (map) {
+      if (suppressMoveEndTimerRef.current) clearTimeout(suppressMoveEndTimerRef.current);
+      suppressNextMoveEndRef.current = true;
+      map.setView([26.2, -80.13], 9);
+      viewportRef.current = map.getBounds();
+      suppressMoveEndTimerRef.current = setTimeout(() => {
+        suppressNextMoveEndRef.current = false;
+        suppressMoveEndTimerRef.current = null;
+        viewportRef.current = map.getBounds();
+      }, 500);
+    }
     startTransition(() => router.push(`${pathname}?${query.toString()}#property-results`, { scroll: false }));
   }
 
@@ -788,7 +851,9 @@ export default function ListingsMap({
             {isPending ? "Updating homes…" : viewportChanged ? "Search this area" : "Move map to update"}
           </button>
         ) : null}
-        {initialBounds || initialShape ? <button type="button" onClick={clearArea} className="min-h-11 px-2 py-2 text-sm text-tide underline underline-offset-4">Clear area</button> : null}
+        <button type="button" onClick={resetMap} disabled={!ready || isPending} className="min-h-11 px-2 py-2 text-sm text-tide underline underline-offset-4 disabled:text-ink/40">
+          Reset map
+        </button>
         <div className="ml-auto flex items-center gap-1" role="group" aria-label="Map view">
           <span className="mr-1 hidden text-xs font-medium text-ink/55 sm:inline">Map view</span>
           <button

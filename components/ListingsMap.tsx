@@ -245,7 +245,7 @@ export default function ListingsMap({
       });
       mapRef.current = map;
 
-      const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      const streetLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
       });
@@ -612,6 +612,7 @@ export default function ListingsMap({
           keepInView: true,
         });
       const previewListing = () => {
+        if (drawRef.current.enabled) return;
         popupLink.href = currentPropertyHref(listing.slug);
         marker.openPopup();
       };
@@ -643,22 +644,43 @@ export default function ListingsMap({
     }
   }, [initialBounds, initialShape, ready]);
 
+  function setDrawingMode(active: boolean) {
+    const container = containerRef.current;
+    if (!container) return;
+    container.classList.toggle("map-freehand-active", active);
+    container.setAttribute(
+      "aria-label",
+      active ? "Draw a property search area" : "Interactive map of property search results",
+    );
+  }
+
   function beginDrawing() {
     const map = mapRef.current;
     if (!map) return;
     clearDraft();
     drawRef.current = { enabled: true, active: false, pointerId: null, points: [] };
+    map.closePopup();
+    map.stop();
+    setDrawingMode(true);
     map.dragging.disable();
     map.doubleClickZoom.disable();
     setDrawing(true);
     setViewportChanged(false);
     setDrawMessage("Hold the mouse button and draw around the area. Release to search.");
+
+    window.requestAnimationFrame(() => {
+      if (mapRef.current !== map) return;
+      map.invalidateSize({ animate: false, pan: false });
+      const hasLoadedTiles = Boolean(containerRef.current?.querySelector(".leaflet-tile-loaded"));
+      if (!hasLoadedTiles) baseLayersRef.current?.[mapView].redraw();
+    });
   }
 
   function cancelDrawing() {
     const map = mapRef.current;
     if (!map) return;
     clearDraft();
+    setDrawingMode(false);
     map.dragging.enable();
     map.doubleClickZoom.enable();
     setDrawing(false);
@@ -684,6 +706,7 @@ export default function ListingsMap({
       fillColor: "#c8402f",
       fillOpacity: 0.1,
     }).addTo(map);
+    setDrawingMode(false);
     map.dragging.enable();
     map.doubleClickZoom.enable();
     setDrawing(false);
@@ -818,8 +841,8 @@ export default function ListingsMap({
       <div className="relative overflow-hidden rounded-sm border border-tide/10 bg-keystone">
         <div
           ref={containerRef}
-          className={`h-[52svh] min-h-[360px] max-h-[620px] w-full bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px] ${drawing ? "map-freehand-active" : ""}`}
-          aria-label={drawing ? "Draw a property search area" : "Interactive map of property search results"}
+          className="h-[52svh] min-h-[360px] max-h-[620px] w-full bg-keystone sm:h-[60vh] sm:min-h-[440px] xl:h-[68vh] xl:max-h-[720px]"
+          aria-label="Interactive map of property search results"
           onPointerDownCapture={handleDrawStart}
           onPointerMoveCapture={handleDrawMove}
           onPointerUpCapture={handleDrawEnd}

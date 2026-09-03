@@ -117,12 +117,24 @@ input.price-field-input:focus-visible {
   font-family: var(--font-sans);
 }
 
+.leaflet-control-zoom a {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
 /* iOS Safari auto-zooms focused controls below 16px. Keep mobile forms at 16px. */
 @media (max-width: 767px) {
   input,
   select,
   textarea {
     font-size: 16px !important;
+  }
+
+  .leaflet-control-zoom a {
+    height: 44px;
+    line-height: 44px;
+    width: 44px;
   }
 }
 

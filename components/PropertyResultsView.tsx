@@ -8,6 +8,14 @@ import type { ListingFilters, ListingSort } from "@/lib/types";
 
 type MapBounds = NonNullable<ListingFilters["bounds"]>;
 
+const INVALID_PROPERTY_SLUGS = new Set(["null", "undefined", "false", "nan"]);
+
+function hasValidPropertySlug(slug: unknown): slug is string {
+  if (typeof slug !== "string") return false;
+  const normalized = slug.trim().toLowerCase();
+  return normalized.length >= 4 && normalized.length <= 300 && !INVALID_PROPERTY_SLUGS.has(normalized);
+}
+
 export default function PropertyResultsView({
   children,
   listings,
@@ -31,7 +39,8 @@ export default function PropertyResultsView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const mappableListings = listings.filter((listing) => (
-    Number.isFinite(listing.lat)
+    hasValidPropertySlug(listing.slug)
+    && Number.isFinite(listing.lat)
     && Number.isFinite(listing.lng)
     && (listing.lat !== 0 || listing.lng !== 0)
   ));

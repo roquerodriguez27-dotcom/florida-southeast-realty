@@ -13,23 +13,31 @@ type FsrGlobal = typeof globalThis & {
   __fsrResoCache?: Map<string, ResoSnapshot>;
   __fsrResoBackoffUntil?: Map<string, number>;
   __fsrResoProviderBackoffUntil?: number;
+  __fsrResoProviderUnavailableUntil?: number;
   __fsrResoFailureTimes?: number[];
   __fsrResoCircuitOpenUntil?: number;
   __fsrResoCircuitLoggedAt?: number;
+  __fsrResoActiveUpstream?: number;
 };
 
 const RESO_HOST = "replication.sparkapi.com";
 const FRESH_TTL_MS = 5 * 60_000;
-const STALE_TTL_MS = 30 * 60_000;
-const MAX_CACHE_ENTRIES = 100;
+// Keep the last known good MLS response available across a provider outage.
+// Listing timestamps remain visible in the UI so stale data is transparent.
+const STALE_TTL_MS = 24 * 60 * 60_000;
+const MAX_CACHE_ENTRIES = 250;
 const MAX_BACKOFF_MS = 750;
 const DEFAULT_THROTTLE_BACKOFF_MS = 60_000;
 const MAX_THROTTLE_BACKOFF_MS = 5 * 60_000;
+const PROVIDER_UNAVAILABLE_BACKOFF_MS = 15_000;
+const NETWORK_UNAVAILABLE_BACKOFF_MS = 5_000;
 const FAILURE_WINDOW_MS = 30_000;
 const FAILURE_THRESHOLD = 4;
-const CIRCUIT_OPEN_MS = 45_000;
+const CIRCUIT_OPEN_MS = 60_000;
 const CIRCUIT_RECOVERY_GRACE_MS = 750;
 const UPSTREAM_TIMEOUT_MS = 4_000;
+const MAX_UPSTREAM_CONCURRENCY = 6;
+const UPSTREAM_SLOT_WAIT_MS = 300;
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -49,11 +57,13 @@ function retryAfterMilliseconds(value: string | null): number | null {
   return delay > 0 ? Math.min(MAX_THROTTLE_BACKOFF_MS, delay) : null;
 }
 
-function responseFromSnapshot(snapshot: ResoSnapshot): Response {
+function responseFromSnapshot(snapshot: ResoSnapshot, stale = false): Response {
+  const headers = new Headers(snapshot.headers);
+  if (stale) headers.set("X-FSR-RESO-Stale", "1");
   return new Response(snapshot.body.slice(0), {
     status: snapshot.status,
     statusText: snapshot.statusText,
-    headers: snapshot.headers,
+    headers,
   });
 }
 
@@ -61,7 +71,8 @@ type TemporaryFailureReason =
   | "circuit_open"
   | "network_error"
   | "throttled"
-  | "upstream_error";
+  | "upstream_error"
+  | "capacity_protected";
 
 function temporaryResoFailureResponse(
   reason: TemporaryFailureReason,
@@ -73,14 +84,18 @@ function temporaryResoFailureResponse(
       ? "RESO_THROTTLED"
       : reason === "upstream_error"
         ? "RESO_UPSTREAM_UNAVAILABLE"
-        : "RESO_NETWORK_ERROR";
+        : reason === "capacity_protected"
+          ? "RESO_CAPACITY_PROTECTED"
+          : "RESO_NETWORK_ERROR";
   const message = reason === "circuit_open"
     ? "BeachesMLS RESO is temporarily protected by a circuit breaker."
     : reason === "throttled"
       ? "BeachesMLS RESO asked this search to pause before trying again."
       : reason === "upstream_error"
         ? "BeachesMLS RESO is temporarily unavailable."
-        : "BeachesMLS RESO is temporarily unreachable.";
+        : reason === "capacity_protected"
+          ? "Florida Southeast Realty is protecting MLS capacity during heavy traffic."
+          : "BeachesMLS RESO is temporarily unreachable.";
   const status = reason === "throttled" ? 429 : 503;
 
   return new Response(JSON.stringify({ error: { code, message } }), {
@@ -262,6 +277,23 @@ function timeoutProtectedInit(init?: RequestInit): {
   };
 }
 
+async function acquireUpstreamSlot(fsrGlobal: FsrGlobal): Promise<boolean> {
+  const deadline = Date.now() + UPSTREAM_SLOT_WAIT_MS;
+  while ((fsrGlobal.__fsrResoActiveUpstream ?? 0) >= MAX_UPSTREAM_CONCURRENCY) {
+    if (Date.now() >= deadline) return false;
+    await wait(25);
+  }
+  fsrGlobal.__fsrResoActiveUpstream = (fsrGlobal.__fsrResoActiveUpstream ?? 0) + 1;
+  return true;
+}
+
+function releaseUpstreamSlot(fsrGlobal: FsrGlobal): void {
+  fsrGlobal.__fsrResoActiveUpstream = Math.max(
+    0,
+    (fsrGlobal.__fsrResoActiveUpstream ?? 1) - 1,
+  );
+}
+
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
@@ -279,9 +311,11 @@ export async function register() {
   fsrGlobal.__fsrResoCache = cache;
   fsrGlobal.__fsrResoBackoffUntil = backoffUntil;
   fsrGlobal.__fsrResoProviderBackoffUntil ??= 0;
+  fsrGlobal.__fsrResoProviderUnavailableUntil ??= 0;
   fsrGlobal.__fsrResoFailureTimes = failureTimes;
   fsrGlobal.__fsrResoCircuitOpenUntil ??= 0;
   fsrGlobal.__fsrResoCircuitLoggedAt ??= 0;
+  fsrGlobal.__fsrResoActiveUpstream ??= 0;
 
   const patchedFetch: typeof fetch = async (input, init) => {
     if (input instanceof Request) return originalFetch(input, init);
@@ -312,16 +346,28 @@ export async function register() {
     // that triggered it. Pause all new upstream queries during that cooldown.
     const providerBackoffUntil = fsrGlobal.__fsrResoProviderBackoffUntil ?? 0;
     if (providerBackoffUntil > now) {
-      if (cached && cached.staleUntil > now) return responseFromSnapshot(cached);
+      if (cached && cached.staleUntil > now) return responseFromSnapshot(cached, true);
       return temporaryResoFailureResponse(
         "throttled",
         Math.ceil((providerBackoffUntil - now) / 1_000),
       );
     }
 
+    // A 5xx from this replication endpoint is usually provider-wide. Once one
+    // request proves the feed is offline, stop every distinct crawler/search URL
+    // from hammering the same unavailable service for the next few seconds.
+    const providerUnavailableUntil = fsrGlobal.__fsrResoProviderUnavailableUntil ?? 0;
+    if (providerUnavailableUntil > now) {
+      if (cached && cached.staleUntil > now) return responseFromSnapshot(cached, true);
+      return temporaryResoFailureResponse(
+        "upstream_error",
+        Math.ceil((providerUnavailableUntil - now) / 1_000),
+      );
+    }
+
     const circuitOpenUntil = fsrGlobal.__fsrResoCircuitOpenUntil ?? 0;
     if (circuitOpenUntil > now) {
-      if (cached && cached.staleUntil > now) return responseFromSnapshot(cached);
+      if (cached && cached.staleUntil > now) return responseFromSnapshot(cached, true);
 
       const remainingMs = circuitOpenUntil - now;
       if (remainingMs <= CIRCUIT_RECOVERY_GRACE_MS) {
@@ -336,6 +382,9 @@ export async function register() {
 
     const existing = inflight.get(key);
     if (existing) {
+      // Do not make a visitor wait for a refresh when a usable prior response
+      // already exists. The in-flight request will refresh the shared snapshot.
+      if (cached && cached.staleUntil > now) return responseFromSnapshot(cached, true);
       return responseFromSnapshot(await existing);
     }
 
@@ -353,6 +402,13 @@ export async function register() {
           ));
         }
         await wait(remainingMs);
+      }
+
+      const slotAcquired = await acquireUpstreamSlot(fsrGlobal);
+      if (!slotAcquired) {
+        const stale = cache.get(key);
+        if (stale && stale.staleUntil > Date.now()) return stale;
+        return snapshotFromResponse(temporaryResoFailureResponse("capacity_protected", 1));
       }
 
       const protectedRequest = timeoutProtectedInit(init);
@@ -377,6 +433,7 @@ export async function register() {
         if (response.ok) {
           pruneFailures(failureTimes, Date.now());
           backoffUntil.delete(key);
+          fsrGlobal.__fsrResoProviderUnavailableUntil = 0;
           cache.set(key, snapshot);
           trimCache(cache);
           return snapshot;
@@ -396,6 +453,13 @@ export async function register() {
               fsrGlobal.__fsrResoProviderBackoffUntil ?? 0,
               Date.now() + delay,
             );
+          } else {
+            const providerDelay = retryAfterMilliseconds(response.headers.get("retry-after"))
+              ?? PROVIDER_UNAVAILABLE_BACKOFF_MS;
+            fsrGlobal.__fsrResoProviderUnavailableUntil = Math.max(
+              fsrGlobal.__fsrResoProviderUnavailableUntil ?? 0,
+              Date.now() + providerDelay,
+            );
           }
 
           const stale = cache.get(key);
@@ -414,7 +478,7 @@ export async function register() {
           }
           return snapshotFromResponse(temporaryResoFailureResponse(
             "upstream_error",
-            Math.ceil(delay / 1_000),
+            Math.ceil((fsrGlobal.__fsrResoProviderUnavailableUntil! - Date.now()) / 1_000),
           ));
         }
 
@@ -424,11 +488,16 @@ export async function register() {
         return snapshot;
       } catch {
         recordFailure(fsrGlobal, failureTimes);
+        fsrGlobal.__fsrResoProviderUnavailableUntil = Math.max(
+          fsrGlobal.__fsrResoProviderUnavailableUntil ?? 0,
+          Date.now() + NETWORK_UNAVAILABLE_BACKOFF_MS,
+        );
         const stale = cache.get(key);
         if (stale && stale.staleUntil > Date.now()) return stale;
         return snapshotFromResponse(temporaryResoFailureResponse("network_error"));
       } finally {
         protectedRequest.cleanup();
+        releaseUpstreamSlot(fsrGlobal);
       }
     })();
 

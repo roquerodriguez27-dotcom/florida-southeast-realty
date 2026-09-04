@@ -14,6 +14,8 @@ const STATUS_STYLE: Record<Listing["status"], string> = {
   Sold: "bg-ink/70 text-sand",
 };
 
+const INVALID_PROPERTY_SLUGS = new Set(["null", "undefined", "false", "nan"]);
+
 function engagementBadges(listing: Listing) {
   const badges: { label: string; className: string }[] = [];
   if (listing.daysOnMarket >= 0 && listing.daysOnMarket <= 3) {
@@ -29,12 +31,20 @@ function engagementBadges(listing: Listing) {
   return badges.slice(0, 3);
 }
 
+function validPropertySlug(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length >= 4 && normalized.length <= 300 && !INVALID_PROPERTY_SLUGS.has(normalized);
+}
+
 export default function PropertyCard({ listing, returnTo }: { listing: Listing; returnTo?: string }) {
   const savedListing = savedComparisonListing(listing);
   const badges = engagementBadges(listing);
-  const propertyHref = `/properties/${encodeURIComponent(listing.slug)}${
-    returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""
-  }`;
+  const propertyHref = validPropertySlug(listing.slug)
+    ? `/properties/${encodeURIComponent(listing.slug.trim())}${
+        returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""
+      }`
+    : returnTo || "/properties";
   const photoCount = listing.photoCount
     ?? (listing.images[0] === "/property-placeholder.svg" ? 0 : listing.images.length);
 

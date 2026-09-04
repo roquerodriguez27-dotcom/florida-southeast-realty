@@ -22,13 +22,14 @@ const RESO_HOST = "replication.sparkapi.com";
 const FRESH_TTL_MS = 5 * 60_000;
 const STALE_TTL_MS = 30 * 60_000;
 const MAX_CACHE_ENTRIES = 100;
-const MAX_BACKOFF_MS = 3_000;
+const MAX_BACKOFF_MS = 750;
 const DEFAULT_THROTTLE_BACKOFF_MS = 60_000;
 const MAX_THROTTLE_BACKOFF_MS = 5 * 60_000;
 const FAILURE_WINDOW_MS = 30_000;
-const FAILURE_THRESHOLD = 8;
-const CIRCUIT_OPEN_MS = 30_000;
-const CIRCUIT_RECOVERY_GRACE_MS = 1_200;
+const FAILURE_THRESHOLD = 4;
+const CIRCUIT_OPEN_MS = 45_000;
+const CIRCUIT_RECOVERY_GRACE_MS = 750;
+const UPSTREAM_TIMEOUT_MS = 4_000;
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -56,20 +57,30 @@ function responseFromSnapshot(snapshot: ResoSnapshot): Response {
   });
 }
 
+type TemporaryFailureReason =
+  | "circuit_open"
+  | "network_error"
+  | "throttled"
+  | "upstream_error";
+
 function temporaryResoFailureResponse(
-  reason: "circuit_open" | "network_error" | "throttled",
+  reason: TemporaryFailureReason,
   retryAfterSeconds = 5,
 ): Response {
   const code = reason === "circuit_open"
     ? "RESO_CIRCUIT_OPEN"
     : reason === "throttled"
       ? "RESO_THROTTLED"
-      : "RESO_NETWORK_ERROR";
+      : reason === "upstream_error"
+        ? "RESO_UPSTREAM_UNAVAILABLE"
+        : "RESO_NETWORK_ERROR";
   const message = reason === "circuit_open"
     ? "BeachesMLS RESO is temporarily protected by a circuit breaker."
     : reason === "throttled"
       ? "BeachesMLS RESO asked this search to pause before trying again."
-      : "BeachesMLS RESO is temporarily unreachable.";
+      : reason === "upstream_error"
+        ? "BeachesMLS RESO is temporarily unavailable."
+        : "BeachesMLS RESO is temporarily unreachable.";
   const status = reason === "throttled" ? 429 : 503;
 
   return new Response(JSON.stringify({ error: { code, message } }), {
@@ -82,6 +93,18 @@ function temporaryResoFailureResponse(
       "X-FSR-RESO-Fallback": reason,
     },
   });
+}
+
+async function snapshotFromResponse(response: Response): Promise<ResoSnapshot> {
+  const body = await response.arrayBuffer();
+  return {
+    body,
+    status: response.status,
+    statusText: response.statusText,
+    headers: Array.from(response.headers.entries()),
+    freshUntil: Date.now(),
+    staleUntil: Date.now(),
+  };
 }
 
 function trimCache(cache: Map<string, ResoSnapshot>): void {
@@ -216,6 +239,29 @@ function recordFailure(
   }
 }
 
+function timeoutProtectedInit(init?: RequestInit): {
+  init: RequestInit;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const existingSignal = init?.signal;
+  const abortFromExisting = () => controller.abort();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+
+  if (existingSignal) {
+    if (existingSignal.aborted) controller.abort();
+    else existingSignal.addEventListener("abort", abortFromExisting, { once: true });
+  }
+
+  return {
+    init: { ...init, signal: controller.signal },
+    cleanup: () => {
+      clearTimeout(timer);
+      existingSignal?.removeEventListener("abort", abortFromExisting);
+    },
+  };
+}
+
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
@@ -263,8 +309,7 @@ export async function register() {
     }
 
     // A BeachesMLS 429 applies to the feed/account, not only to the exact URL
-    // that happened to trigger it. Pause every new upstream query during that
-    // cooldown so a crawler cannot bypass the throttle by changing filters.
+    // that triggered it. Pause all new upstream queries during that cooldown.
     const providerBackoffUntil = fsrGlobal.__fsrResoProviderBackoffUntil ?? 0;
     if (providerBackoffUntil > now) {
       if (cached && cached.staleUntil > now) return responseFromSnapshot(cached);
@@ -302,25 +347,20 @@ export async function register() {
 
         const remainingMs = delayUntil - Date.now();
         if (remainingMs > MAX_BACKOFF_MS) {
-          const fallback = temporaryResoFailureResponse(
-            "throttled",
+          return snapshotFromResponse(temporaryResoFailureResponse(
+            "upstream_error",
             Math.ceil(remainingMs / 1_000),
-          );
-          const body = await fallback.arrayBuffer();
-          return {
-            body,
-            status: fallback.status,
-            statusText: fallback.statusText,
-            headers: Array.from(fallback.headers.entries()),
-            freshUntil: Date.now(),
-            staleUntil: Date.now(),
-          };
+          ));
         }
         await wait(remainingMs);
       }
 
+      const protectedRequest = timeoutProtectedInit(init);
       try {
-        const upstreamResponse = await originalFetch(mediaProxyUrl ?? normalizedUrl, init);
+        const upstreamResponse = await originalFetch(
+          mediaProxyUrl ?? normalizedUrl,
+          protectedRequest.init,
+        );
         const response = mediaProxyUrl
           ? await unwrapPropertyMediaResponse(upstreamResponse)
           : upstreamResponse;
@@ -350,6 +390,7 @@ export async function register() {
               ?? DEFAULT_THROTTLE_BACKOFF_MS
             : MAX_BACKOFF_MS;
           backoffUntil.set(key, Date.now() + delay);
+
           if (response.status === 429) {
             fsrGlobal.__fsrResoProviderBackoffUntil = Math.max(
               fsrGlobal.__fsrResoProviderBackoffUntil ?? 0,
@@ -359,24 +400,35 @@ export async function register() {
 
           const stale = cache.get(key);
           if (stale && stale.staleUntil > Date.now()) return stale;
+
+          // Do not return a raw upstream 5xx/429 into lib/idx.ts. That layer
+          // retries raw 5xx responses, which can amplify an MLS outage and push
+          // the page request into a Vercel 504. A protected response carries the
+          // X-FSR-RESO-Fallback header, so the caller fails fast and renders the
+          // existing unavailable state instead of retrying the provider.
+          if (response.status === 429) {
+            return snapshotFromResponse(temporaryResoFailureResponse(
+              "throttled",
+              Math.ceil(delay / 1_000),
+            ));
+          }
+          return snapshotFromResponse(temporaryResoFailureResponse(
+            "upstream_error",
+            Math.ceil(delay / 1_000),
+          ));
         }
 
+        // Preserve ordinary 4xx responses such as 400/404 because the listing
+        // detail code intentionally uses them to decide whether to try its safe
+        // collection lookup fallback.
         return snapshot;
       } catch {
         recordFailure(fsrGlobal, failureTimes);
         const stale = cache.get(key);
         if (stale && stale.staleUntil > Date.now()) return stale;
-
-        const fallback = temporaryResoFailureResponse("network_error");
-        const body = await fallback.arrayBuffer();
-        return {
-          body,
-          status: fallback.status,
-          statusText: fallback.statusText,
-          headers: Array.from(fallback.headers.entries()),
-          freshUntil: Date.now(),
-          staleUntil: Date.now(),
-        };
+        return snapshotFromResponse(temporaryResoFailureResponse("network_error"));
+      } finally {
+        protectedRequest.cleanup();
       }
     })();
 

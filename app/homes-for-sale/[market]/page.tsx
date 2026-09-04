@@ -47,7 +47,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 function searchHref(searchValue: string, filter?: { key: string; value: string }) {
-  const params = new URLSearchParams({ location: searchValue });
+  const normalizedSearchValue = searchValue.trim();
+  const params = /^\d{5}(?:-\d{4})?$/.test(normalizedSearchValue)
+    ? new URLSearchParams({ q: normalizedSearchValue })
+    : new URLSearchParams({ location: normalizedSearchValue });
   if (filter) params.set(filter.key, filter.value);
   return `/properties?${params.toString()}`;
 }

@@ -36,6 +36,10 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
   const [status, setStatus] = useState<Status>("idle");
   const [validationError, setValidationError] = useState("");
   const [receipt, setReceipt] = useState<DeliveryReceipt | null>(null);
+  const compactContact = formName === "property-inquiry" || formName === "buyer-tools-review";
+  const visibleFields = formName === "buyer-tools-review"
+    ? fields.filter((field) => field.name !== "name")
+    : fields;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -47,11 +51,17 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
       values[field.name] = String(form.get(field.name) || "").trim();
     }
 
-    for (const field of fields) {
+    for (const field of visibleFields) {
+      if (compactContact && (field.name === "email" || field.name === "phone")) continue;
       if (field.required && !values[field.name]) {
         setValidationError(`${field.label} is required.`);
         return;
       }
+    }
+
+    if (compactContact && !values.email && !values.phone) {
+      setValidationError("Enter an email address or phone number so Roque can follow up.");
+      return;
     }
 
     const email = values.email;
@@ -116,26 +126,27 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white border border-ink/10 rounded-sm p-6 md:p-8 space-y-4" noValidate>
+    <form onSubmit={handleSubmit} className={`bg-white border border-ink/10 rounded-sm ${compactContact ? "p-5 md:p-6" : "p-6 md:p-8"} space-y-4`} noValidate>
       <div className="hidden" aria-hidden="true">
         <label htmlFor={`${formName}-company_website`}>Company Website</label>
         <input id={`${formName}-company_website`} name="company_website" type="text" tabIndex={-1} autoComplete="off" />
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        {fields.map((field) => {
+        {visibleFields.map((field) => {
           const id = `${formName}-${field.name}`;
           const wrapClass = field.colSpan === 2 ? "sm:col-span-2" : "";
+          const displayRequired = field.required && !(compactContact && (field.name === "email" || field.name === "phone"));
           return (
             <div key={field.name} className={wrapClass}>
               <label htmlFor={id} className="block text-xs font-mono uppercase tracking-wide text-ink/50 mb-1">
-                {field.label}{field.required ? " *" : ""}
+                {field.label}{displayRequired ? " *" : ""}
               </label>
               {field.type === "textarea" ? (
                 <textarea
                   id={id}
                   name={field.name}
-                  required={field.required}
+                  required={displayRequired}
                   placeholder={field.placeholder}
                   defaultValue={field.defaultValue}
                   rows={4}
@@ -145,11 +156,11 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
                 <select
                   id={id}
                   name={field.name}
-                  required={field.required}
+                  required={displayRequired}
                   defaultValue={field.defaultValue ?? ""}
                   className="w-full border border-ink/15 rounded-sm px-3 py-2.5 text-base md:text-sm bg-white focus:border-tide outline-none"
                 >
-                  <option value="" disabled={field.required}>Select one</option>
+                  <option value="" disabled={displayRequired}>Select one</option>
                   {field.options?.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
@@ -159,7 +170,7 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
                   id={id}
                   name={field.name}
                   type={field.type}
-                  required={field.required}
+                  required={displayRequired}
                   placeholder={field.placeholder}
                   defaultValue={field.defaultValue}
                   autoComplete={field.name === "name" ? "name" : field.name === "email" ? "email" : field.name === "phone" ? "tel" : undefined}
@@ -171,6 +182,8 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
         })}
       </div>
 
+      {compactContact ? <p className="text-xs text-ink/50">Use either email or phone. You do not need to fill in both.</p> : null}
+
       <label className="flex items-start gap-3 text-xs text-ink/60 leading-relaxed cursor-pointer">
         <input
           type="checkbox"
@@ -179,9 +192,7 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
           className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-tide)]"
         />
         <span>
-          By submitting, you agree that {SITE.shortName} may contact you by phone, email, or text
-          about this real estate request. Consent is not a condition of purchase. Message and data
-          rates may apply. See our <Link href="/privacy-policy" className="text-tide underline">Privacy Policy</Link>.
+          By submitting, you agree that {SITE.shortName} may contact you by phone, email, or text about this request. Consent is not a condition of purchase. Message and data rates may apply. See our <Link href="/privacy-policy" className="text-tide underline">Privacy Policy</Link>.
         </span>
       </label>
 

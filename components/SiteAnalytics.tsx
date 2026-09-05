@@ -17,6 +17,7 @@ type EventName =
 
 const LAST_SEARCH_STORAGE_KEY = "fsr-last-property-search-v1";
 const LAST_SEARCH_UPDATED_EVENT = "fsr-last-property-search-updated";
+const BOT_USER_AGENT = /(bot|crawler|spider|slurp|bingpreview|facebookexternalhit|linkedinbot|twitterbot|googleother|google-inspectiontool|semrush|ahrefs|mj12bot|dotbot|headless|phantomjs|python-requests|curl|wget)/i;
 
 function getOrCreateId(storage: Storage, key: string) {
   const existing = storage.getItem(key);
@@ -36,6 +37,17 @@ function referrerHost() {
   }
 }
 
+function visitorSignals(): Record<string, string | boolean> {
+  const userAgent = navigator.userAgent || "";
+  const webdriver = navigator.webdriver === true;
+  const botUserAgent = BOT_USER_AGENT.test(userAgent);
+  const probableBot = webdriver || botUserAgent;
+  return {
+    visitorType: probableBot ? "probable_bot" : "browser",
+    automatedSignal: webdriver ? "webdriver" : botUserAgent ? "user_agent" : "none",
+  };
+}
+
 function send(eventName: EventName, metadata: Record<string, string | number | boolean | null> = {}) {
   try {
     const visitorId = getOrCreateId(localStorage, "fsr_visitor_id");
@@ -46,7 +58,7 @@ function send(eventName: EventName, metadata: Record<string, string | number | b
       eventName,
       path: `${window.location.pathname}${window.location.search}`.slice(0, 600),
       referrerHost: referrerHost(),
-      metadata,
+      metadata: { ...visitorSignals(), ...metadata },
     });
     if (navigator.sendBeacon) {
       navigator.sendBeacon("/api/analytics", new Blob([body], { type: "application/json" }));
@@ -100,7 +112,8 @@ export default function SiteAnalytics() {
     const handler = (event: MouseEvent) => {
       const anchor = (event.target as Element | null)?.closest("a");
       const href = anchor?.getAttribute("href") ?? "";
-      if (href.startsWith("tel:")) send("phone_click");
+      if (href.startsWith("tel:")) send("phone_click", { channel: "call" });
+      else if (href.startsWith("sms:")) send("phone_click", { channel: "text" });
       else if (href.startsWith("mailto:")) send("email_click");
     };
     document.addEventListener("click", handler, true);

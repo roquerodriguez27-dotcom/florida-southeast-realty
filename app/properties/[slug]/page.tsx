@@ -85,6 +85,7 @@ export default async function ListingPage({ params, searchParams }: Props) {
   if (!listing) notFound();
   const isLiveListing = Boolean(listing.idx);
   const savedListing = savedComparisonListing(listing);
+  const textHref = SITE.phoneHref.replace(/^tel:/, "sms:");
 
   // The property itself remains indexable for legitimate search engines, but
   // crawlers do not need a second live BeachesMLS query just to render the
@@ -194,20 +195,34 @@ export default async function ListingPage({ params, searchParams }: Props) {
 
         <aside id="property-inquiry" className="lg:col-span-1 scroll-mt-32">
           <div className="bg-white border border-ink/10 rounded-sm p-6 sticky top-28">
-            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1">Tour or ask a question</p>
-            <p className="font-display text-xl text-ink">Talk directly with Roque</p>
-            <p className="text-sm text-ink/60 mt-1">Ask about the home or request a showing without leaving the listing.</p>
+            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1">Showing request</p>
+            <p className="font-display text-2xl text-ink">Want to see this home?</p>
+            <p className="text-sm text-ink/60 mt-2">Leave an email or phone number and Roque will follow up about this exact property.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <a href={textHref} className="rounded-sm border border-tide/25 px-4 py-2.5 text-center text-sm font-medium text-tide">Text Roque</a>
+              <a href={SITE.phoneHref} className="rounded-sm border border-tide/25 px-4 py-2.5 text-center text-sm font-medium text-tide">Call {SITE.phoneDisplay}</a>
+            </div>
             <div className="mt-5">
               <LeadForm
                 formName="property-inquiry"
-                submitLabel="Send to Roque"
-                successMessage={`Florida Southeast Realty will follow up about ${listing.address}.`}
-                hiddenContext={{ listingAddress: listing.address, listingId: listing.mlsId }}
+                submitLabel="Request Showing"
+                successMessage={`Roque will follow up about ${listing.address}.`}
+                hiddenContext={{ listingAddress: listing.address, listingId: listing.mlsId, requestType: "showing" }}
                 fields={[
-                  { name: "name", label: "Your Name", type: "text" },
-                  { name: "email", label: "Your Email", type: "email", required: true },
-                  { name: "phone", label: "Phone", type: "tel" },
-                  { name: "message", label: "Message", type: "textarea", defaultValue: `I'd like to ask about or schedule a tour of ${listing.address}.`, colSpan: 2 },
+                  { name: "email", label: "Email", type: "email", placeholder: "you@example.com" },
+                  { name: "phone", label: "Phone", type: "tel", placeholder: "Best number" },
+                  {
+                    name: "preferred_time",
+                    label: "Best time",
+                    type: "select",
+                    colSpan: 2,
+                    options: [
+                      { value: "today", label: "Today" },
+                      { value: "tomorrow", label: "Tomorrow" },
+                      { value: "this-weekend", label: "This weekend" },
+                      { value: "flexible", label: "I’m flexible" },
+                    ],
+                  },
                 ]}
               />
             </div>

@@ -6,7 +6,6 @@ import { trackSiteEvent } from "@/components/SiteAnalytics";
 type SearchCriteria = Record<string, string | boolean | undefined>;
 
 export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteria }) {
-  const [open, setOpen] = useState(false);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
   const [pendingIdx, setPendingIdx] = useState(false);
@@ -78,41 +77,30 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   );
 
   return (
-    <div className="border border-tide/15 bg-white rounded-sm p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="font-display text-lg text-ink">Save this search & get alerts</p>
-          <p className="text-xs text-ink/55 mt-0.5">New listings, price changes, and back-on-market updates.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="border border-tide/25 text-tide px-4 py-2 rounded-sm text-sm font-medium hover:bg-tide/5"
-        >
-          {open ? "Close" : "Get listing alerts"}
-        </button>
+    <div className="border border-tide/15 bg-white rounded-sm p-5">
+      <div>
+        <p className="font-display text-lg text-ink">Want new listings in this search before you miss them?</p>
+        <p className="text-xs text-ink/55 mt-1">Get new matches, price changes, and back-on-market updates by email.</p>
       </div>
-      {open && (
-        <form onSubmit={submit} className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-start">
-          <div className="hidden" aria-hidden="true"><label>Company website<input name="companyWebsite" tabIndex={-1} autoComplete="off" /></label></div>
-          <label className="flex-1 text-sm">
-            <span className="sr-only">Email</span>
-            <input
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="Email address"
-              className="w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm text-base md:text-sm focus:border-tide outline-none"
-            />
-          </label>
-          <button disabled={state === "saving"} className="bg-hibiscus text-sand px-5 py-2.5 rounded-sm text-sm font-medium disabled:opacity-60">
-            {state === "saving" ? "Saving…" : "Save & alert me"}
-          </button>
-          {state === "error" && <p className="sm:basis-full text-sm text-hibiscus" role="alert">{message}</p>}
-          <p className="sm:basis-full text-[11px] text-ink/45">Email alerts only. Unsubscribe anytime.</p>
-        </form>
-      )}
+      <form onSubmit={submit} className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-start">
+        <div className="hidden" aria-hidden="true"><label>Company website<input name="companyWebsite" tabIndex={-1} autoComplete="off" /></label></div>
+        <label className="flex-1 text-sm">
+          <span className="sr-only">Email</span>
+          <input
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="Email address"
+            className="w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm text-base md:text-sm focus:border-tide outline-none"
+          />
+        </label>
+        <button disabled={state === "saving"} className="bg-hibiscus text-sand px-5 py-2.5 rounded-sm text-sm font-medium disabled:opacity-60">
+          {state === "saving" ? "Saving…" : "Send me new listings"}
+        </button>
+        {state === "error" && <p className="sm:basis-full text-sm text-hibiscus" role="alert">{message}</p>}
+        <p className="sm:basis-full text-[11px] text-ink/45">Email alerts only. Unsubscribe anytime.</p>
+      </form>
     </div>
   );
 }

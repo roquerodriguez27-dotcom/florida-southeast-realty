@@ -61,6 +61,7 @@ function hasPropertySearchParameters(request: NextRequest): boolean {
 function isMlsHeavyPath(pathname: string): boolean {
   return pathname === "/properties"
     || pathname.startsWith("/properties/")
+    || pathname.startsWith("/communities/")
     || pathname === "/buyer-tools";
 }
 
@@ -153,5 +154,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/crm/:path*", "/properties/:path*", "/buyer-tools"],
+  matcher: ["/crm/:path*", "/properties/:path*", "/communities/:path*", "/buyer-tools"],
 };

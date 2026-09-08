@@ -3,10 +3,9 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { getListingBySlug, searchListings } from "@/lib/listings";
+import { getListingBySlug } from "@/lib/listings";
 import { formatFullPrice } from "@/lib/format";
 import Tideline from "@/components/Tideline";
-import PropertyGrid from "@/components/PropertyGrid";
 import SampleDataNotice from "@/components/SampleDataNotice";
 import LeadForm from "@/components/LeadForm";
 import ResearchLinks from "@/components/ResearchLinks";
@@ -86,16 +85,6 @@ export default async function ListingPage({ params, searchParams }: Props) {
   const isLiveListing = Boolean(listing.idx);
   const savedListing = savedComparisonListing(listing);
   const textHref = SITE.phoneHref.replace(/^tel:/, "sms:");
-
-  // The property itself remains indexable for legitimate search engines, but
-  // crawlers do not need a second live BeachesMLS query just to render the
-  // "More in this community" rail. Skipping it cuts crawler MLS pressure while
-  // preserving the full experience for real visitors.
-  const similar = crawlerRequest
-    ? []
-    : (await searchListings({ community: listing.communitySlug }))
-      .filter((item) => item.slug !== listing.slug)
-      .slice(0, 3);
 
   const jsonLd = isLiveListing
     ? {
@@ -241,18 +230,16 @@ export default async function ListingPage({ params, searchParams }: Props) {
         <ResearchLinks limit={4} />
       </section>
 
-      {similar.length > 0 && (
-        <div className="container-fsre mt-20">
-          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-hibiscus">Keep exploring</p>
-              <h2 className="font-display text-2xl text-ink">More homes in {listing.community}</h2>
-            </div>
-            <Link href={`/properties?location=${encodeURIComponent(listing.city)}`} rel="nofollow" className="text-sm text-tide underline underline-offset-4">See more in {listing.city}</Link>
+      <section className="container-fsre mt-16 border-t border-ink/10 pt-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-hibiscus">Keep exploring</p>
+            <h2 className="font-display text-2xl text-ink">More homes in {listing.city}</h2>
+            <p className="mt-1 text-sm text-ink/60">Continue to the live search when you are ready to compare nearby listings.</p>
           </div>
-          <PropertyGrid listings={similar} />
+          <Link href={`/properties?location=${encodeURIComponent(listing.city)}`} rel="nofollow" className="text-sm text-tide underline underline-offset-4">Browse homes in {listing.city}</Link>
         </div>
-      )}
+      </section>
 
       <PropertyConversionBar mlsId={listing.mlsId} />
     </div>

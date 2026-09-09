@@ -6,6 +6,7 @@ import { trackSiteEvent } from "@/components/SiteAnalytics";
 type SearchCriteria = Record<string, string | boolean | undefined>;
 
 export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteria }) {
+  const [expanded, setExpanded] = useState(false);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
   const [pendingIdx, setPendingIdx] = useState(false);
@@ -77,30 +78,46 @@ export default function SavedSearchAlert({ criteria }: { criteria: SearchCriteri
   );
 
   return (
-    <div className="border border-tide/15 bg-white rounded-sm p-5">
-      <div>
-        <p className="font-display text-lg text-ink">Want new listings in this search before you miss them?</p>
-        <p className="text-xs text-ink/55 mt-1">Get new matches, price changes, and back-on-market updates by email.</p>
-      </div>
-      <form onSubmit={submit} className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-start">
-        <div className="hidden" aria-hidden="true"><label>Company website<input name="companyWebsite" tabIndex={-1} autoComplete="off" /></label></div>
-        <label className="flex-1 text-sm">
-          <span className="sr-only">Email</span>
-          <input
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            placeholder="Email address"
-            className="w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm text-base md:text-sm focus:border-tide outline-none"
-          />
-        </label>
-        <button disabled={state === "saving"} className="bg-hibiscus text-sand px-5 py-2.5 rounded-sm text-sm font-medium disabled:opacity-60">
-          {state === "saving" ? "Saving…" : "Send me new listings"}
+    <div className="border border-tide/15 bg-white rounded-sm p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-tide/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-tide">Optional</span>
+            <p className="font-display text-base text-ink">Want email alerts for this search?</p>
+          </div>
+          <p className="text-xs text-ink/50 mt-1">You can search and browse every listing without entering any contact information.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          className="shrink-0 rounded-sm border border-tide/25 px-4 py-2 text-sm font-medium text-tide hover:bg-tide/5"
+        >
+          {expanded ? "Hide alerts" : "Get listing alerts"}
         </button>
-        {state === "error" && <p className="sm:basis-full text-sm text-hibiscus" role="alert">{message}</p>}
-        <p className="sm:basis-full text-[11px] text-ink/45">Email alerts only. Unsubscribe anytime.</p>
-      </form>
+      </div>
+
+      {expanded ? (
+        <form onSubmit={submit} className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-start">
+          <div className="hidden" aria-hidden="true"><label>Company website<input name="companyWebsite" tabIndex={-1} autoComplete="off" /></label></div>
+          <label className="flex-1 text-sm">
+            <span className="sr-only">Email</span>
+            <input
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="Email address"
+              className="w-full border border-ink/15 bg-white px-3 py-2.5 rounded-sm text-base md:text-sm focus:border-tide outline-none"
+            />
+          </label>
+          <button disabled={state === "saving"} className="bg-hibiscus text-sand px-5 py-2.5 rounded-sm text-sm font-medium disabled:opacity-60">
+            {state === "saving" ? "Saving…" : "Send me new listings"}
+          </button>
+          {state === "error" && <p className="sm:basis-full text-sm text-hibiscus" role="alert">{message}</p>}
+          <p className="sm:basis-full text-[11px] text-ink/45">Email alerts only. Unsubscribe anytime.</p>
+        </form>
+      ) : null}
     </div>
   );
 }

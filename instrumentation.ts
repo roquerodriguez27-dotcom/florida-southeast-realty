@@ -21,7 +21,7 @@ type FsrGlobal = typeof globalThis & {
 };
 
 const RESO_HOST = "replication.sparkapi.com";
-const FRESH_TTL_MS = 5 * 60_000;
+const FRESH_TTL_MS = 15 * 60_000;
 // Keep the last known good MLS response available across a provider outage.
 // Listing timestamps remain visible in the UI so stale data is transparent.
 const STALE_TTL_MS = 24 * 60 * 60_000;
@@ -29,14 +29,14 @@ const MAX_CACHE_ENTRIES = 250;
 const MAX_BACKOFF_MS = 750;
 const DEFAULT_THROTTLE_BACKOFF_MS = 60_000;
 const MAX_THROTTLE_BACKOFF_MS = 5 * 60_000;
-const PROVIDER_UNAVAILABLE_BACKOFF_MS = 15_000;
-const NETWORK_UNAVAILABLE_BACKOFF_MS = 5_000;
+const PROVIDER_UNAVAILABLE_BACKOFF_MS = 30_000;
+const NETWORK_UNAVAILABLE_BACKOFF_MS = 15_000;
 const FAILURE_WINDOW_MS = 30_000;
-const FAILURE_THRESHOLD = 4;
-const CIRCUIT_OPEN_MS = 60_000;
+const FAILURE_THRESHOLD = 3;
+const CIRCUIT_OPEN_MS = 90_000;
 const CIRCUIT_RECOVERY_GRACE_MS = 750;
 const UPSTREAM_TIMEOUT_MS = 4_000;
-const MAX_UPSTREAM_CONCURRENCY = 6;
+const MAX_UPSTREAM_CONCURRENCY = 4;
 const UPSTREAM_SLOT_WAIT_MS = 300;
 
 function wait(milliseconds: number): Promise<void> {
@@ -128,6 +128,23 @@ function trimCache(cache: Map<string, ResoSnapshot>): void {
     if (!oldestKey) break;
     cache.delete(oldestKey);
   }
+}
+
+function optimizeKnownLocationFilters(url: URL): URL {
+  const filter = url.searchParams.get("$filter");
+  if (!filter) return url;
+
+  // FBS confirmed that contains(City, ...) and contains(SubdivisionName, ...)
+  // force scans on the BeachesMLS replication database. Exact city/subdivision
+  // values should use eq so the provider can use its indexes directly.
+  const optimizedFilter = filter
+    .replace(/contains\(City,('(?:''|[^'])+')\)/g, "City eq $1")
+    .replace(/contains\(SubdivisionName,('(?:''|[^'])+')\)/g, "SubdivisionName eq $1");
+
+  if (optimizedFilter === filter) return url;
+  const optimized = new URL(url.toString());
+  optimized.searchParams.set("$filter", optimizedFilter);
+  return optimized;
 }
 
 function normalizeEntityLookup(url: URL): URL {
@@ -332,7 +349,7 @@ export async function register() {
       return originalFetch(input, init);
     }
 
-    const normalizedUrl = normalizeEntityLookup(url);
+    const normalizedUrl = optimizeKnownLocationFilters(normalizeEntityLookup(url));
     const mediaProxyUrl = mediaCollectionPropertyProxy(normalizedUrl);
     const key = normalizedUrl.toString();
     const now = Date.now();

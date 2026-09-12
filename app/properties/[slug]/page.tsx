@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { getListingBySlug } from "@/lib/listings";
 import { formatFullPrice } from "@/lib/format";
+import type { Listing } from "@/lib/types";
 import Tideline from "@/components/Tideline";
 import SampleDataNotice from "@/components/SampleDataNotice";
 import LeadForm from "@/components/LeadForm";
@@ -41,6 +42,27 @@ function validPropertySlug(slug: string) {
   return normalized.length >= 4 && normalized.length <= 300 && !INVALID_PROPERTY_SLUGS.has(normalized);
 }
 
+function listingSeoLocation(listing: Listing): string {
+  const address = listing.address.trim();
+  const city = listing.city.trim();
+  if (city && address.toLowerCase().includes(city.toLowerCase())) return address;
+  return [address, city ? `${city}, FL` : "", listing.zip].filter(Boolean).join(" ").replace(" FL ", " FL ");
+}
+
+function listingMetaDescription(listing: Listing): string {
+  const location = listingSeoLocation(listing);
+  const details = [
+    listing.beds > 0 ? `${listing.beds} bed${listing.beds === 1 ? "" : "s"}` : "",
+    listing.baths > 0 ? `${listing.baths} bath${listing.baths === 1 ? "" : "s"}` : "",
+    listing.sqft > 0 ? `${listing.sqft.toLocaleString("en-US")} sq ft` : "",
+    listing.waterfront ? "waterfront" : "",
+    listing.privatePool ? "private pool" : "",
+  ].filter(Boolean).join(", ");
+  const description = `${location}: ${formatFullPrice(listing.price)}${details ? `, ${details}` : ""}. View current BeachesMLS listing details and photos.`;
+  if (description.length <= 160) return description;
+  return `${description.slice(0, 157).replace(/\s+\S*$/, "")}…`;
+}
+
 function getReturnContext(value: string | string[] | undefined) {
   const candidate = Array.isArray(value) ? value[0] : value;
   const fallback = { href: "/properties", label: "Back to property search", fromResults: false };
@@ -66,11 +88,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const crawlerRequest = await isCrawlerRequest();
   const listing = await getCachedListingBySlug(slug, !crawlerRequest);
   if (!listing) return {};
+  const location = listingSeoLocation(listing);
+  const description = listingMetaDescription(listing);
+  const canonical = `/properties/${listing.slug}`;
   return {
-    title: `${listing.address}, ${listing.city} FL | ${formatFullPrice(listing.price)}`,
-    description: listing.description,
-    alternates: { canonical: `/properties/${listing.slug}` },
-    openGraph: { images: [{ url: listing.images[0], alt: listing.address }] },
+    title: `${location} | ${formatFullPrice(listing.price)}`,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      title: `${location} | ${formatFullPrice(listing.price)}`,
+      description,
+      url: canonical,
+      images: [{ url: listing.images[0], alt: listing.address }],
+    },
     robots: { index: idxLive, follow: true },
   };
 }
@@ -85,29 +116,44 @@ export default async function ListingPage({ params, searchParams }: Props) {
   const isLiveListing = Boolean(listing.idx);
   const savedListing = savedComparisonListing(listing);
   const textHref = SITE.phoneHref.replace(/^tel:/, "sms:");
+  const canonicalUrl = `${SITE.url}/properties/${listing.slug}`;
 
   const jsonLd = isLiveListing
     ? {
         "@context": "https://schema.org",
-        "@type": "RealEstateListing",
-        name: listing.address,
-        description: listing.description,
-        url: `${SITE.url}/properties/${listing.slug}`,
-        image: listing.images,
-        address: {
-          "@type": "PostalAddress",
-          streetAddress: listing.address,
-          addressLocality: listing.city,
-          addressRegion: "FL",
-          postalCode: listing.zip,
-          addressCountry: "US",
-        },
-        offers: {
-          "@type": "Offer",
-          price: listing.price,
-          priceCurrency: "USD",
-          availability: listing.status === "Active" ? "https://schema.org/InStock" : "https://schema.org/LimitedAvailability",
-        },
+        "@graph": [
+          {
+            "@type": "RealEstateListing",
+            "@id": `${canonicalUrl}#listing`,
+            name: listing.address,
+            description: listing.description,
+            url: canonicalUrl,
+            image: listing.images,
+            address: {
+              "@type": "PostalAddress",
+              streetAddress: listing.address,
+              addressLocality: listing.city,
+              addressRegion: "FL",
+              postalCode: listing.zip,
+              addressCountry: "US",
+            },
+            offers: {
+              "@type": "Offer",
+              price: listing.price,
+              priceCurrency: "USD",
+              availability: listing.status === "Active" ? "https://schema.org/InStock" : "https://schema.org/LimitedAvailability",
+            },
+            provider: { "@id": `${SITE.url}/#real-estate-agent` },
+          },
+          {
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Home", item: SITE.url },
+              { "@type": "ListItem", position: 2, name: "Properties", item: `${SITE.url}/properties` },
+              { "@type": "ListItem", position: 3, name: listing.address, item: canonicalUrl },
+            ],
+          },
+        ],
       }
     : null;
 

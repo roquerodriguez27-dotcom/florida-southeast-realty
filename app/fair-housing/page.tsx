@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Fair Housing & Equal Opportunity",
   description: `Equal housing opportunity statement and assistance information for ${SITE.name}.`,
   alternates: { canonical: "/fair-housing" },
+  robots: { index: false, follow: true },
 };
 
 export default function FairHousingPage() {

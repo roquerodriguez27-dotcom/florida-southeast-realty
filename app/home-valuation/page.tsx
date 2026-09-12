@@ -2,13 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import LeadForm from "@/components/LeadForm";
 
-export const metadata: Metadata = {
-  title: "What's My South Florida Home Worth? | Free Home Valuation",
-  description:
-    "Request a no-obligation South Florida home valuation from Florida Southeast Realty, then learn how the brokerage's 0.5% listing-side fee works if you decide to sell.",
-  alternates: { canonical: "/home-valuation" },
-};
-
 const REASONS = [
   {
     title: "Reviewed by the brokerage",
@@ -26,6 +19,19 @@ const REASONS = [
 
 interface Props {
   searchParams: Promise<{ address?: string }>;
+}
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const params = await searchParams;
+  const hasPrefilledAddress = Boolean(params.address?.trim());
+
+  return {
+    title: "What's My South Florida Home Worth? | Free Home Valuation",
+    description:
+      "Request a no-obligation South Florida home valuation from Florida Southeast Realty, then learn how the brokerage's 0.5% listing-side fee works if you decide to sell.",
+    alternates: { canonical: "/home-valuation" },
+    robots: { index: !hasPrefilledAddress, follow: true },
+  };
 }
 
 export default async function HomeValuationPage({ searchParams }: Props) {

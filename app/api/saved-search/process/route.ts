@@ -11,6 +11,9 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const WORKER_RPC_MAX_ATTEMPTS = 3;
+const WORKER_RPC_RETRY_BASE_MS = 150;
+
 type ClaimedSearch = {
   search_id: string;
   full_name: string;
@@ -25,10 +28,51 @@ type ClaimedSearch = {
   first_run: boolean;
 };
 
+type WorkerRpcError = {
+  code?: unknown;
+};
+
 function bearerToken(request: Request): string | null {
   const header = request.headers.get("authorization")?.trim() ?? "";
   const match = header.match(/^Bearer\s+([^\s]{20,256})$/i);
   return match?.[1] ?? null;
+}
+
+function workerErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const code = (error as WorkerRpcError).code;
+  return typeof code === "string" && code.trim() ? code.trim() : null;
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function workerRpc(
+  supabase: ReturnType<typeof createSupabasePublicClient>,
+  functionName: string,
+  args: Record<string, unknown>,
+): Promise<{ data: unknown; error: unknown; attempts: number }> {
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= WORKER_RPC_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const result = await supabase.rpc(functionName, args);
+      if (!result.error) return { data: result.data, error: null, attempts: attempt };
+      lastError = result.error;
+    } catch (error) {
+      lastError = error;
+    }
+
+    // SQLSTATE 28000 is the deliberate invalid-worker-token error raised by
+    // the database. Retrying that would only add load and hide a real auth issue.
+    if (workerErrorCode(lastError) === "28000") break;
+    if (attempt < WORKER_RPC_MAX_ATTEMPTS) {
+      await wait(WORKER_RPC_RETRY_BASE_MS * (2 ** (attempt - 1)));
+    }
+  }
+
+  return { data: null, error: lastError, attempts: WORKER_RPC_MAX_ATTEMPTS };
 }
 
 export async function POST(request: Request) {
@@ -36,16 +80,32 @@ export async function POST(request: Request) {
   if (!token) return NextResponse.json({ ok: false }, { status: 401 });
 
   const supabase = createSupabasePublicClient();
-  const { data, error } = await supabase.rpc("claim_due_saved_searches", {
+  const claim = await workerRpc(supabase, "claim_due_saved_searches", {
     p_token: token,
     p_limit: 6,
   });
-  if (error) {
-    console.error("[saved-search-worker:claim-failed]", { code: error.code });
-    return NextResponse.json({ ok: false }, { status: 401 });
+  if (claim.error) {
+    const code = workerErrorCode(claim.error);
+    const invalidToken = code === "28000";
+    const details = {
+      code: code ?? "rpc_transport_error",
+      attempts: claim.attempts,
+      invalidToken,
+    };
+
+    if (invalidToken) console.error("[saved-search-worker:claim-failed]", details);
+    else console.warn("[saved-search-worker:claim-deferred]", details);
+
+    return NextResponse.json(
+      { ok: false, temporary: !invalidToken },
+      {
+        status: invalidToken ? 401 : 503,
+        headers: invalidToken ? undefined : { "Retry-After": "30" },
+      },
+    );
   }
 
-  const claimed = Array.isArray(data) ? data as ClaimedSearch[] : [];
+  const claimed = Array.isArray(claim.data) ? claim.data as ClaimedSearch[] : [];
   let evaluated = 0;
   let sent = 0;
   let deferred = 0;
@@ -55,14 +115,17 @@ export async function POST(request: Request) {
     try {
       const result = await searchListingPage(savedCriteriaToFilters(search.criteria), 1);
       if (!result.live || result.unavailable) {
-        await supabase.rpc("release_saved_search_claim", { p_token: token, p_search_id: search.search_id });
+        await workerRpc(supabase, "release_saved_search_claim", {
+          p_token: token,
+          p_search_id: search.search_id,
+        });
         deferred += 1;
         continue;
       }
 
       const snapshot = snapshotListings(result.listings);
       if (search.first_run) {
-        const complete = await supabase.rpc("complete_saved_search_evaluation", {
+        const complete = await workerRpc(supabase, "complete_saved_search_evaluation", {
           p_token: token,
           p_search_id: search.search_id,
           p_snapshot: snapshot,
@@ -89,7 +152,10 @@ export async function POST(request: Request) {
           searchId: search.search_id,
         });
         if (!delivery.configured || !delivery.delivered) {
-          await supabase.rpc("release_saved_search_claim", { p_token: token, p_search_id: search.search_id });
+          await workerRpc(supabase, "release_saved_search_claim", {
+            p_token: token,
+            p_search_id: search.search_id,
+          });
           failed += 1;
           continue;
         }
@@ -97,7 +163,7 @@ export async function POST(request: Request) {
         sent += 1;
       }
 
-      const complete = await supabase.rpc("complete_saved_search_evaluation", {
+      const complete = await workerRpc(supabase, "complete_saved_search_evaluation", {
         p_token: token,
         p_search_id: search.search_id,
         p_snapshot: snapshot,
@@ -106,7 +172,10 @@ export async function POST(request: Request) {
       if (complete.error) throw complete.error;
       evaluated += 1;
     } catch (workerError) {
-      await supabase.rpc("release_saved_search_claim", { p_token: token, p_search_id: search.search_id });
+      await workerRpc(supabase, "release_saved_search_claim", {
+        p_token: token,
+        p_search_id: search.search_id,
+      });
       console.error("[saved-search-worker:evaluation-failed]", {
         searchId: search.search_id,
         error: workerError instanceof Error ? workerError.name : "unknown",

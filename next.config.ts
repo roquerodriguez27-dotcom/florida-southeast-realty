@@ -42,12 +42,16 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // Legacy IDX / brokerage URLs that still appear in old search-engine indexes.
       { source: "/search-results", destination: "/properties", permanent: true },
+      { source: "/search-results/:path*", destination: "/properties", permanent: true },
       { source: "/agents", destination: "/about", permanent: true },
       { source: "/info/1", destination: "/referral-status", permanent: true },
       { source: "/terms-services", destination: "/terms-of-use", permanent: true },
       { source: "/terms-and-services", destination: "/terms-of-use", permanent: true },
       { source: "/dmca-notice", destination: "/terms-of-use", permanent: true },
+      { source: "/dmca-notice-policy", destination: "/terms-of-use", permanent: true },
+      { source: "/DMCA-Notice-Policy", destination: "/terms-of-use", permanent: true },
     ];
   },
 };

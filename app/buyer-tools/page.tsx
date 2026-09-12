@@ -4,15 +4,25 @@ import { headers } from "next/headers";
 import BuyerTools from "@/components/BuyerTools";
 import { getListingBySlug } from "@/lib/listings";
 
-export const metadata: Metadata = {
-  title: "Mortgage, Affordability & Property Comparison Tools",
-  description: "Compare South Florida homes and estimate mortgage payments, affordability, taxes, insurance, HOA fees, flood insurance, and true monthly ownership costs.",
-  alternates: { canonical: "/buyer-tools" },
-};
+interface Props {
+  searchParams: Promise<{ listing?: string; tool?: string }>;
+}
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const params = await searchParams;
+  const parameterized = Boolean(params.listing || params.tool);
+
+  return {
+    title: "Mortgage, Affordability & Property Comparison Tools",
+    description: "Compare South Florida homes and estimate mortgage payments, affordability, taxes, insurance, HOA fees, flood insurance, and true monthly ownership costs.",
+    alternates: { canonical: "/buyer-tools" },
+    robots: { index: !parameterized, follow: true },
+  };
+}
 
 const CRAWLER_USER_AGENT = /(bot|crawler|spider|slurp|bingpreview|facebookexternalhit|linkedinbot|twitterbot|googleother|google-inspectiontool|semrush|ahrefs|mj12bot|dotbot)/i;
 
-export default async function BuyerToolsPage({ searchParams }: { searchParams: Promise<{ listing?: string; tool?: string }> }) {
+export default async function BuyerToolsPage({ searchParams }: Props) {
   const params = await searchParams;
   const requestHeaders = await headers();
   const userAgent = requestHeaders.get("user-agent") ?? "";

@@ -1,24 +1,21 @@
 import type { MetadataRoute } from "next";
-import { getAllListings } from "@/lib/listings";
 import { getAllCommunities } from "@/lib/communities";
 import { getGuides, getBlogPosts } from "@/lib/content";
-import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
 import { SEARCH_MARKETS } from "@/lib/seo/search-markets";
 
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [listings, communities, guides, posts] = await Promise.all([
-    getAllListings(),
+  const [communities, guides, posts] = await Promise.all([
     getAllCommunities(),
     getGuides(),
     getBlogPosts(),
   ]);
 
-  const idxLive = IDX_PROVIDER !== "not_connected";
   const staticPaths = [
     "",
+    "/properties",
     "/sellers",
     "/communities",
     "/fort-lauderdale-homes-for-sale",
@@ -32,10 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/testimonials",
     "/contact",
     "/referral-status",
-    "/accessibility-statement",
-    "/fair-housing",
   ];
-  if (idxLive) staticPaths.splice(1, 0, "/properties");
 
   const staticRoutes: MetadataRoute.Sitemap = staticPaths.map((route) => ({
     url: `${SITE.url}${route}`,
@@ -46,14 +40,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ? 0.9
         : 0.7,
   }));
-
-  const listingRoutes: MetadataRoute.Sitemap = idxLive
-    ? listings.map((listing) => ({
-        url: `${SITE.url}/properties/${listing.slug}`,
-        changeFrequency: "daily",
-        priority: 0.8,
-      }))
-    : [];
 
   const communityRoutes: MetadataRoute.Sitemap = communities.map((community) => ({
     url: `${SITE.url}/communities/${community.slug}`,
@@ -69,15 +55,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const guideRoutes: MetadataRoute.Sitemap = guides.map((guide) => ({
     url: `${SITE.url}/guides/${guide.slug}`,
+    lastModified: guide.publishedAt,
     changeFrequency: "monthly",
     priority: 0.7,
   }));
 
   const postRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${SITE.url}/blog/${post.slug}`,
+    lastModified: post.publishedAt,
     changeFrequency: "monthly",
     priority: 0.6,
   }));
 
-  return [...staticRoutes, ...searchMarketRoutes, ...communityRoutes, ...listingRoutes, ...guideRoutes, ...postRoutes];
+  // Individual MLS listings remain indexable and are linked from the site, but
+  // they are intentionally excluded from the XML sitemap. They are short-lived,
+  // widely syndicated URLs and previously caused search crawlers to create large
+  // bursts of live BeachesMLS traffic. The sitemap is reserved for durable pages
+  // that should accumulate long-term local-search authority.
+  return [...staticRoutes, ...searchMarketRoutes, ...communityRoutes, ...guideRoutes, ...postRoutes];
 }

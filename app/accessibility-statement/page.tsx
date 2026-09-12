@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Accessibility Statement",
   description: "Florida Southeast Realty, Inc.'s commitment to an accessible website.",
   alternates: { canonical: "/accessibility-statement" },
+  robots: { index: false, follow: true },
 };
 
 export default function AccessibilityStatementPage() {

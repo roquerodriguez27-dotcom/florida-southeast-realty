@@ -29,15 +29,18 @@ const MAX_CACHE_ENTRIES = 250;
 const MAX_BACKOFF_MS = 750;
 const DEFAULT_THROTTLE_BACKOFF_MS = 60_000;
 const MAX_THROTTLE_BACKOFF_MS = 5 * 60_000;
-const PROVIDER_UNAVAILABLE_BACKOFF_MS = 30_000;
+const PROVIDER_UNAVAILABLE_BACKOFF_MS = 15_000;
 const NETWORK_UNAVAILABLE_BACKOFF_MS = 15_000;
 const FAILURE_WINDOW_MS = 30_000;
 const FAILURE_THRESHOLD = 3;
 const CIRCUIT_OPEN_MS = 90_000;
 const CIRCUIT_RECOVERY_GRACE_MS = 750;
-const UPSTREAM_TIMEOUT_MS = 4_000;
+// Normal successful searches are usually sub-second, but BeachesMLS has brief
+// latency spikes above the old 4s cutoff. Give a healthy slow request room to
+// finish while staying below lib/idx.ts's 10s outer request deadline.
+const UPSTREAM_TIMEOUT_MS = 6_000;
 const MAX_UPSTREAM_CONCURRENCY = 4;
-const UPSTREAM_SLOT_WAIT_MS = 300;
+const UPSTREAM_SLOT_WAIT_MS = 750;
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));

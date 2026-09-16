@@ -71,6 +71,25 @@ function isRecognizedCrawler(userAgent: string): boolean {
     || AUTOMATION_USER_AGENT.test(userAgent);
 }
 
+function isBrowserNavigationRequest(request: NextRequest): boolean {
+  const accept = request.headers.get("accept") ?? "";
+  const fetchMode = request.headers.get("sec-fetch-mode") ?? "";
+  const fetchDest = request.headers.get("sec-fetch-dest") ?? "";
+  const isRscRequest = request.headers.get("rsc") === "1"
+    || request.headers.has("next-router-state-tree");
+
+  // Next.js client-side navigations legitimately request RSC payloads rather
+  // than a full HTML document, so they must pass this check.
+  if (isRscRequest) return true;
+
+  // Fail open when older/privacy-focused browsers omit fetch metadata, but
+  // reject contradictory headers from raw HTTP clients spoofing browser UAs.
+  if (accept && !accept.includes("text/html")) return false;
+  if (fetchMode && fetchMode !== "navigate") return false;
+  if (fetchDest && fetchDest !== "document") return false;
+  return true;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const userAgent = request.headers.get("user-agent") ?? "";
@@ -118,6 +137,27 @@ export async function proxy(request: NextRequest) {
     && !MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
     && !SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
     && (!userAgent || !BROWSER_USER_AGENT.test(userAgent))
+  ) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Cache-Control": "public, max-age=900, stale-while-revalidate=900",
+        "X-Robots-Tag": "noindex, nofollow",
+      },
+    });
+  }
+
+  // Some scrapers evade User-Agent checks by claiming to be Chrome/Safari.
+  // Real top-level browsers advertise HTML/document navigation semantics, and
+  // Next.js client transitions are tagged as RSC requests. Block browser-UA
+  // requests whose headers contradict both legitimate patterns.
+  if (
+    mlsHeavyPath
+    && request.method === "GET"
+    && BROWSER_USER_AGENT.test(userAgent)
+    && !MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
+    && !SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
+    && !isBrowserNavigationRequest(request)
   ) {
     return new NextResponse(null, {
       status: 204,

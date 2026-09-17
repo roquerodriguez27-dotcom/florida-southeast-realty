@@ -65,6 +65,36 @@ function isMlsHeavyPath(pathname: string): boolean {
     || pathname === "/buyer-tools";
 }
 
+function isPublicPagePath(pathname: string): boolean {
+  if (
+    pathname.startsWith("/api/")
+    || pathname === "/api"
+    || pathname.startsWith("/crm")
+    || pathname.startsWith("/_next/")
+    || pathname.startsWith("/.well-known/")
+    || pathname === "/robots.txt"
+    || pathname === "/sitemap.xml"
+    || pathname === "/favicon.ico"
+  ) return false;
+
+  // Do not run document-navigation heuristics against images, fonts, scripts,
+  // downloadable files, or other static assets requested by real browsers.
+  const lastSegment = pathname.split("/").pop() ?? "";
+  return !/\.[a-z0-9]{2,8}$/i.test(lastSegment);
+}
+
+function blockedAutomationResponse(): NextResponse {
+  // Never edge-cache a bot rejection. A cached 204 could otherwise be reused
+  // for a legitimate buyer request that reaches the same URL later.
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Cache-Control": "private, no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
 function isRecognizedCrawler(userAgent: string): boolean {
   return MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
     || SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
@@ -94,6 +124,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const userAgent = request.headers.get("user-agent") ?? "";
   const mlsHeavyPath = isMlsHeavyPath(pathname);
+  const publicPagePath = isPublicPagePath(pathname);
 
   if (pathname.startsWith("/properties/")) {
     const slug = pathname.slice("/properties/".length).trim().toLowerCase();
@@ -108,23 +139,17 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // MLS routes are expensive because an uncached request can trigger a live
-  // BeachesMLS RESO call. Keep major search engines and social link previews,
-  // but stop SEO scrapers, AI crawlers, headless clients, and other automation
-  // from consuming the same upstream capacity as real buyers.
+  // The September crawler waves did not stay on MLS routes: they swept
+  // research, contact, seller, join, and other public pages before fanning
+  // into property URLs. Stop known automation at the first public page it
+  // requests, while preserving verified search crawlers and social previews.
   if (
-    mlsHeavyPath
+    publicPagePath
     && AUTOMATION_USER_AGENT.test(userAgent)
     && !MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
     && !SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
   ) {
-    return new NextResponse(null, {
-      status: 204,
-      headers: {
-        "Cache-Control": "public, max-age=3600, stale-while-revalidate=3600",
-        "X-Robots-Tag": "noindex, nofollow",
-      },
-    });
+    return blockedAutomationResponse();
   }
 
   // Drop generic programmatic clients that do not present as a browser or a
@@ -132,19 +157,13 @@ export async function proxy(request: NextRequest) {
   // affected, and this prevents simple scraper clients from bypassing bot-name
   // checks with an empty or custom User-Agent.
   if (
-    mlsHeavyPath
+    publicPagePath
     && request.method === "GET"
     && !MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
     && !SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
     && (!userAgent || !BROWSER_USER_AGENT.test(userAgent))
   ) {
-    return new NextResponse(null, {
-      status: 204,
-      headers: {
-        "Cache-Control": "public, max-age=900, stale-while-revalidate=900",
-        "X-Robots-Tag": "noindex, nofollow",
-      },
-    });
+    return blockedAutomationResponse();
   }
 
   // Some scrapers evade User-Agent checks by claiming to be Chrome/Safari.
@@ -152,20 +171,14 @@ export async function proxy(request: NextRequest) {
   // Next.js client transitions are tagged as RSC requests. Block browser-UA
   // requests whose headers contradict both legitimate patterns.
   if (
-    mlsHeavyPath
+    publicPagePath
     && request.method === "GET"
     && BROWSER_USER_AGENT.test(userAgent)
     && !MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
     && !SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
     && !isBrowserNavigationRequest(request)
   ) {
-    return new NextResponse(null, {
-      status: 204,
-      headers: {
-        "Cache-Control": "public, max-age=900, stale-while-revalidate=900",
-        "X-Robots-Tag": "noindex, nofollow",
-      },
-    });
+    return blockedAutomationResponse();
   }
 
   // Filter combinations and pagination URLs canonicalize to /properties and
@@ -194,5 +207,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/crm/:path*", "/properties/:path*", "/communities/:path*", "/buyer-tools"],
+  // Apply bot heuristics to all document routes, not only MLS pages. API
+  // endpoints and Next.js/static assets are excluded so saved-search workers,
+  // analytics, images, scripts, and styles keep their existing behavior.
+  matcher: [
+    "/crm/:path*",
+    "/((?!api(?:/|$)|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+  ],
 };

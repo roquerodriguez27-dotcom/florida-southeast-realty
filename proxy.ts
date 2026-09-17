@@ -100,9 +100,10 @@ function blockedAutomationResponse(): NextResponse {
 
 function browserVerificationResponse(): NextResponse {
   // This is intentionally limited to direct browser navigations on MLS-heavy
-  // routes. Verified search crawlers/social previews bypass it, and Next.js
-  // RSC transitions from an already-open page are left alone. Raw HTTP
-  // scrapers that merely spoof Chrome/Safari do not execute this JavaScript,
+  // routes. Verified search crawlers/social previews bypass it. Real browsers
+  // receive the verification cookie from instrumentation-client.ts before
+  // normal Next.js RSC transitions; direct arrivals get this one-time page.
+  // Raw HTTP scrapers that merely spoof Chrome/Safari do not execute JavaScript,
   // so they never reach the expensive MLS render on the retry.
   const html = `<!doctype html>
 <html lang="en">
@@ -225,16 +226,13 @@ export async function proxy(request: NextRequest) {
   // navigation headers. For direct navigations to MLS-heavy pages, require one
   // tiny JavaScript round-trip before rendering live listing data. This is not
   // applied to ordinary marketing pages, verified crawlers, social previews,
-  // APIs, CRM, or Next.js RSC client transitions.
-  const isRscRequest = request.headers.get("rsc") === "1"
-    || request.headers.has("next-router-state-tree");
+  // APIs, or CRM. Unverified direct RSC fetches are challenged as well.
   if (
     mlsHeavyPath
     && request.method === "GET"
     && BROWSER_USER_AGENT.test(userAgent)
     && !MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
     && !SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
-    && !isRscRequest
     && isBrowserNavigationRequest(request)
     && request.cookies.get("fsr_browser_verified")?.value !== "1"
   ) {

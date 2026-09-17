@@ -62,7 +62,10 @@ function isMlsHeavyPath(pathname: string): boolean {
   return pathname === "/properties"
     || pathname.startsWith("/properties/")
     || pathname.startsWith("/communities/")
-    || pathname === "/buyer-tools";
+    || pathname === "/buyer-tools"
+    || pathname === "/home-valuation"
+    || pathname.startsWith("/homes-for-sale/")
+    || pathname === "/fort-lauderdale-homes-for-sale";
 }
 
 function isPublicPagePath(pathname: string): boolean {
@@ -89,6 +92,43 @@ function blockedAutomationResponse(): NextResponse {
   return new NextResponse(null, {
     status: 204,
     headers: {
+      "Cache-Control": "private, no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
+function browserVerificationResponse(): NextResponse {
+  // This is intentionally limited to direct browser navigations on MLS-heavy
+  // routes. Verified search crawlers/social previews bypass it, and Next.js
+  // RSC transitions from an already-open page are left alone. Raw HTTP
+  // scrapers that merely spoof Chrome/Safari do not execute this JavaScript,
+  // so they never reach the expensive MLS render on the retry.
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Checking your browser…</title>
+</head>
+<body>
+  <main style="font-family:system-ui,-apple-system,sans-serif;max-width:34rem;margin:12vh auto;padding:1.5rem;text-align:center">
+    <h1 style="font-size:1.25rem">Checking your browser…</h1>
+    <p>One moment while we protect live property searches.</p>
+    <noscript>JavaScript is required to view live property search results.</noscript>
+  </main>
+  <script>
+    document.cookie = "fsr_browser_verified=1; Max-Age=21600; Path=/; SameSite=Lax; Secure";
+    location.reload();
+  </script>
+</body>
+</html>`;
+
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "private, no-store",
       "X-Robots-Tag": "noindex, nofollow",
     },
@@ -179,6 +219,26 @@ export async function proxy(request: NextRequest) {
     && !isBrowserNavigationRequest(request)
   ) {
     return blockedAutomationResponse();
+  }
+
+  // A browser-looking raw scraper can satisfy header checks by copying Chrome
+  // navigation headers. For direct navigations to MLS-heavy pages, require one
+  // tiny JavaScript round-trip before rendering live listing data. This is not
+  // applied to ordinary marketing pages, verified crawlers, social previews,
+  // APIs, CRM, or Next.js RSC client transitions.
+  const isRscRequest = request.headers.get("rsc") === "1"
+    || request.headers.has("next-router-state-tree");
+  if (
+    mlsHeavyPath
+    && request.method === "GET"
+    && BROWSER_USER_AGENT.test(userAgent)
+    && !MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
+    && !SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
+    && !isRscRequest
+    && isBrowserNavigationRequest(request)
+    && request.cookies.get("fsr_browser_verified")?.value !== "1"
+  ) {
+    return browserVerificationResponse();
   }
 
   // Filter combinations and pagination URLs canonicalize to /properties and

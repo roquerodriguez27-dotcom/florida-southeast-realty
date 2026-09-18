@@ -1,3 +1,5 @@
+import { createResoUpstreamPolicy } from "./lib/reso-upstream-policy";
+
 type ResoSnapshot = {
   body: ArrayBuffer;
   status: number;
@@ -62,7 +64,9 @@ function retryAfterMilliseconds(value: string | null): number | null {
 
 function responseFromSnapshot(snapshot: ResoSnapshot, stale = false): Response {
   const headers = new Headers(snapshot.headers);
-  if (stale) headers.set("X-FSR-RESO-Stale", "1");
+  if (stale || (snapshot.status >= 200 && snapshot.status < 300 && snapshot.freshUntil <= Date.now())) {
+    headers.set("X-FSR-RESO-Stale", "1");
+  }
   return new Response(snapshot.body.slice(0), {
     status: snapshot.status,
     statusText: snapshot.statusText,
@@ -320,7 +324,9 @@ export async function register() {
   const fsrGlobal = globalThis as FsrGlobal;
   if (fsrGlobal.__fsrOriginalFetch) return;
 
-  const originalFetch = globalThis.fetch.bind(globalThis);
+  // Keep admission underneath caching: cached results remain available while
+  // only actual network calls observe adaptive cooldown and single-probe recovery.
+  const originalFetch = createResoUpstreamPolicy(globalThis.fetch.bind(globalThis));
   const inflight = fsrGlobal.__fsrResoInflight ?? new Map<string, Promise<ResoSnapshot>>();
   const cache = fsrGlobal.__fsrResoCache ?? new Map<string, ResoSnapshot>();
   const backoffUntil = fsrGlobal.__fsrResoBackoffUntil ?? new Map<string, number>();
@@ -449,6 +455,15 @@ export async function register() {
           freshUntil: Date.now() + FRESH_TTL_MS,
           staleUntil: Date.now() + STALE_TTL_MS,
         };
+
+        // A local admission rejection is not a new upstream outage. In
+        // particular, queued work must not extend the circuit or retry when
+        // another request has already triggered the provider-wide pause.
+        if (response.headers.get("X-FSR-RESO-Admission") === "local") {
+          const stale = cache.get(key);
+          if (stale && stale.staleUntil > Date.now()) return stale;
+          return snapshot;
+        }
 
         if (response.ok) {
           pruneFailures(failureTimes, Date.now());

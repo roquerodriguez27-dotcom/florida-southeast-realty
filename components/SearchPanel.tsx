@@ -1,10 +1,11 @@
 import Link from "next/link";
+import Form from "next/form";
+import SearchSubmitButton from "@/components/SearchSubmitButton";
 
 export default function SearchPanel() {
   return (
-    <form
+    <Form
       action="/properties"
-      method="get"
       className="bg-white rounded-sm shadow-[0_20px_60px_-15px_rgba(14,43,48,0.35)] p-4 md:p-5 grid grid-cols-2 md:grid-cols-6 gap-3"
     >
       <div className="col-span-2 md:col-span-2 min-w-0">
@@ -81,12 +82,10 @@ export default function SearchPanel() {
         </select>
       </div>
 
-      <button
-        type="submit"
+      <SearchSubmitButton
+        label="Search Homes"
         className="col-span-2 md:col-span-1 bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-sm rounded-sm px-4 py-2.5 transition-colors"
-      >
-        Search Homes
-      </button>
+      />
 
       <Link
         href="/properties#ai-property-search"
@@ -94,6 +93,6 @@ export default function SearchPanel() {
       >
         Or describe your ideal home in plain English →
       </Link>
-    </form>
+    </Form>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Form from "next/form";
+import SearchSubmitButton from "@/components/SearchSubmitButton";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import MultiLocationField from "@/components/MultiLocationField";
 import type { ListingAmenity, ListingFilters, ListingSort } from "@/lib/types";
@@ -269,10 +271,9 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
   }
 
   return (
-    <form
+    <Form
       key={JSON.stringify(current)}
       action="/properties"
-      method="get"
       className="rounded-sm border border-ink/10 bg-white p-3 shadow-[0_18px_50px_-42px_rgba(14,43,48,0.75)] md:p-4"
     >
       {current.bounds ? (
@@ -350,7 +351,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
           <button type="button" aria-expanded={showMore} onClick={toggleMoreFilters} className={`min-h-11 rounded-sm border px-3 py-2 text-sm font-medium ${showMore || advancedCount ? "border-tide bg-tide/5 text-tide" : "border-ink/15 bg-white text-ink/75 hover:border-tide/30"}`}>
             More filters{advancedCount ? ` (${advancedCount})` : ""}
           </button>
-          <button type="submit" className="min-h-11 rounded-sm bg-hibiscus px-5 py-2 text-sm font-semibold text-sand transition-colors hover:bg-hibiscus-dark">Search homes</button>
+          <SearchSubmitButton label="Search homes" className="min-h-11 rounded-sm bg-hibiscus px-5 py-2 text-sm font-semibold text-sand transition-colors hover:bg-hibiscus-dark" />
         </div>
       </div>
 
@@ -489,6 +490,6 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
           </div>
         </div>
       ) : null}
-    </form>
+    </Form>
   );
 }

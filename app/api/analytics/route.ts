@@ -40,9 +40,13 @@ export async function POST(request: Request) {
       p_referrer_host: parsed.data.referrerHost ?? null,
       p_metadata: parsed.data.metadata,
     });
-    if (error || data !== true) throw error ?? new Error("Analytics event rejected");
+    if (error || data !== true) {
+      console.error("Site analytics storage failed", { code: error?.code ?? "event_rejected", eventName: parsed.data.eventName });
+      return NextResponse.json({ stored: false }, { status: 503 });
+    }
     return NextResponse.json({ stored: true });
   } catch {
+    console.error("Site analytics storage unavailable");
     return NextResponse.json({ stored: false }, { status: 503 });
   }
 }

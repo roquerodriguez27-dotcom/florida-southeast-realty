@@ -2,6 +2,7 @@ export default function Loading() {
   return (
     <div className="pt-28 md:pt-32 pb-20">
       <div className="container-fsre">
+        <p role="status" aria-live="polite" className="mb-4 text-sm text-tide">Searching current MLS listings…</p>
         <div className="h-4 w-24 bg-ink/10 rounded-sm mb-3 animate-pulse" />
         <div className="h-9 w-72 bg-ink/10 rounded-sm mb-8 animate-pulse" />
         <div className="h-24 bg-ink/5 rounded-sm mb-10 animate-pulse" />

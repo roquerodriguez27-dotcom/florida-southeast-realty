@@ -19,12 +19,24 @@ const LAST_SEARCH_STORAGE_KEY = "fsr-last-property-search-v1";
 const LAST_SEARCH_UPDATED_EVENT = "fsr-last-property-search-updated";
 const BOT_USER_AGENT = /(bot|crawler|spider|slurp|bingpreview|facebookexternalhit|linkedinbot|twitterbot|googleother|google-inspectiontool|semrush|ahrefs|mj12bot|dotbot|headless|phantomjs|python-requests|curl|wget)/i;
 
-function getOrCreateId(storage: Storage, key: string) {
-  const existing = storage.getItem(key);
-  if (existing) return existing;
-  const value = crypto.randomUUID();
-  storage.setItem(key, value);
-  return value;
+const memoryIds = new Map<string, string>();
+let interactionObserved = false;
+
+function getOrCreateId(kind: "localStorage" | "sessionStorage", key: string) {
+  // Private browsing and storage restrictions must not disable all tracking.
+  try {
+    const storage = window[kind];
+    const existing = storage.getItem(key);
+    if (existing) return existing;
+    const value = memoryIds.get(key) ?? crypto.randomUUID();
+    memoryIds.set(key, value);
+    storage.setItem(key, value);
+    return value;
+  } catch {
+    const value = memoryIds.get(key) ?? crypto.randomUUID();
+    memoryIds.set(key, value);
+    return value;
+  }
 }
 
 function referrerHost() {
@@ -43,6 +55,8 @@ function visitorSignals(): Record<string, string | boolean> {
   const botUserAgent = BOT_USER_AGENT.test(userAgent);
   const probableBot = webdriver || botUserAgent;
   return {
+    signalVersion: "2",
+    interactionObserved,
     visitorType: probableBot ? "probable_bot" : "browser",
     automatedSignal: webdriver ? "webdriver" : botUserAgent ? "user_agent" : "none",
   };
@@ -50,8 +64,8 @@ function visitorSignals(): Record<string, string | boolean> {
 
 function send(eventName: EventName, metadata: Record<string, string | number | boolean | null> = {}) {
   try {
-    const visitorId = getOrCreateId(localStorage, "fsr_visitor_id");
-    const sessionId = getOrCreateId(sessionStorage, "fsr_session_id");
+    const visitorId = getOrCreateId("localStorage", "fsr_visitor_id");
+    const sessionId = getOrCreateId("sessionStorage", "fsr_session_id");
     const body = JSON.stringify({
       visitorId,
       sessionId,
@@ -60,10 +74,12 @@ function send(eventName: EventName, metadata: Record<string, string | number | b
       referrerHost: referrerHost(),
       metadata: { ...visitorSignals(), ...metadata },
     });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon("/api/analytics", new Blob([body], { type: "application/json" }));
-    } else {
-      void fetch("/api/analytics", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true });
+    let queued = false;
+    try {
+      queued = navigator.sendBeacon?.("/api/analytics", new Blob([body], { type: "application/json" })) ?? false;
+    } catch { /* Fall back when a browser refuses the beacon. */ }
+    if (!queued) {
+      void fetch("/api/analytics", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
     }
   } catch {
     // Analytics must never interfere with the customer experience.
@@ -109,15 +125,25 @@ export default function SiteAnalytics() {
   }, [pathname, searchParams]);
 
   useEffect(() => {
+    const recordInteraction = (event: Event) => {
+      if (event.isTrusted) interactionObserved = true;
+    };
+    document.addEventListener("pointerdown", recordInteraction, true);
+    document.addEventListener("keydown", recordInteraction, true);
     const handler = (event: MouseEvent) => {
-      const anchor = (event.target as Element | null)?.closest("a");
+      recordInteraction(event);
+      const anchor = event.target instanceof Element ? event.target.closest("a") : null;
       const href = anchor?.getAttribute("href") ?? "";
       if (href.startsWith("tel:")) send("phone_click", { channel: "call" });
       else if (href.startsWith("sms:")) send("phone_click", { channel: "text" });
       else if (href.startsWith("mailto:")) send("email_click");
     };
     document.addEventListener("click", handler, true);
-    return () => document.removeEventListener("click", handler, true);
+    return () => {
+      document.removeEventListener("click", handler, true);
+      document.removeEventListener("pointerdown", recordInteraction, true);
+      document.removeEventListener("keydown", recordInteraction, true);
+    };
   }, []);
 
   return null;

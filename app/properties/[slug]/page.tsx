@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { getListingBySlug } from "@/lib/listings";
+import { getListingDetail } from "@/lib/listing-detail";
 import { formatFullPrice } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import Tideline from "@/components/Tideline";
@@ -17,6 +16,7 @@ import IdxAttribution from "@/components/IdxAttribution";
 import CompareToggle from "@/components/CompareToggle";
 import { savedComparisonListing } from "@/lib/comparison";
 import PropertyGallery from "@/components/PropertyGallery";
+import ListingUnavailable from "@/components/ListingUnavailable";
 import SaveListingButton from "@/components/SaveListingButton";
 import AskRoqueActions from "@/components/AskRoqueActions";
 import PropertyConversionBar from "@/components/PropertyConversionBar";
@@ -29,13 +29,11 @@ interface Props {
 
 const idxLive = IDX_PROVIDER !== "not_connected";
 const siteOrigin = new URL(SITE.url).origin;
-const getCachedListingBySlug = cache(getListingBySlug);
+const getCachedListingBySlug = cache(getListingDetail);
 const INVALID_PROPERTY_SLUGS = new Set(["null", "undefined", "false", "nan"]);
-const CRAWLER_USER_AGENT = /(bot|crawler|spider|slurp|bingpreview|facebookexternalhit|linkedinbot|twitterbot|googleother|google-inspectiontool|semrush|ahrefs|mj12bot|dotbot)/i;
-const isCrawlerRequest = cache(async () => (
-  CRAWLER_USER_AGENT.test((await headers()).get("user-agent") ?? "")
-));
-export const revalidate = 300;
+// Keep the temporary-unavailable UI out of the full-route cache. Listing data
+// still uses the explicit shared cache in lib/idx.ts.
+export const dynamic = "force-dynamic";
 
 function validPropertySlug(slug: string) {
   const normalized = slug.trim().toLowerCase();
@@ -85,9 +83,9 @@ function getReturnContext(value: string | string[] | undefined) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   if (!validPropertySlug(slug)) return { robots: { index: false, follow: false } };
-  const crawlerRequest = await isCrawlerRequest();
-  const listing = await getCachedListingBySlug(slug, !crawlerRequest);
-  if (!listing) return {};
+  const result = await getCachedListingBySlug(slug);
+  if (result.kind !== "found") return { robots: { index: false, follow: true } };
+  const listing = result.listing;
   const location = listingSeoLocation(listing);
   const description = listingMetaDescription(listing);
   const canonical = `/properties/${listing.slug}`;
@@ -110,9 +108,10 @@ export default async function ListingPage({ params, searchParams }: Props) {
   const [{ slug }, search] = await Promise.all([params, searchParams]);
   const returnContext = getReturnContext(search.returnTo);
   if (!validPropertySlug(slug)) notFound();
-  const crawlerRequest = await isCrawlerRequest();
-  const listing = await getCachedListingBySlug(slug, !crawlerRequest);
-  if (!listing) notFound();
+  const result = await getCachedListingBySlug(slug);
+  if (result.kind === "unavailable") return <ListingUnavailable />;
+  if (result.kind === "not-found") notFound();
+  const listing = result.listing;
   const isLiveListing = Boolean(listing.idx);
   const savedListing = savedComparisonListing(listing);
   const textHref = SITE.phoneHref.replace(/^tel:/, "sms:");
@@ -169,7 +168,7 @@ export default async function ListingPage({ params, searchParams }: Props) {
         />
       </div>
 
-      <PropertyGallery images={listing.images} address={listing.address} />
+      <PropertyGallery key={listing.slug} images={listing.images} address={listing.address} slug={isLiveListing ? listing.slug : undefined} photoCount={listing.photoCount} />
 
       {!isLiveListing && <div className="container-fsre mt-6"><SampleDataNotice variant="listings" /></div>}
 

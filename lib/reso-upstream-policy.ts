@@ -115,6 +115,11 @@ export function createResoUpstreamPolicy(
     const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
     if (url.hostname !== RESO_HOST || method !== "GET") return upstream(input, init);
 
+    // An already-expired caller did not contact the provider. Do not turn its
+    // cancellation into a new feed-wide outage or extend the recovery pause.
+    const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    signal?.throwIfAborted();
+
     const time = now();
     if (pauseUntil > time) return admissionResponse(pauseReason, pauseUntil - time);
     if (probeInFlight || active >= MAX_CONCURRENT_REQUESTS) {

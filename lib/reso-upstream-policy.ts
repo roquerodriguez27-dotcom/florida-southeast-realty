@@ -57,6 +57,17 @@ function admissionResponse(reason: AdmissionReason, remainingMs: number): Respon
   });
 }
 
+/** A caller cancellation is not proof that the MLS provider is unavailable.
+ * TimeoutError is intentionally NOT excluded: real deadlines retain backoff.
+ * Unknown/custom abort reasons are conservatively treated as failures.
+ */
+export function isResoRequestCancellation(signal?: AbortSignal | null): boolean {
+  if (!signal?.aborted) return false;
+  const reason: unknown = signal.reason;
+  return typeof reason === "object" && reason !== null
+    && "name" in reason && reason.name === "AbortError";
+}
+
 export function createResoUpstreamPolicy(
   upstream: typeof fetch,
   options: PolicyOptions = {},
@@ -143,6 +154,7 @@ export function createResoUpstreamPolicy(
       }
       return response;
     } catch (error) {
+      if (isResoRequestCancellation(signal)) throw error;
       recordFailure(startedInGeneration, "network_error", null);
       throw error;
     } finally {

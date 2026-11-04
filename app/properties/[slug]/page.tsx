@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { getListingDetail } from "@/lib/listing-detail";
+import { ListingUnavailableError } from "@/lib/listing-result";
 import { formatFullPrice } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import Tideline from "@/components/Tideline";
@@ -16,7 +17,6 @@ import IdxAttribution from "@/components/IdxAttribution";
 import CompareToggle from "@/components/CompareToggle";
 import { savedComparisonListing } from "@/lib/comparison";
 import PropertyGallery from "@/components/PropertyGallery";
-import ListingUnavailable from "@/components/ListingUnavailable";
 import SaveListingButton from "@/components/SaveListingButton";
 import AskRoqueActions from "@/components/AskRoqueActions";
 import PropertyConversionBar from "@/components/PropertyConversionBar";
@@ -31,8 +31,8 @@ const idxLive = IDX_PROVIDER !== "not_connected";
 const siteOrigin = new URL(SITE.url).origin;
 const getCachedListingBySlug = cache(getListingDetail);
 const INVALID_PROPERTY_SLUGS = new Set(["null", "undefined", "false", "nan"]);
-// Keep the temporary-unavailable UI out of the full-route cache. Listing data
-// still uses the explicit shared cache in lib/idx.ts.
+// Listing data uses the explicit shared cache in lib/idx.ts. Transient failures
+// use the route's retry boundary rather than a cached noindex/soft-404 document.
 export const dynamic = "force-dynamic";
 
 function validPropertySlug(slug: string) {
@@ -84,7 +84,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   if (!validPropertySlug(slug)) return { robots: { index: false, follow: false } };
   const result = await getCachedListingBySlug(slug);
-  if (result.kind !== "found") return { robots: { index: false, follow: true } };
+  if (result.kind === "unavailable") throw new ListingUnavailableError();
+  if (result.kind === "not-found") return { robots: { index: false, follow: true } };
   const listing = result.listing;
   const location = listingSeoLocation(listing);
   const description = listingMetaDescription(listing);
@@ -109,7 +110,7 @@ export default async function ListingPage({ params, searchParams }: Props) {
   const returnContext = getReturnContext(search.returnTo);
   if (!validPropertySlug(slug)) notFound();
   const result = await getCachedListingBySlug(slug);
-  if (result.kind === "unavailable") return <ListingUnavailable />;
+  if (result.kind === "unavailable") throw new ListingUnavailableError();
   if (result.kind === "not-found") notFound();
   const listing = result.listing;
   const isLiveListing = Boolean(listing.idx);

@@ -188,10 +188,10 @@ export default async function ListingPage({ params, searchParams }: Props) {
           <p className="font-display text-3xl text-tide mt-4">{formatFullPrice(listing.price)}</p>
 
           <div className="flex flex-wrap gap-3 mt-5">
-            <Link href={`/buyer-tools?listing=${listing.slug}&tool=cost`} className="bg-tide text-sand px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide-light transition-colors">Calculate true monthly cost</Link>
+            <Link prefetch={false} href={`/buyer-tools?listing=${listing.slug}&tool=cost`} className="bg-tide text-sand px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide-light transition-colors">Calculate true monthly cost</Link>
             <SaveListingButton listing={savedListing} variant="detail" />
             <CompareToggle listing={savedListing} variant="detail" />
-            <Link href={returnContext.href} className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">Choose more homes</Link>
+            <Link prefetch={false} href={returnContext.href} className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">Choose more homes</Link>
           </div>
           <p className="mt-2 text-xs text-ink/50">Save favorites for later, or select up to three homes to compare side-by-side.</p>
 
@@ -271,7 +271,7 @@ export default async function ListingPage({ params, searchParams }: Props) {
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus mb-2">Due Diligence</p>
             <h2 className="font-display text-2xl md:text-3xl text-ink">Research beyond the listing</h2>
           </div>
-          <Link href="/research" className="text-sm text-tide underline underline-offset-4">Open full research center</Link>
+          <Link prefetch={false} href="/research" className="text-sm text-tide underline underline-offset-4">Open full research center</Link>
         </div>
         <ResearchLinks limit={4} />
       </section>
@@ -283,7 +283,7 @@ export default async function ListingPage({ params, searchParams }: Props) {
             <h2 className="font-display text-2xl text-ink">More homes in {listing.city}</h2>
             <p className="mt-1 text-sm text-ink/60">Continue to the live search when you are ready to compare nearby listings.</p>
           </div>
-          <Link href={`/properties?location=${encodeURIComponent(listing.city)}`} rel="nofollow" className="text-sm text-tide underline underline-offset-4">Browse homes in {listing.city}</Link>
+          <Link prefetch={false} href={`/properties?location=${encodeURIComponent(listing.city)}`} rel="nofollow" className="text-sm text-tide underline underline-offset-4">Browse homes in {listing.city}</Link>
         </div>
       </section>
 

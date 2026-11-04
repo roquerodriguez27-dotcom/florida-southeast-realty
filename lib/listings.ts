@@ -169,12 +169,11 @@ export async function getListingBySlug(
   slug: string,
   includeCompleteMedia = true,
 ): Promise<Listing | undefined> {
-  try {
-    const live = await fetchLiveListingBySlug(slug, includeCompleteMedia);
-    if (live) return live;
-  } catch {
-    return undefined;
-  }
+  // A transport/provider failure is not evidence that a home does not exist.
+  // Let the detail route show its retry boundary; only a completed empty lookup
+  // may become a 404. Callers such as buyer tools handle the failure explicitly.
+  const live = await fetchLiveListingBySlug(slug, includeCompleteMedia);
+  if (live) return live;
 
   return canUseSampleListings() ? LISTINGS.find((listing) => listing.slug === slug) : undefined;
 }

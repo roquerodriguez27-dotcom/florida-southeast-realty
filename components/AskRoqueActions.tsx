@@ -34,7 +34,7 @@ export default function AskRoqueActions({
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2.5">
-        <Link
+        <Link prefetch={false}
           href={`/buyer-tools?listing=${encodeURIComponent(slug)}&tool=cost`}
           onClick={() => track("monthly_cost")}
           className="rounded-full border border-tide/20 bg-white px-4 py-2 text-sm font-medium text-tide hover:bg-tide/5"
@@ -51,7 +51,7 @@ export default function AskRoqueActions({
         >
           Is the HOA high?
         </button>
-        <Link
+        <Link prefetch={false}
           href={`/properties?location=${encodeURIComponent(city)}&maxPrice=${similarMax}`}
           rel="nofollow"
           onClick={() => track("similar_homes")}
@@ -59,7 +59,7 @@ export default function AskRoqueActions({
         >
           Show me similar homes
         </Link>
-        <Link
+        <Link prefetch={false}
           href="/research"
           onClick={() => track("research")}
           className="rounded-full border border-tide/20 bg-white px-4 py-2 text-sm font-medium text-tide hover:bg-tide/5"

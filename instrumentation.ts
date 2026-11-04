@@ -1,4 +1,4 @@
-import { createResoUpstreamPolicy } from "./lib/reso-upstream-policy";
+import { createResoUpstreamPolicy, isResoRequestCancellation } from "./lib/reso-upstream-policy";
 
 type ResoSnapshot = {
   body: ArrayBuffer;
@@ -48,7 +48,7 @@ function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function retryAfterMilliseconds(value: string | null): number | null {
+function retryAfterMilliseconds(value: string | null, now = Date.now()): number | null {
   if (!value) return null;
 
   const seconds = Number(value);
@@ -58,7 +58,7 @@ function retryAfterMilliseconds(value: string | null): number | null {
 
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) return null;
-  const delay = timestamp - Date.now();
+  const delay = timestamp - now;
   return delay > 0 ? Math.min(MAX_THROTTLE_BACKOFF_MS, delay) : null;
 }
 
@@ -284,11 +284,14 @@ function timeoutProtectedInit(init?: RequestInit): {
 } {
   const controller = new AbortController();
   const existingSignal = init?.signal;
-  const abortFromExisting = () => controller.abort();
-  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  const abortFromExisting = () => controller.abort(existingSignal?.reason);
+  const timer = setTimeout(
+    () => controller.abort(new DOMException("MLS upstream request timed out.", "TimeoutError")),
+    UPSTREAM_TIMEOUT_MS,
+  );
 
   if (existingSignal) {
-    if (existingSignal.aborted) controller.abort();
+    if (existingSignal.aborted) abortFromExisting();
     else existingSignal.addEventListener("abort", abortFromExisting, { once: true });
   }
 
@@ -358,6 +361,8 @@ export async function register() {
       return originalFetch(input, init);
     }
 
+    // Do not return cached data or consume a slot for a caller already cancelled.
+    init?.signal?.throwIfAborted();
     const normalizedUrl = optimizeKnownLocationFilters(normalizeEntityLookup(url));
     const mediaProxyUrl = mediaCollectionPropertyProxy(normalizedUrl);
     const key = normalizedUrl.toString();
@@ -521,7 +526,10 @@ export async function register() {
         // detail code intentionally uses them to decide whether to try its safe
         // collection lookup fallback.
         return snapshot;
-      } catch {
+      } catch (error) {
+        // Preserve caller cancellation through both admission layers. A normal
+        // navigation abort must not pause unrelated visitors or open the circuit.
+        if (isResoRequestCancellation(protectedRequest.init.signal)) throw error;
         recordFailure(fsrGlobal, failureTimes);
         fsrGlobal.__fsrResoProviderUnavailableUntil = Math.max(
           fsrGlobal.__fsrResoProviderUnavailableUntil ?? 0,

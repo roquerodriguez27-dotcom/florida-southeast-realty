@@ -12,17 +12,68 @@ const MAX_AUTOMATIC_PAUSE_MS = 300_000;
 type PauseReason = "upstream_error" | "network_error" | "throttled";
 type AdmissionReason = PauseReason | "capacity_protected";
 
+type RequestKind = "property_collection" | "property_entity" | "media_collection" | "system" | "metadata" | "other";
+const ERROR_CLASSES = ["Error", "TypeError", "AbortError", "TimeoutError", "AggregateError"] as const;
+const CAUSE_CODES = [
+  "ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE",
+  "ENETUNREACH", "EHOSTUNREACH", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT", "UND_ERR_SOCKET", "CERT_HAS_EXPIRED",
+  "DEPTH_ZERO_SELF_SIGNED_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+] as const;
+type NetworkErrorDetails = {
+  failureType: "timeout" | "network_error";
+  errorClass: typeof ERROR_CLASSES[number] | "unknown";
+  causeCode: typeof CAUSE_CODES[number] | "unknown";
+};
+
 type FailureEvent = {
   kind: "actual_upstream_failure";
   status: number | "network_error";
   consecutiveFailures: number;
   retryAfterSeconds: number;
+  requestKind: RequestKind;
+  durationMs: number;
+  failureType: "http_error" | NetworkErrorDetails["failureType"];
+  errorClass?: NetworkErrorDetails["errorClass"];
+  causeCode?: NetworkErrorDetails["causeCode"];
 };
 
 type PolicyOptions = {
   now?: () => number;
   onFailure?: (event: FailureEvent) => void;
 };
+
+// Fixed categories describe only the actual upstream resource shape. The
+// outer cache may rewrite detail/media lookups into a Property collection.
+function requestKind(url: URL): RequestKind {
+  if (/\/Property$/i.test(url.pathname)) return "property_collection";
+  if (/\/Property\([^/]*\)$/i.test(url.pathname)) return "property_entity";
+  if (/\/Media$/i.test(url.pathname)) return "media_collection";
+  if (/\/System$/i.test(url.pathname)) return "system";
+  if (/\/\$metadata$/i.test(url.pathname)) return "metadata";
+  return "other";
+}
+
+function errorField(value: unknown, key: string): unknown {
+  try {
+    return typeof value === "object" && value !== null
+      ? (value as Record<string, unknown>)[key] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function networkErrorDetails(error: unknown, signal?: AbortSignal | null): NetworkErrorDetails {
+  const name = errorField(error, "name");
+  const code = errorField(errorField(error, "cause"), "code");
+  // Return literals from the allowlists, never values copied from an error.
+  const errorClass = ERROR_CLASSES.find((value) => value === name) ?? "unknown";
+  const causeCode = CAUSE_CODES.find((value) => value === code) ?? "unknown";
+  const timeout = errorClass === "TimeoutError"
+    || (signal?.aborted && errorField(signal.reason, "name") === "TimeoutError")
+    || causeCode === "ETIMEDOUT" || causeCode.endsWith("_TIMEOUT");
+  return { failureType: timeout ? "timeout" : "network_error", errorClass, causeCode };
+}
 
 function retryAfterMs(value: string | null, now: number): number {
   if (!value?.trim()) return 0;
@@ -88,6 +139,9 @@ export function createResoUpstreamPolicy(
     startedInGeneration: number,
     status: number | "network_error",
     retryAfter: string | null,
+    startedAt: number,
+    kind: RequestKind,
+    errorDetails?: NetworkErrorDetails,
   ): void {
     const time = now();
     // Parallel failures in the same wave count as ONE recovery failure. A
@@ -113,6 +167,10 @@ export function createResoUpstreamPolicy(
       status,
       consecutiveFailures,
       retryAfterSeconds: Math.ceil((pauseUntil - time) / 1_000),
+      requestKind: kind,
+      durationMs: Number.isFinite(time - startedAt) ? Math.max(0, Math.round(time - startedAt)) : 0,
+      failureType: "http_error",
+      ...errorDetails,
     });
   }
 
@@ -141,10 +199,12 @@ export function createResoUpstreamPolicy(
     if (isRecoveryProbe) probeInFlight = true;
     const startedInGeneration = generation;
     active += 1;
+    const startedAt = now();
+    const kind = requestKind(url);
     try {
       const response = await upstream(input, init);
       if (response.status === 429 || response.status >= 500) {
-        recordFailure(startedInGeneration, response.status, response.headers.get("retry-after"));
+        recordFailure(startedInGeneration, response.status, response.headers.get("retry-after"), startedAt, kind);
       } else if (startedInGeneration === generation) {
         // A response that started BEFORE a concurrent failure must never
         // cancel the newer pause. Ordinary 4xx responses prove reachability
@@ -155,7 +215,7 @@ export function createResoUpstreamPolicy(
       return response;
     } catch (error) {
       if (isResoRequestCancellation(signal)) throw error;
-      recordFailure(startedInGeneration, "network_error", null);
+      recordFailure(startedInGeneration, "network_error", null, startedAt, kind, networkErrorDetails(error, signal));
       throw error;
     } finally {
       active = Math.max(0, active - 1);

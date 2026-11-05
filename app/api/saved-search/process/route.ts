@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
-import { searchListingPage } from "@/lib/listings";
+import { fetchLiveListingSnapshot } from "@/lib/idx";
 import {
   compareSavedSearchSnapshots,
   savedCriteriaToFilters,
@@ -113,8 +113,8 @@ export async function POST(request: Request) {
 
   for (const search of claimed) {
     try {
-      const result = await searchListingPage(savedCriteriaToFilters(search.criteria), 1);
-      if (!result.live || result.unavailable) {
+      const result = await fetchLiveListingSnapshot(savedCriteriaToFilters(search.criteria));
+      if (!result || !result.live || result.unavailable) {
         await workerRpc(supabase, "release_saved_search_claim", {
           p_token: token,
           p_search_id: search.search_id,

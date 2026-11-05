@@ -1,4 +1,4 @@
-import { createResoUpstreamPolicy, isResoRequestCancellation } from "./lib/reso-upstream-policy";
+import { createResoUpstreamPolicy, isResoRequestCancellation, observeResoDeadlineAbort } from "./lib/reso-upstream-policy";
 
 type ResoSnapshot = {
   body: ArrayBuffer;
@@ -284,9 +284,16 @@ function timeoutProtectedInit(init?: RequestInit): {
 } {
   const controller = new AbortController();
   const existingSignal = init?.signal;
-  const abortFromExisting = () => controller.abort(existingSignal?.reason);
+  const abortFromExisting = () => {
+    observeResoDeadlineAbort(controller.signal, "caller_signal", performance.now());
+    controller.abort(existingSignal?.reason);
+  };
+  const timerDueAt = performance.now() + UPSTREAM_TIMEOUT_MS;
   const timer = setTimeout(
-    () => controller.abort(new DOMException("MLS upstream request timed out.", "TimeoutError")),
+    () => {
+      observeResoDeadlineAbort(controller.signal, "upstream_timeout", performance.now(), timerDueAt);
+      controller.abort(new DOMException("MLS upstream request timed out.", "TimeoutError"));
+    },
     UPSTREAM_TIMEOUT_MS,
   );
 

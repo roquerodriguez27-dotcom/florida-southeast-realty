@@ -26,6 +26,53 @@ type NetworkErrorDetails = {
   causeCode: typeof CAUSE_CODES[number] | "unknown";
 };
 
+type DeadlineSource = "upstream_timeout" | "caller_signal" | "unknown" | "not_aborted";
+type AbortTimingDetails = {
+  deadlineSource: DeadlineSource;
+  abortAfterMs: number | null;
+  timerLatenessMs: number | null;
+  abortToRejectionMs: number | null;
+};
+type DeadlineObservation = { source: DeadlineSource; abortedAt: number; dueAt?: number };
+const deadlineObservations = new WeakMap<AbortSignal, DeadlineObservation>();
+const MAX_DIAGNOSTIC_TIMING_MS = 300_000;
+
+// Observe the first abort source without changing its signal, reason, or timer.
+// All timestamps are monotonic and private; only capped relative times are logged.
+export function observeResoDeadlineAbort(
+  signal: AbortSignal,
+  source: "upstream_timeout" | "caller_signal",
+  abortedAt: number,
+  dueAt?: number,
+): void {
+  if (signal.aborted || deadlineObservations.has(signal) || !Number.isFinite(abortedAt)) return;
+  deadlineObservations.set(signal, {
+    source: source === "upstream_timeout" ? "upstream_timeout" : source === "caller_signal" ? "caller_signal" : "unknown",
+    abortedAt,
+    ...(source === "upstream_timeout" && Number.isFinite(dueAt) ? { dueAt } : {}),
+  });
+}
+
+function boundedTiming(value: number): number | null {
+  return Number.isFinite(value) ? Math.min(MAX_DIAGNOSTIC_TIMING_MS, Math.max(0, Math.round(value))) : null;
+}
+
+function abortTimingDetails(
+  signal: AbortSignal | null | undefined,
+  startedAt: number,
+  observedAbortAt: number | undefined,
+  rejectedAt: number,
+): AbortTimingDetails {
+  const observation = signal ? deadlineObservations.get(signal) : undefined;
+  const abortedAt = observation?.abortedAt ?? observedAbortAt;
+  return {
+    deadlineSource: !signal?.aborted ? "not_aborted" : observation?.source ?? (observedAbortAt === undefined ? "unknown" : "caller_signal"),
+    abortAfterMs: abortedAt === undefined ? null : boundedTiming(abortedAt - startedAt),
+    timerLatenessMs: observation?.dueAt === undefined ? null : boundedTiming(observation.abortedAt - observation.dueAt),
+    abortToRejectionMs: abortedAt === undefined ? null : boundedTiming(rejectedAt - abortedAt),
+  };
+}
+
 type FailureEvent = {
   kind: "actual_upstream_failure";
   status: number | "network_error";
@@ -36,10 +83,15 @@ type FailureEvent = {
   failureType: "http_error" | NetworkErrorDetails["failureType"];
   errorClass?: NetworkErrorDetails["errorClass"];
   causeCode?: NetworkErrorDetails["causeCode"];
+  deadlineSource?: AbortTimingDetails["deadlineSource"];
+  abortAfterMs?: number | null;
+  timerLatenessMs?: number | null;
+  abortToRejectionMs?: number | null;
 };
 
 type PolicyOptions = {
   now?: () => number;
+  timingNow?: () => number;
   onFailure?: (event: FailureEvent) => void;
 };
 
@@ -124,6 +176,7 @@ export function createResoUpstreamPolicy(
   options: PolicyOptions = {},
 ): typeof fetch {
   const now = options.now ?? Date.now;
+  const timingNow = options.timingNow ?? (() => performance.now());
   const reportFailure = options.onFailure ?? ((event: FailureEvent) => {
     // Never log the URL, bearer token, request headers, or response body.
     console.warn("[BeachesMLS RESO] Actual upstream request failed.", event);
@@ -141,7 +194,7 @@ export function createResoUpstreamPolicy(
     retryAfter: string | null,
     startedAt: number,
     kind: RequestKind,
-    errorDetails?: NetworkErrorDetails,
+    errorDetails?: NetworkErrorDetails & AbortTimingDetails,
   ): void {
     const time = now();
     // Parallel failures in the same wave count as ONE recovery failure. A
@@ -201,6 +254,10 @@ export function createResoUpstreamPolicy(
     active += 1;
     const startedAt = now();
     const kind = requestKind(url);
+    const upstreamStartedAt = timingNow();
+    let observedAbortAt: number | undefined;
+    const observeAbort = () => { observedAbortAt ??= timingNow(); };
+    signal?.addEventListener("abort", observeAbort, { once: true });
     try {
       const response = await upstream(input, init);
       if (response.status === 429 || response.status >= 500) {
@@ -214,10 +271,15 @@ export function createResoUpstreamPolicy(
       }
       return response;
     } catch (error) {
+      const rejectedAt = timingNow();
       if (isResoRequestCancellation(signal)) throw error;
-      recordFailure(startedInGeneration, "network_error", null, startedAt, kind, networkErrorDetails(error, signal));
+      recordFailure(startedInGeneration, "network_error", null, startedAt, kind, {
+        ...networkErrorDetails(error, signal),
+        ...abortTimingDetails(signal, upstreamStartedAt, observedAbortAt, rejectedAt),
+      });
       throw error;
     } finally {
+      signal?.removeEventListener("abort", observeAbort);
       active = Math.max(0, active - 1);
       if (isRecoveryProbe) probeInFlight = false;
     }

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node scripts/next-cache-lifecycle.mjs",
+    "prebuild": "node scripts/next-cache-lifecycle.mjs --prepare-build",
+    "postbuild": "node scripts/next-cache-lifecycle.mjs --verify-build",
+    "test:cache-lifecycle": "node scripts/test-next-cache-lifecycle.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.4",

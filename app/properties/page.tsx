@@ -301,6 +301,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
     sort,
   }, optionalPositiveInteger(params.page) ?? 1);
   const { listings } = result;
+  const hasMorePages = result.pagination.page < result.pagination.totalPages;
+  const isPartialSearchPage = hasMorePages || result.pagination.page > 1;
   const addressQuery = looksLikeStreetAddress(propertyQuery) ? propertyQuery : undefined;
   const hasSecondaryFilters = Boolean(
     locations.length > 0 || params.minPrice || params.maxPrice || params.beds || params.baths
@@ -314,7 +316,8 @@ export default async function PropertiesPage({ searchParams }: Props) {
       || params.newer === "1" || params.spacious === "1" || params.largeLot === "1" || bounds,
   );
   const noCurrentAddressListing = Boolean(
-    addressQuery && !hasSecondaryFilters && result.live && !result.unavailable && listings.length === 0,
+    addressQuery && !hasSecondaryFilters && result.live && !result.unavailable
+      && listings.length === 0 && !isPartialSearchPage,
   );
   const valuationHref = addressQuery
     ? `/home-valuation?address=${encodeURIComponent(addressQuery)}`
@@ -466,16 +469,6 @@ export default async function PropertiesPage({ searchParams }: Props) {
               <PropertyGrid listings={listings} compact={params.view === "map"} returnTo={returnTo} />
             </PropertyResultsView>
             <IdxPageDisclaimer attribution={listings[0]?.idx} />
-            {result.pagination.totalPages > 1 && (
-              <nav className="mt-8 flex items-center justify-between gap-4" aria-label="Listing results pages">
-                {result.pagination.page > 1 ? <Link href={pageHref(params, result.pagination.page - 1)} prefetch={false} rel="nofollow" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Previous</Link> : <span />}
-                <span className="text-sm text-ink/55">
-                  Page {result.pagination.page}
-                  {result.pagination.totalRowsExact === false ? "" : ` of ${result.pagination.totalPages}`}
-                </span>
-                {result.pagination.page < result.pagination.totalPages ? <Link href={pageHref(params, result.pagination.page + 1)} prefetch={false} rel="nofollow" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Next</Link> : <span />}
-              </nav>
-            )}
           </section>
         ) : noCurrentAddressListing ? (
           <div className="bg-white border border-ink/10 rounded-sm p-7 md:p-10" role="status">
@@ -491,15 +484,34 @@ export default async function PropertiesPage({ searchParams }: Props) {
           </div>
         ) : (
           <div className="bg-white border border-ink/10 rounded-sm p-7 md:p-10">
-            <h2 className="font-display text-2xl text-ink">Tell us what you want to find</h2>
+            <h2 className="font-display text-2xl text-ink">
+              {result.unavailable ? "Please try your search again" : isPartialSearchPage ? "No matching homes on this page" : "Tell us what you want to find"}
+            </h2>
             <p className="text-sm text-ink/65 mt-2 max-w-2xl">
-              No matching homes are available in this search right now. Florida Southeast Realty can refine the criteria or watch for new inventory.
+              {result.unavailable
+                ? "The live feed could not complete this search. Please try again shortly."
+                : hasMorePages
+                  ? "These listings did not match all of your filters. Select Next to check more listings with the same criteria."
+                  : isPartialSearchPage
+                    ? "These listings did not match all of your filters. You can return to Previous to review earlier results or refine your search."
+                    : "No matching homes are available in this search right now. Florida Southeast Realty can refine the criteria or watch for new inventory."}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               {bounds ? <Link href={withoutMapBoundsHref(params)} className="inline-block border border-tide/25 text-tide font-medium px-5 py-3 rounded-sm">Clear map area</Link> : null}
               <Link href="/contact" className="inline-block bg-hibiscus text-sand font-medium px-5 py-3 rounded-sm">Start a property search</Link>
             </div>
           </div>
+        )}
+
+        {!result.unavailable && isPartialSearchPage && (
+          <nav className="mt-8 flex items-center justify-between gap-4" aria-label="Listing results pages">
+            {result.pagination.page > 1 ? <Link href={pageHref(params, result.pagination.page - 1)} prefetch={false} rel="nofollow" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Previous</Link> : <span />}
+            <span className="text-sm text-ink/55">
+              Page {result.pagination.page}
+              {result.pagination.totalRowsExact === false ? "" : ` of ${result.pagination.totalPages}`}
+            </span>
+            {hasMorePages ? <Link href={pageHref(params, result.pagination.page + 1)} prefetch={false} rel="nofollow" className="border border-tide/25 text-tide font-medium px-4 py-2.5 rounded-sm hover:bg-tide/5">Next</Link> : <span />}
+          </nav>
         )}
 
         <div className="mt-20 grid lg:grid-cols-2 gap-10 items-start">

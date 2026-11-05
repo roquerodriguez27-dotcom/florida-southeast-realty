@@ -1077,6 +1077,7 @@ function buildResoFilter(filters: ListingFilters): string {
 async function fetchUncachedLiveListingPage(
   filters: ListingFilters = {},
   page = 1,
+  snapshotOnly = false,
 ): Promise<ListingSearchPage | null> {
   if (!getAccessToken()) return null;
 
@@ -1090,22 +1091,9 @@ async function fetchUncachedLiveListingPage(
     .sort();
   // BeachesMLS returns several Boolean amenities in listing records but does
   // not consistently enforce them in `$filter`. Polygon searches also need
-  // point-in-shape verification. Pull a wider candidate window for those cases,
-  // then enforce exact matches locally.
-  const exactAmenityFallback = Boolean(
-    filters.privatePoolOnly
-      || filters.fireplaceOnly
-      || filters.newConstructionOnly
-      || filters.seniorCommunityMode === "only"
-      || filters.maxHoaMonthly
-      || filters.priceReducedOnly
-      || filters.maxAnnualTaxes
-      || filters.architecturalStyle
-      || filters.viewType
-      || filters.coolingType
-      || filters.heatingType
-      || filters.amenities?.length,
-  );
+  // point-in-shape verification. Keep each candidate page within the display
+  // limit so local filtering cannot discard surplus matches before the next
+  // provider offset. Sparse or empty pages must still allow continuation.
   const providerFilters = {
     ...filters,
     privatePoolOnly: false,
@@ -1121,9 +1109,17 @@ async function fetchUncachedLiveListingPage(
     heatingType: undefined,
     amenities: undefined,
   };
-  const exactPolygonFallback = Boolean(filters.polygon?.length);
-  const widerCandidateWindow = exactAmenityFallback || exactPolygonFallback;
-  const providerPageSize = widerCandidateWindow ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
+  // Saved alerts historically sample up to 72 candidates once, keeping the
+  // first 24 matches. Preserve that bounded sample independently of public
+  // pagination so a page-size repair cannot shrink existing alert coverage.
+  const widerSnapshot = snapshotOnly && Boolean(
+    filters.privatePoolOnly || filters.fireplaceOnly || filters.newConstructionOnly
+      || filters.seniorCommunityMode === "only" || filters.maxHoaMonthly
+      || filters.priceReducedOnly || filters.maxAnnualTaxes || filters.architecturalStyle
+      || filters.viewType || filters.coolingType || filters.heatingType
+      || filters.amenities?.length || filters.polygon?.length,
+  );
+  const providerPageSize = widerSnapshot ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
   const providerRequestSize = providerPageSize + 1;
   console.info("[BeachesMLS RESO] Listing search started.", {
     page: currentPage,
@@ -1142,6 +1138,12 @@ async function fetchUncachedLiveListingPage(
       "$skip": (currentPage - 1) * providerPageSize,
       "$orderby": RESO_SORTS[filters.sort ?? "newest"],
     });
+    // Fixed-offset pages require a full candidate window before advancing.
+    // If the provider ever caps a page below that window, report a temporary
+    // failure rather than silently skipping the remaining candidates.
+    if (payload.nextLink && payload.value.length < providerPageSize) {
+      throw new ResoRequestError("RESO returned an incomplete candidate page.", "invalid_payload");
+    }
   } catch (error) {
     if (!(error instanceof ResoRequestError && error.locallyProtected)) {
       console.error("[BeachesMLS RESO] Listing search failed.", {
@@ -1206,7 +1208,7 @@ async function fetchUncachedLiveListingPage(
     .filter((listing) => matchesStructuredValues(listing.heating, filters.heatingType, HEATING_TERMS))
     .filter((listing) => !filters.maxDaysOnMarket || listing.daysOnMarket <= filters.maxDaysOnMarket)
     .filter((listing) => !filters.polygon?.length || pointInPolygon(listing.lat, listing.lng, filters.polygon))
-    .slice(0, LISTING_PAGE_SIZE);
+    .slice(0, snapshotOnly ? LISTING_PAGE_SIZE : providerPageSize);
   // BeachesMLS can spend most of a request calculating @odata.count for broad
   // searches. Asking for one extra row gives us reliable Previous/Next paging
   // without forcing that expensive full-dataset count on every visitor.
@@ -1296,12 +1298,29 @@ function normalizedListingFilters(filters: ListingFilters): ListingFilters {
 
 const fetchCachedLiveListingPage = unstable_cache(
   async (filters: ListingFilters, page: number) => fetchUncachedLiveListingPage(filters, page),
-  ["beaches-mls-listing-page-v2"],
+  ["beaches-mls-listing-page-v3"],
   {
     revalidate: LISTING_SEARCH_REVALIDATE_SECONDS,
     tags: ["beaches-mls-listing-pages"],
   },
 );
+
+const fetchCachedLiveListingSnapshot = unstable_cache(
+  async (filters: ListingFilters) => fetchUncachedLiveListingPage(filters, 1, true),
+  ["beaches-mls-listing-snapshot-v1"],
+  {
+    revalidate: LISTING_SEARCH_REVALIDATE_SECONDS,
+    tags: ["beaches-mls-listing-pages"],
+  },
+);
+
+// This is a bounded alert sample, not a page for use in public navigation.
+export async function fetchLiveListingSnapshot(
+  filters: ListingFilters = {},
+): Promise<ListingSearchPage | null> {
+  if (!getAccessToken()) return null;
+  return fetchCachedLiveListingSnapshot(normalizedListingFilters(filters));
+}
 
 export async function fetchLiveListingPage(
   filters: ListingFilters = {},

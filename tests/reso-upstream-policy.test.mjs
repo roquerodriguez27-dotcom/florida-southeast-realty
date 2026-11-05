@@ -144,3 +144,144 @@ test('successful recovery resets automatic backoff for a later independent failu
   await s.fetch(URL); s.advance(30_001); await s.fetch(URL); await s.fetch(URL);
   assert.equal((await s.fetch(URL)).headers.get('retry-after'), '30');
 });
+
+test('network diagnostics report only allowlisted error details and actual upstream duration', async () => {
+  const error = new TypeError('sensitive request details', { cause: { code: 'ECONNRESET', message: 'secret server response' } });
+  const s = setup(async () => { s.advance(137); throw error; });
+  await assert.rejects(s.fetch(`${URL}?$filter=secret-query`), value => value === error);
+  assert.deepEqual(s.events, [{
+    kind: 'actual_upstream_failure', status: 'network_error', consecutiveFailures: 1,
+    retryAfterSeconds: 30, requestKind: 'property_collection', durationMs: 137,
+    failureType: 'network_error', errorClass: 'TypeError', causeCode: 'ECONNRESET',
+  }]);
+  await s.fetch(`${URL}?different=secret`);
+  assert.equal(s.calls(), 1);
+  assert.equal(s.events.length, 1, 'Local admission rejection must not create another upstream event');
+});
+
+test('known DNS, socket, TLS, and timeout cause codes use fixed categories', async () => {
+  for (const [code, type] of [
+    ['ENOTFOUND', 'network_error'], ['EAI_AGAIN', 'network_error'], ['UND_ERR_SOCKET', 'network_error'],
+    ['CERT_HAS_EXPIRED', 'network_error'], ['ETIMEDOUT', 'timeout'],
+    ['UND_ERR_CONNECT_TIMEOUT', 'timeout'], ['UND_ERR_HEADERS_TIMEOUT', 'timeout'], ['UND_ERR_BODY_TIMEOUT', 'timeout'],
+  ]) {
+    const s = setup(async () => { throw new TypeError('private', { cause: { code } }); });
+    await assert.rejects(s.fetch(URL));
+    assert.equal(s.events[0].causeCode, code);
+    assert.equal(s.events[0].failureType, type);
+    assert.equal((await s.fetch(URL)).headers.get('retry-after'), '30');
+  }
+});
+
+test('unknown, nested, and non-error exceptions cannot place private values in diagnostics', async () => {
+  const secret = 'PRIVATE-CANARY-user-token-query';
+  const hostile = { name: secret, code: secret, message: secret, stack: secret,
+    cause: { code: secret, message: secret, cause: { code: 'ECONNRESET', token: secret } },
+    toJSON: () => secret, toString: () => secret };
+  for (const error of [hostile, secret, null, undefined, 42]) {
+    const s = setup(async () => { throw error; });
+    await assert.rejects(s.fetch(`${URL}?$filter=${secret}`), value => value === error);
+    assert.equal(s.events[0].errorClass, 'unknown');
+    assert.equal(s.events[0].causeCode, 'unknown');
+    assert.doesNotMatch(JSON.stringify(s.events), /PRIVATE-CANARY|user-token-query/);
+    assert.equal((await s.fetch(URL)).headers.get('retry-after'), '30');
+  }
+});
+
+test('throwing error getters cannot hide the original failure or bypass protection', async () => {
+  for (const property of ['name', 'cause', 'code']) {
+    const error = property === 'code' ? { name: 'TypeError', cause: {} } : {};
+    Object.defineProperty(property === 'code' ? error.cause : error, property, {
+      get() { throw new Error('PRIVATE-CANARY-getter'); },
+    });
+    const s = setup(async () => { throw error; });
+    await assert.rejects(s.fetch(URL), value => value === error);
+    assert.equal(s.events.length, 1);
+    assert.doesNotMatch(JSON.stringify(s.events), /PRIVATE-CANARY/);
+    assert.equal((await s.fetch(URL)).headers.get('retry-after'), '30');
+  }
+  const error = new Proxy({}, { get() { throw new Error('PRIVATE-CANARY-proxy'); } });
+  const s = setup(async () => { throw error; });
+  let caught;
+  try { await s.fetch(URL); } catch (value) { caught = value; }
+  assert.equal(caught === error, true);
+  assert.equal(s.events[0].errorClass, 'unknown');
+  assert.equal(s.events[0].causeCode, 'unknown');
+  assert.equal((await s.fetch(URL)).headers.get('retry-after'), '30');
+});
+
+test('request kinds contain no URL path, entity key, or query values', async () => {
+  const base = 'https://replication.sparkapi.com/Version/3/Reso/OData';
+  const secret = 'PRIVATE-CANARY-listing-key';
+  for (const [resource, expected] of [
+    ['Property', 'property_collection'], [`Property('${secret}')`, 'property_entity'],
+    ['Media', 'media_collection'], ['System', 'system'], ['$metadata', 'metadata'],
+    [secret, 'other'], [`${secret}/Unexpected`, 'other'],
+  ]) {
+    const s = setup(async () => { throw new Error('private'); });
+    await assert.rejects(s.fetch(new Request(`${base}/${resource}?$filter=${secret}`, {
+      headers: { Authorization: `Bearer ${secret}` },
+    })));
+    assert.equal(s.events[0].requestKind, expected);
+    assert.doesNotMatch(JSON.stringify(s.events), /PRIVATE-CANARY|https:|Bearer|OData/);
+  }
+});
+
+test('deadline aborts are distinguished from caller cancellation without changing backoff', async () => {
+  const controller = new AbortController();
+  const error = new DOMException('private abort message', 'AbortError');
+  const s = setup(async () => {
+    s.advance(6000);
+    controller.abort(new DOMException('private timeout message', 'TimeoutError'));
+    throw error;
+  });
+  await assert.rejects(s.fetch(URL, { signal: controller.signal }), value => value === error);
+  assert.equal(s.events[0].failureType, 'timeout');
+  assert.equal(s.events[0].errorClass, 'AbortError');
+  assert.equal(s.events[0].durationMs, 6000);
+  assert.equal((await s.fetch(URL)).headers.get('retry-after'), '30');
+
+  const unexpected = setup(async () => { throw error; });
+  await assert.rejects(unexpected.fetch(URL));
+  assert.equal(unexpected.events[0].failureType, 'network_error', 'AbortError alone does not prove caller cancellation');
+});
+
+test('caller cancellation remains silent and leaves admission open', async t => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const controller = new AbortController();
+  let calls = 0;
+  const fetch = createResoUpstreamPolicy(async () => {
+    if (++calls > 1) return ok();
+    controller.abort();
+    throw controller.signal.reason;
+  });
+  await assert.rejects(fetch(URL, { signal: controller.signal }), { name: 'AbortError' });
+  assert.equal(warn.mock.calls.length, 0);
+  assert.equal((await fetch(URL)).status, 200);
+  assert.equal(calls, 2);
+});
+
+test('default logger never receives raw errors, URLs, headers, or response bodies', async t => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const secret = 'PRIVATE-CANARY-do-not-log';
+  const error = new TypeError(secret, { cause: { code: 'ECONNRESET', message: secret, url: secret } });
+  const fetch = createResoUpstreamPolicy(async () => { throw error; });
+  await assert.rejects(fetch(`${URL}('${secret}')?$filter=${secret}`, {
+    headers: { Authorization: `Bearer ${secret}`, 'X-Private': secret },
+  }));
+  const http = createResoUpstreamPolicy(async () => new Response(secret, {
+    status: 503, headers: { 'X-Private': secret },
+  }));
+  const response = await http(`${URL}?$filter=${secret}`);
+  assert.equal(await response.text(), secret, 'Diagnostics must not consume or alter the response body');
+  assert.equal(warn.mock.calls.length, 2);
+  for (const call of warn.mock.calls) {
+    assert.equal(call.arguments.length, 2);
+    assert.equal(call.arguments[0], '[BeachesMLS RESO] Actual upstream request failed.');
+    assert.doesNotMatch(JSON.stringify(call.arguments), /PRIVATE-CANARY|https:|Bearer|Authorization|X-Private|stack|message/);
+    assert.ok(Object.values(call.arguments[1]).every(value => typeof value === 'string' || typeof value === 'number'));
+  }
+  assert.equal(warn.mock.calls[1].arguments[1].failureType, 'http_error');
+  assert.equal(warn.mock.calls[1].arguments[1].errorClass, undefined);
+  assert.equal(warn.mock.calls[1].arguments[1].causeCode, undefined);
+});

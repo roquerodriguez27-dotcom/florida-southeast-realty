@@ -1121,19 +1121,23 @@ async function fetchUncachedLiveListingPage(
   );
   const providerPageSize = widerSnapshot ? LISTING_PAGE_SIZE * 3 : LISTING_PAGE_SIZE;
   const providerRequestSize = providerPageSize + 1;
+  // Alert snapshots and their text-only emails do not consume listing photos.
+  // Keep Media expansion for public search cards, but avoid it for alerts.
+  const mediaPerListing = snapshotOnly ? 0 : SEARCH_MEDIA_LIMIT;
   console.info("[BeachesMLS RESO] Listing search started.", {
     page: currentPage,
+    snapshotOnly,
     activeFilterCount: activeFilterKeys.length,
     activeFilterKeys,
     providerPageSize,
-    mediaPerListing: SEARCH_MEDIA_LIMIT,
+    mediaPerListing,
     requestsExactCount: false,
   });
   let payload: ResoPayload;
   try {
     payload = await resoRequest("Property", {
       "$filter": buildResoFilter(providerFilters),
-      "$expand": `Media($top=${SEARCH_MEDIA_LIMIT};$orderby=Order)`,
+      ...(snapshotOnly ? {} : { "$expand": `Media($top=${mediaPerListing};$orderby=Order)` }),
       "$top": providerRequestSize,
       "$skip": (currentPage - 1) * providerPageSize,
       "$orderby": RESO_SORTS[filters.sort ?? "newest"],
@@ -1148,6 +1152,8 @@ async function fetchUncachedLiveListingPage(
     if (!(error instanceof ResoRequestError && error.locallyProtected)) {
       console.error("[BeachesMLS RESO] Listing search failed.", {
         page: currentPage,
+        snapshotOnly,
+        mediaPerListing,
         activeFilterCount: activeFilterKeys.length,
         activeFilterKeys,
         durationMs: Date.now() - startedAt,
@@ -1218,6 +1224,8 @@ async function fetchUncachedLiveListingPage(
 
   console.info("[BeachesMLS RESO] Listing search completed.", {
     page: currentPage,
+    snapshotOnly,
+    mediaPerListing,
     activeFilterCount: activeFilterKeys.length,
     activeFilterKeys,
     providerRows: providerRecords.length,
@@ -1307,7 +1315,7 @@ const fetchCachedLiveListingPage = unstable_cache(
 
 const fetchCachedLiveListingSnapshot = unstable_cache(
   async (filters: ListingFilters) => fetchUncachedLiveListingPage(filters, 1, true),
-  ["beaches-mls-listing-snapshot-v1"],
+  ["beaches-mls-listing-snapshot-v2"],
   {
     revalidate: LISTING_SEARCH_REVALIDATE_SECONDS,
     tags: ["beaches-mls-listing-pages"],

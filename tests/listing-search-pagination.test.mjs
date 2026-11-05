@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
 import ts from 'typescript';
 import React from 'react';
 import * as jsxRuntime from 'react/jsx-runtime';
@@ -36,11 +37,12 @@ const records = count => Array.from({ length: count }, (_, i) => ({
 function loadIdx(dataset, respond) {
   const requests = [];
   const cacheKeys = [];
+  const logs = [];
   const loaded = { exports: {} };
   vm.runInNewContext(idxCode, {
     module: loaded, exports: loaded.exports,
     process: { env: { NODE_ENV: 'production', RESO_ACCESS_TOKEN: 'synthetic-test-only' } },
-    console: { info() {}, warn() {}, error() {} },
+    console: Object.fromEntries(['info', 'warn', 'error'].map(level => [level, (...args) => logs.push({ level, args })])),
     Buffer, URL, TextDecoder, AbortSignal, setTimeout,
     fetch: async input => {
       const url = new URL(input);
@@ -49,7 +51,7 @@ function loadIdx(dataset, respond) {
       const top = Number(url.searchParams.get('$top'));
       const ordered = url.searchParams.get('$orderby')?.startsWith('ListPrice desc')
         ? [...dataset].reverse() : dataset;
-      return new Response(JSON.stringify(respond ? respond({ skip, top }) : {
+      return new Response(JSON.stringify(respond ? respond({ skip, top, url }) : {
         value: ordered.slice(skip, skip + top),
       }));
     },
@@ -63,7 +65,8 @@ function loadIdx(dataset, respond) {
       throw new Error(`Unexpected dependency: ${name}`);
     },
   });
-  return { search: loaded.exports.fetchLiveListingPage, snapshot: loaded.exports.fetchLiveListingSnapshot, requests, cacheKeys };
+  return { search: loaded.exports.fetchLiveListingPage, snapshot: loaded.exports.fetchLiveListingSnapshot,
+    detail: loaded.exports.fetchLiveListingBySlug, requests, cacheKeys, logs };
 }
 
 async function traverse(search, filters) {
@@ -161,7 +164,10 @@ test('saved alerts retain their original single-request candidate coverage indep
   assert.deepEqual(Array.from(alert.listings, listing => listing.mlsId), dataset.slice(24, 48).map(record => record.ListingId));
   assert.deepEqual(requests.map(url => url.searchParams.get('$top')), ['25', '73']);
   assert.equal(requests[1].searchParams.get('$skip'), '0');
-  assert.ok(cacheKeys.some(keys => keys.includes('beaches-mls-listing-snapshot-v1')));
+  assert.ok(cacheKeys.some(keys => keys.includes('beaches-mls-listing-snapshot-v2')));
+  assert.ok(cacheKeys.every(keys => !keys.includes('beaches-mls-listing-snapshot-v1')));
+  assert.equal(requests[0].searchParams.get('$expand'), 'Media($top=1;$orderby=Order)');
+  assert.equal(requests[1].searchParams.has('$expand'), false);
 
   const sparse = records(100).map((record, i) => ({ ...record, PoolPrivateYN: [24, 48, 71, 72].includes(i) }));
   const sparseAlert = await loadIdx(sparse).snapshot({ privatePoolOnly: true });
@@ -182,7 +188,100 @@ test('only the original local-verification filters widen an alert sample', async
     await snapshot(filters);
     assert.equal(requests.length, 1);
     assert.equal(requests[0].searchParams.get('$top'), expected, JSON.stringify(filters));
+    assert.equal(requests[0].searchParams.has('$expand'), false, JSON.stringify(filters));
   }
+});
+
+test('snapshot requests omit only Media without changing filters, ordering, or candidate windows', async () => {
+  for (const privatePoolOnly of [false, true]) {
+    const { search, snapshot, requests } = loadIdx(records(100));
+    const filters = { locations: ['33467'], maxPrice: 500000, privatePoolOnly, sort: 'price-desc' };
+    await search(filters);
+    const result = await snapshot(filters);
+    const publicQuery = Object.fromEntries(requests[0].searchParams);
+    const snapshotQuery = Object.fromEntries(requests[1].searchParams);
+    const { $expand, ...withoutMedia } = publicQuery;
+    assert.equal($expand, 'Media($top=1;$orderby=Order)');
+    assert.deepEqual(snapshotQuery, { ...withoutMedia, $top: privatePoolOnly ? '73' : '25' });
+    assert.equal(snapshotQuery.$orderby, 'ListPrice desc,ModificationTimestamp desc');
+    assert.deepEqual(Array.from(result.listings, listing => listing.mlsId), records(100).reverse().slice(0, 24).map(record => record.ListingId));
+  }
+});
+
+test('public cards and detail keep photos when alert snapshots omit Media', async () => {
+  const photo = 'https://photos.example.test/listing.jpg';
+  const dataset = records(1).map(record => ({ ...record, PhotosCount: 1, Media: [{ MediaURL: photo, Order: 1 }] }));
+  const { search, snapshot, detail, requests } = loadIdx(dataset, ({ url }) => ({
+    value: dataset.map(record => url.searchParams.has('$expand') ? record : { ...record, Media: undefined }),
+  }));
+  const alert = await snapshot({});
+  const page = await search({});
+  const full = await detail(page.listings[0].slug, false);
+  assert.deepEqual(Array.from(alert.listings[0].images), ['/property-placeholder.svg']);
+  assert.equal(alert.listings[0].photoCount, 1);
+  assert.deepEqual(Array.from(page.listings[0].images), [photo]);
+  assert.deepEqual(Array.from(full.images), [photo]);
+  assert.equal(requests[0].searchParams.has('$expand'), false);
+  assert.equal(requests[1].searchParams.get('$expand'), 'Media($top=1;$orderby=Order)');
+  assert.equal(requests[2].searchParams.get('$expand'), 'Media($top=25;$orderby=Order)');
+});
+
+test('photo-free snapshots produce identical saved data, change detection, and email payloads', async () => {
+  const dataset = records(3).map(record => ({ ...record, PhotosCount: 1,
+    Media: [{ MediaURL: `https://photos.example.test/${record.ListingId}.jpg`, Order: 1 }] }));
+  const { search, snapshot } = loadIdx(dataset, ({ url }) => ({
+    value: dataset.map(record => url.searchParams.has('$expand') ? record : { ...record, Media: undefined }),
+  }));
+  const withPhotos = (await search({})).listings;
+  const withoutPhotos = (await snapshot({})).listings;
+  const emails = [];
+  const loaded = { exports: {} };
+  vm.runInNewContext(compile('../lib/saved-search-worker.ts'), {
+    module: loaded, exports: loaded.exports, URL, AbortSignal,
+    process: { env: { RESEND_API_KEY: 'synthetic-test-only' } },
+    console: { error() {} },
+    fetch: async (_url, init) => { emails.push({ body: JSON.parse(init.body), idempotency: init.headers['Idempotency-Key'] }); return { ok: true }; },
+    require(name) {
+      if (name === 'server-only') return {};
+      if (name === 'node:crypto') return { createHash };
+      if (name === '@/lib/site-config') return { SITE: { url: 'https://synthetic.test' } };
+      if (name === '@/lib/types') return listingTypes;
+      throw new Error(`Unexpected dependency: ${name}`);
+    },
+  });
+  const { snapshotListings, compareSavedSearchSnapshots, sendSavedSearchEmail } = loaded.exports;
+  assert.equal(JSON.stringify(snapshotListings(withoutPhotos)), JSON.stringify(snapshotListings(withPhotos)));
+  assert.deepEqual(Object.keys(snapshotListings(withoutPhotos)[0]), ['mlsId', 'slug', 'address', 'price', 'status']);
+  const previous = [{ mlsId: '2', price: 2500, status: 'Active' }, { mlsId: '3', price: 3000, status: 'Pending' }];
+  for (const listings of [withPhotos, withoutPhotos]) {
+    const changes = compareSavedSearchSnapshots(listings, previous, { newMatches: true, priceChanges: true, backOnMarket: true });
+    assert.deepEqual(Array.from(changes.newMatches, item => item.mlsId), ['1']);
+    assert.deepEqual(Array.from(changes.priceChanges, item => item.listing.mlsId), ['2']);
+    assert.deepEqual(Array.from(changes.backOnMarket, item => item.mlsId), ['3']);
+    const sent = await sendSavedSearchEmail({ email: 'synthetic@example.test', frequency: 'daily',
+      changes, unsubscribeToken: 'synthetic-token', searchId: 'synthetic-search' });
+    assert.equal(sent.delivered, true);
+  }
+  assert.deepEqual(emails[1], emails[0]);
+  assert.doesNotMatch(JSON.stringify(emails[1]), /photos\.example|property-placeholder|<img/);
+});
+
+test('search diagnostics distinguish photo-free snapshots on success and failure', async () => {
+  const { search, snapshot, logs } = loadIdx([]);
+  await search({});
+  await snapshot({ privatePoolOnly: true });
+  const publicLogs = logs.filter(log => log.args[1]?.snapshotOnly === false);
+  const snapshotLogs = logs.filter(log => log.args[1]?.snapshotOnly === true);
+  assert.equal(publicLogs.length, 2);
+  assert.equal(snapshotLogs.length, 2);
+  assert.ok(publicLogs.every(log => log.args[1].mediaPerListing === 1));
+  assert.ok(snapshotLogs.every(log => log.args[1].mediaPerListing === 0));
+  assert.equal(snapshotLogs[0].args[1].providerPageSize, 72);
+  const failure = loadIdx([], () => ({ value: records(20), '@odata.nextLink': 'Property?$skip=20' }));
+  await assert.rejects(failure.snapshot({ privatePoolOnly: true }), /incomplete candidate page/);
+  const error = failure.logs.find(log => log.level === 'error');
+  assert.equal(error.args[1].snapshotOnly, true);
+  assert.equal(error.args[1].mediaPerListing, 0);
 });
 
 test('failed alert sample releases the claim without sending mail or replacing the snapshot', async () => {

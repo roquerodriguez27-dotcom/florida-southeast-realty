@@ -153,6 +153,7 @@ test('network diagnostics report only allowlisted error details and actual upstr
     kind: 'actual_upstream_failure', status: 'network_error', consecutiveFailures: 1,
     retryAfterSeconds: 30, requestKind: 'property_collection', durationMs: 137,
     failureType: 'network_error', errorClass: 'TypeError', causeCode: 'ECONNRESET',
+    deadlineSource: 'not_aborted', abortAfterMs: null, timerLatenessMs: null, abortToRejectionMs: null,
   }]);
   await s.fetch(`${URL}?different=secret`);
   assert.equal(s.calls(), 1);
@@ -279,7 +280,7 @@ test('default logger never receives raw errors, URLs, headers, or response bodie
     assert.equal(call.arguments.length, 2);
     assert.equal(call.arguments[0], '[BeachesMLS RESO] Actual upstream request failed.');
     assert.doesNotMatch(JSON.stringify(call.arguments), /PRIVATE-CANARY|https:|Bearer|Authorization|X-Private|stack|message/);
-    assert.ok(Object.values(call.arguments[1]).every(value => typeof value === 'string' || typeof value === 'number'));
+    assert.ok(Object.values(call.arguments[1]).every(value => value === null || typeof value === 'string' || typeof value === 'number'));
   }
   assert.equal(warn.mock.calls[1].arguments[1].failureType, 'http_error');
   assert.equal(warn.mock.calls[1].arguments[1].errorClass, undefined);

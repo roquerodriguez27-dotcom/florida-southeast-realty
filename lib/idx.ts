@@ -21,6 +21,30 @@ const DEFAULT_MLS_DISCLAIMER =
   "© 2026 Beaches MLS. All Rights Reserved. This information is for your personal, non-commercial use and may not be used for any purpose other than to identify prospective properties you may be interested in purchasing. Display of MLS data is usually deemed reliable but is NOT guaranteed accurate by the MLS. Buyers are responsible for verifying the accuracy of all information and should investigate the data themselves or retain appropriate professionals. Information from sources other than the Listing Agent may have been included in the MLS data. Unless otherwise specified in writing, Broker/Agent has not and will not verify any information obtained from other sources. The Broker/Agent providing the information contained herein may or may not have been the Listing and/or Selling Agent.";
 const LISTING_PAGE_SIZE = 24;
 const SEARCH_MEDIA_LIMIT = 1;
+// Verified against this feed's Property metadata on 2026-11-06. Keep all
+// supported inputs to normalization, local filters, comparison, and required
+// attribution; generic fallback aliases absent from this schema are omitted.
+// Media stays in its existing bounded expansion, and detail requests keep the
+// complete record. Saved-search snapshots use the same scalar projection.
+const SEARCH_PROPERTY_FIELDS = [
+  "Appliances", "ArchitecturalStyle", "AssociationAmenities", "AssociationFee",
+  "AssociationFee2", "AssociationFee2Frequency", "AssociationFeeFrequency", "AssociationYN",
+  "BathroomsFull", "BathroomsHalf", "BathroomsTotalInteger", "BedroomsTotal",
+  "BuildingAreaTotal", "City", "Cooling", "DaysOnMarket", "ExteriorFeatures",
+  "FireplaceYN", "GarageSpaces", "Heating", "HorseAmenities", "HorseYN",
+  "InteriorFeatures", "Latitude", "ListAgentDirectPhone", "ListAgentEmail",
+  "ListAgentFirstName", "ListAgentFullName", "ListAgentLastName", "ListAgentMiddleName",
+  "ListAgentOfficePhone", "ListAgentPreferredPhone", "ListOfficeName", "ListPrice",
+  "ListingId", "ListingKey", "LivingArea", "Longitude", "LotFeatures", "LotSizeSquareFeet",
+  "MajorChangeTimestamp", "MlsStatus", "ModificationTimestamp", "NewConstructionYN",
+  "OriginalListPrice", "OriginatingSystemID", "OriginatingSystemKey", "OriginatingSystemName",
+  "PhotosCount", "PoolFeatures", "PoolPrivateYN", "PostalCode", "PropertySubType",
+  "PropertyType", "PublicRemarks", "SeniorCommunityYN", "SpaFeatures", "SpaYN",
+  "StandardStatus", "StreetDirPrefix", "StreetDirSuffix", "StreetName", "StreetNumber",
+  "StreetSuffix", "SubdivisionName", "TaxAnnualAmount", "UnitNumber", "UnparsedAddress",
+  "View", "WaterfrontFeatures", "WaterfrontYN", "WindowFeatures", "YearBuilt",
+] as const;
+const SEARCH_PROPERTY_SELECT = SEARCH_PROPERTY_FIELDS.join(",");
 const DETAIL_MEDIA_PAGE_SIZE = 25;
 const MAX_DETAIL_MEDIA_PAGES = 20;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -1137,6 +1161,7 @@ async function fetchUncachedLiveListingPage(
   try {
     payload = await resoRequest("Property", {
       "$filter": buildResoFilter(providerFilters),
+      "$select": SEARCH_PROPERTY_SELECT,
       ...(snapshotOnly ? {} : { "$expand": `Media($top=${mediaPerListing};$orderby=Order)` }),
       "$top": providerRequestSize,
       "$skip": (currentPage - 1) * providerPageSize,

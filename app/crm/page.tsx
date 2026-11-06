@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { addCrmTeamMember, addNote, addTask, completeTask, setCrmTeamMemberActive, signOut, updateLead } from "./actions";
 import { requireCrmUser } from "@/lib/crm/auth";
 import { CRM_STATUSES, type CrmLead, type CrmUser } from "@/lib/crm/types";
@@ -83,7 +84,7 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
       <header className="bg-tide text-sand border-b border-white/10">
         <div className="container-fsre py-4 flex flex-wrap items-center justify-between gap-3">
           <div><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-brass">Florida Southeast Realty</p><h1 className="font-display text-2xl">{user.role === "broker" ? "Broker CRM" : "Agent CRM"}</h1></div>
-          <div className="flex items-center gap-4 text-xs"><span className="hidden sm:inline text-white/60">{user.displayName} · {user.email}</span><form action={signOut}><button className="border border-white/25 rounded-sm px-3 py-2 hover:bg-white/10">Sign out</button></form></div>
+          <div className="flex items-center gap-4 text-xs">{user.role === "broker" && <Link href="/crm/analytics" className="border border-white/25 rounded-sm px-3 py-2 hover:bg-white/10">Visitor report</Link>}<span className="hidden sm:inline text-white/60">{user.displayName} · {user.email}</span><form action={signOut}><button className="border border-white/25 rounded-sm px-3 py-2 hover:bg-white/10">Sign out</button></form></div>
         </div>
       </header>
 

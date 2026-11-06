@@ -26,7 +26,9 @@ try {
   const fields = [...property[2].matchAll(/<(?:\w+:)?Property\b[^>]*Name=["']([^"']+)["']/g)]
     .map((field) => field[1]).sort();
   if (!fields.includes('ListingKey')) throw new Error('Property schema was incomplete.');
-  console.log(`FSR_METADATA_PROPERTY_FIELDS ${JSON.stringify(fields)}`);
+  for (let index = 0; index < fields.length; index += 8) {
+    console.log(`FSR_METADATA_FIELDS_${index} ${JSON.stringify(fields.slice(index, index + 8))}`);
+  }
   console.log(`RESO schema check succeeded: ${fields.length} property fields.`);
 } catch (error) {
   // Do not print raw response bodies, request headers, or fetch error details.

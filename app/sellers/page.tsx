@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import LeadForm from "@/components/LeadForm";
+import { SITE } from "@/lib/site-config";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 export const metadata: Metadata = {
@@ -83,14 +84,29 @@ export default function SellersPage() {
             buyer-broker compensation you choose to authorize is separate and negotiable.
           </p>
           <div className="flex flex-wrap gap-3 mt-7">
-            <Link href="/home-valuation" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium px-5 py-3 rounded-sm transition-colors">Get My Home Value</Link>
-            <Link href="/contact" className="border border-sand/30 text-sand font-medium px-5 py-3 rounded-sm hover:bg-white/10 transition-colors">Talk to the Broker</Link>
+            <Link href="#seller-valuation" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium px-5 py-3 rounded-sm transition-colors">Get My Free Home Value</Link>
+            <a href={SITE.phoneHref} className="border border-sand/30 text-sand font-medium px-5 py-3 rounded-sm hover:bg-white/10 transition-colors">Call Roque: {SITE.phoneDisplay}</a>
           </div>
         </div>
       </section>
 
       <section className="container-fsre py-16">
         <div className="grid lg:grid-cols-3 gap-10">
+          <aside id="seller-valuation" aria-labelledby="seller-valuation-heading" className="scroll-mt-28 lg:order-last lg:sticky lg:top-28 h-fit">
+            <h2 id="seller-valuation-heading" className="font-display text-2xl text-ink mb-3">What could your home sell for?</h2>
+            <p className="text-sm text-ink/65 mb-5">Request a free broker review of your property and recent comparable sales. No obligation to list. Roque will follow up to discuss your home and selling plans.</p>
+            <LeadForm
+              formName="sellers-page"
+              submitLabel="Request My Free Home Value"
+              successMessage="Florida Southeast Realty will follow up about your property and the 0.5% listing-side service."
+              fields={[
+                { name: "address", label: "Property Address", type: "text", required: true, colSpan: 2 },
+                { name: "name", label: "Name", type: "text", required: true },
+                { name: "email", label: "Email", type: "email", required: true },
+                { name: "phone", label: "Phone (optional)", type: "tel" },
+              ]}
+            />
+          </aside>
           <div className="lg:col-span-2">
             <h2 className="font-display text-2xl md:text-3xl text-ink mb-6">What&apos;s included</h2>
             <div className="grid sm:grid-cols-2 gap-5">
@@ -111,20 +127,6 @@ export default function SellersPage() {
               </ul>
             </div>
           </div>
-
-          <aside className="lg:sticky lg:top-28 h-fit">
-            <LeadForm
-              formName="sellers-page"
-              submitLabel="Get My Home Value"
-              successMessage="Florida Southeast Realty will follow up about your property and the 0.5% listing-side service."
-              fields={[
-                { name: "address", label: "Property Address", type: "text", required: true, colSpan: 2 },
-                { name: "name", label: "Name", type: "text", required: true },
-                { name: "email", label: "Email", type: "email", required: true },
-                { name: "phone", label: "Phone", type: "tel" },
-              ]}
-            />
-          </aside>
         </div>
       </section>
 

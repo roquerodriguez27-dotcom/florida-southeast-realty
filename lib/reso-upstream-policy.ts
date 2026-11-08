@@ -6,7 +6,9 @@
 const RESO_HOST = "replication.sparkapi.com";
 const MAX_CONCURRENT_REQUESTS = 4;
 const INITIAL_FAILURE_PAUSE_MS = 30_000;
-const INITIAL_THROTTLE_PAUSE_MS = 60_000;
+// FBS confirmed a five-minute quiet period; an early retry can prolong it.
+// Until FBS supplies reliable subcodes, an unclassified 429 stays conservative.
+const INITIAL_THROTTLE_PAUSE_MS = 300_000;
 const MAX_AUTOMATIC_PAUSE_MS = 300_000;
 
 type PauseReason = "upstream_error" | "network_error" | "throttled";

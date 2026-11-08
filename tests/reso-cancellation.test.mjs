@@ -55,6 +55,7 @@ test('a real timeout continues to pause provider requests', async () => {
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as nodeCrypto from 'node:crypto';
 import * as policyModule from '../lib/reso-upstream-policy.ts';
 
 async function instrument(upstream) {
@@ -74,6 +75,7 @@ async function instrument(upstream) {
     clearTimeout: id => timeouts.delete(id),
     module: { exports: {} },
     require: name => {
+      if (name === 'node:crypto') return nodeCrypto;
       if (name === './lib/reso-upstream-policy') return {
         ...policyModule,
         createResoUpstreamPolicy: upstream => policyModule.createResoUpstreamPolicy(upstream, {
@@ -149,6 +151,36 @@ test('pre-cancelled calls do not consume a cache slot or trip outer protection',
   assert.equal(calls, 0);
   assert.equal(context.__fsrResoFailureTimes.length, 0);
   assert.equal((await context.fetch(URL)).status, 200);
+});
+
+test('outer response preserves provider Retry-After beyond five minutes without resetting it locally', async () => {
+  let calls = 0;
+  const h = await instrument(async () => ++calls === 1
+    ? new Response('', { status: 429, headers: { 'Retry-After': '900' } }) : ok());
+  assert.equal((await h.context.fetch(URL)).headers.get('retry-after'), '900');
+  h.advance(60_000);
+  assert.equal((await h.context.fetch(URL)).headers.get('retry-after'), '840');
+  assert.equal(calls, 1);
+  h.advance(840_001);
+  assert.equal((await h.context.fetch(URL)).status, 200);
+  assert.equal(calls, 2);
+});
+
+test('outer cached responses and duplicate suppression respect access and representation headers', async () => {
+  let calls = 0;
+  const h = await instrument(async (_url, init) => {
+    calls++;
+    const headers = new Headers(init.headers);
+    return new Response(JSON.stringify({ access: headers.get('authorization'), format: headers.get('accept') }));
+  });
+  const a = { headers: { Authorization: 'Bearer PRIVATE-A', Accept: 'application/json' } };
+  const b = { headers: { authorization: 'Bearer PRIVATE-B', accept: 'application/json' } };
+  const json = response => response.json();
+  assert.equal((await json(await h.context.fetch(URL, a))).access, 'Bearer PRIVATE-A');
+  assert.equal((await json(await h.context.fetch(URL, b))).access, 'Bearer PRIVATE-B');
+  assert.equal((await json(await h.context.fetch(URL, a))).access, 'Bearer PRIVATE-A');
+  assert.equal(calls, 2);
+  assert.doesNotMatch(JSON.stringify([...h.context.__fsrResoCache.keys()]), /PRIVATE-|Authorization/);
 });
 
 async function pendingInstrumentedRequest(input = URL, init) {

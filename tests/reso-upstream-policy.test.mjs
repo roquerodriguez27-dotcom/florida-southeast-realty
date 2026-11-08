@@ -88,6 +88,20 @@ test('provider Retry-After longer than five minutes is honored', async () => {
   assert.equal(s.calls(), 1);
 });
 
+test('an unclassified 429 keeps a full quiet five minutes without local hits extending it', async () => {
+  let attempt = 0;
+  const s = setup(async () => ++attempt === 1 ? new Response('', { status: 429 }) : ok());
+  await s.fetch(URL);
+  s.advance(60_000);
+  assert.equal((await s.fetch(URL)).headers.get('retry-after'), '240');
+  s.advance(239_000);
+  assert.equal((await s.fetch(URL)).headers.get('retry-after'), '1');
+  assert.equal(s.calls(), 1);
+  s.advance(1_001);
+  assert.equal((await s.fetch(URL)).status, 200);
+  assert.equal(s.calls(), 2);
+});
+
 test('HTTP-date Retry-After is honored', async () => {
   const date = new Date(1_000_000 + 900_000).toUTCString();
   const s = setup(async () => new Response('', { status: 503, headers: { 'Retry-After': date } }));

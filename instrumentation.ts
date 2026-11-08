@@ -29,8 +29,7 @@ const FRESH_TTL_MS = 15 * 60_000;
 const STALE_TTL_MS = 24 * 60 * 60_000;
 const MAX_CACHE_ENTRIES = 250;
 const MAX_BACKOFF_MS = 750;
-const DEFAULT_THROTTLE_BACKOFF_MS = 60_000;
-const MAX_THROTTLE_BACKOFF_MS = 5 * 60_000;
+const DEFAULT_THROTTLE_BACKOFF_MS = 5 * 60_000;
 const PROVIDER_UNAVAILABLE_BACKOFF_MS = 15_000;
 const NETWORK_UNAVAILABLE_BACKOFF_MS = 15_000;
 const FAILURE_WINDOW_MS = 30_000;
@@ -53,13 +52,14 @@ function retryAfterMilliseconds(value: string | null, now = Date.now()): number 
 
   const seconds = Number(value);
   if (Number.isFinite(seconds) && seconds > 0) {
-    return Math.min(MAX_THROTTLE_BACKOFF_MS, seconds * 1_000);
+    const milliseconds = seconds * 1_000;
+    return Number.isFinite(milliseconds) ? milliseconds : null;
   }
 
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) return null;
   const delay = timestamp - now;
-  return delay > 0 ? Math.min(MAX_THROTTLE_BACKOFF_MS, delay) : null;
+  return delay > 0 ? delay : null;
 }
 
 function responseFromSnapshot(snapshot: ResoSnapshot, stale = false): Response {
@@ -111,7 +111,7 @@ function temporaryResoFailureResponse(
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
-      "Retry-After": String(Math.max(1, Math.min(300, Math.ceil(retryAfterSeconds)))),
+      "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))),
       "X-FSR-RESO-Fallback": reason,
     },
   });
@@ -334,9 +334,35 @@ export async function register() {
   const fsrGlobal = globalThis as FsrGlobal;
   if (fsrGlobal.__fsrOriginalFetch) return;
 
+  // Keep Node-only code out of the Edge instrumentation bundle. Cache identity
+  // includes access and representation headers, without retaining raw tokens.
+  const createHash = process.env.NEXT_RUNTIME === "nodejs"
+    ? (await import("node:crypto")).createHash
+    : undefined;
+  if (!createHash) return;
+
   // Keep admission underneath caching: cached results remain available while
   // only actual network calls observe adaptive cooldown and single-probe recovery.
-  const originalFetch = createResoUpstreamPolicy(globalThis.fetch.bind(globalThis));
+  const baseFetch = globalThis.fetch.bind(globalThis);
+  let originalFetch = createResoUpstreamPolicy(baseFetch);
+  const coordinatorSecret = process.env.RESO_COORDINATOR_SECRET?.trim();
+  if (coordinatorSecret) {
+    const { createResoSharedCoordinator, createResoCoordinatorStore } = await import("./lib/reso-shared-coordinator");
+    const { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } = await import("./lib/supabase/config");
+    originalFetch = createResoSharedCoordinator(originalFetch, {
+      store: createResoCoordinatorStore({
+        url: SUPABASE_URL,
+        publishableKey: SUPABASE_PUBLISHABLE_KEY,
+        secret: coordinatorSecret,
+        fetch: baseFetch,
+      }),
+      onEvent: (event) => {
+        if (event.kind !== "duplicate_wait_expired") {
+          console.warn("[BeachesMLS RESO] Shared request coordination unavailable.", event);
+        }
+      },
+    });
+  }
   const inflight = fsrGlobal.__fsrResoInflight ?? new Map<string, Promise<ResoSnapshot>>();
   const cache = fsrGlobal.__fsrResoCache ?? new Map<string, ResoSnapshot>();
   const backoffUntil = fsrGlobal.__fsrResoBackoffUntil ?? new Map<string, number>();
@@ -354,7 +380,19 @@ export async function register() {
   fsrGlobal.__fsrResoActiveUpstream ??= 0;
 
   const patchedFetch: typeof fetch = async (input, init) => {
-    if (input instanceof Request) return originalFetch(input, init);
+    if (input instanceof Request) {
+      // Shared ownership must also have a bounded request lifetime when callers
+      // supply a Request object. Other hosts/methods keep their original behavior.
+      const requestUrl = new URL(input.url);
+      if (!coordinatorSecret || requestUrl.hostname !== RESO_HOST
+        || (init?.method ?? input.method).toUpperCase() !== "GET") return originalFetch(input, init);
+      const protectedRequest = timeoutProtectedInit({ ...init, signal: init?.signal ?? input.signal });
+      try {
+        return await originalFetch(input, protectedRequest.init);
+      } finally {
+        protectedRequest.cleanup();
+      }
+    }
 
     let url: URL;
     try {
@@ -372,7 +410,9 @@ export async function register() {
     init?.signal?.throwIfAborted();
     const normalizedUrl = optimizeKnownLocationFilters(normalizeEntityLookup(url));
     const mediaProxyUrl = mediaCollectionPropertyProxy(normalizedUrl);
-    const key = normalizedUrl.toString();
+    const key = createHash("sha256").update(JSON.stringify([
+      normalizedUrl.toString(), [...new Headers(init?.headers).entries()],
+    ])).digest("hex");
     const now = Date.now();
     const cached = cache.get(key);
 
@@ -380,8 +420,9 @@ export async function register() {
       return responseFromSnapshot(cached);
     }
 
-    // A BeachesMLS 429 applies to the feed/account, not only to the exact URL
-    // that triggered it. Pause all new upstream queries during that cooldown.
+    // A 429 can describe either quota exhaustion or an individual query block.
+    // Until FBS supplies a reliable discriminator, retain a conservative pause;
+    // do not mistake this local policy for proof of a provider-wide outage.
     const providerBackoffUntil = fsrGlobal.__fsrResoProviderBackoffUntil ?? 0;
     if (providerBackoffUntil > now) {
       if (cached && cached.staleUntil > now) return responseFromSnapshot(cached, true);
@@ -490,8 +531,8 @@ export async function register() {
           recordFailure(fsrGlobal, failureTimes);
 
           const delay = response.status === 429
-            ? retryAfterMilliseconds(response.headers.get("retry-after"))
-              ?? DEFAULT_THROTTLE_BACKOFF_MS
+            ? Math.max(DEFAULT_THROTTLE_BACKOFF_MS,
+              retryAfterMilliseconds(response.headers.get("retry-after")) ?? 0)
             : MAX_BACKOFF_MS;
           backoffUntil.set(key, Date.now() + delay);
 

@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import LeadForm from "@/components/LeadForm";
+import BrokerIdentity, { BrokerClientReview } from "@/components/BrokerIdentity";
 import { SITE } from "@/lib/site-config";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 export const metadata: Metadata = {
-  title: "Sell Your South Florida Home for a 0.5% Listing Fee",
+  title: "Full-Service Home Selling | 0.5% Listing-Side Fee",
   description:
-    "Florida Southeast Realty offers full-service seller representation for a 0.5% listing-side brokerage fee, including MLS exposure, marketing, negotiation, and closing support.",
+    "Work directly with Roque Rodriguez for a personal pricing and selling-cost review, full-service representation, and a transparent 0.5% listing-side brokerage fee.",
   alternates: { canonical: "/sellers" },
 };
 
@@ -53,7 +54,7 @@ const FAQS = [
   },
   {
     q: "How do I find out what my home may be worth?",
-    a: "Start with the home valuation form. Florida Southeast Realty can review the property, recent market activity, condition, location, and your timing before discussing a pricing strategy.",
+    a: "Request a personal pricing and selling-cost review. Roque will review your property, relevant comparable sales and current competition, then discuss a price range and estimated selling costs with you. There is no charge for the review and no obligation to list.",
   },
 ];
 
@@ -74,31 +75,38 @@ export default function SellersPage() {
 
       <section className="pt-32 pb-16 bg-tide">
         <div className="container-fsre max-w-4xl">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-brass mb-3">For South Florida Sellers</p>
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-brass mb-3">For Palm Beach &amp; Broward County Sellers</p>
           <h1 className="font-display text-4xl md:text-6xl text-sand leading-tight mb-6">
-            Sell your home with a 0.5% listing-side fee.
+            Full-service home selling. Direct broker guidance.
           </h1>
           <p className="text-sand/85 text-lg leading-relaxed max-w-3xl">
-            Florida Southeast Realty&apos;s 0.5% fee is the brokerage fee for representing you on
-            the listing side. Commission rates are negotiable and are not set by law. Any
-            buyer-broker compensation you choose to authorize is separate and negotiable.
+            Work with {SITE.brokerName}, a real estate professional since {SITE.brokerSince},
+            on pricing, marketing, negotiation and your path to closing. Start with a personal
+            review of your home&apos;s price range and estimated selling costs.
+          </p>
+          <p className="mt-5 text-lg font-medium text-brass">0.5% listing-side brokerage fee.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-sand/75">
+            Commission rates are negotiable. Buyer-broker compensation, if authorized, is
+            separate and negotiable; other closing costs also apply.
           </p>
           <div className="flex flex-wrap gap-3 mt-7">
-            <Link href="#seller-valuation" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium px-5 py-3 rounded-sm transition-colors">Get My Free Home Value</Link>
+            <Link href="#seller-valuation" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium px-5 py-3 rounded-sm transition-colors">Get My Pricing &amp; Cost Review</Link>
             <a href={SITE.phoneHref} className="border border-sand/30 text-sand font-medium px-5 py-3 rounded-sm hover:bg-white/10 transition-colors">Call Roque: {SITE.phoneDisplay}</a>
           </div>
+          <p className="mt-5 text-sm text-sand/70">Lake Worth and 33467, with service throughout Palm Beach and Broward counties.</p>
         </div>
       </section>
 
       <section className="container-fsre py-16">
         <div className="grid lg:grid-cols-3 gap-10">
           <aside id="seller-valuation" aria-labelledby="seller-valuation-heading" className="scroll-mt-28 lg:order-last lg:sticky lg:top-28 h-fit">
-            <h2 id="seller-valuation-heading" className="font-display text-2xl text-ink mb-3">What could your home sell for?</h2>
-            <p className="text-sm text-ink/65 mb-5">Request a free broker review of your property and recent comparable sales. No obligation to list. Roque will follow up to discuss your home and selling plans.</p>
+            <h2 id="seller-valuation-heading" className="font-display text-2xl text-ink mb-3">Your pricing &amp; selling-cost review</h2>
+            <p className="text-sm text-ink/65 mb-5">Share your address. Roque will review relevant sales, discuss a price range and walk through estimated selling costs with you. Free, with no obligation to list.</p>
+            <div className="mb-5"><BrokerIdentity /></div>
             <LeadForm
               formName="sellers-page"
-              submitLabel="Request My Free Home Value"
-              successMessage="Florida Southeast Realty will follow up about your property and the 0.5% listing-side service."
+              submitLabel="Request My Home Review"
+              successMessage="Roque will follow up about your home, its potential price range and estimated selling costs. There is no obligation to list."
               fields={[
                 { name: "address", label: "Property Address", type: "text", required: true, colSpan: 2 },
                 { name: "name", label: "Name", type: "text", required: true },
@@ -106,9 +114,11 @@ export default function SellersPage() {
                 { name: "phone", label: "Phone (optional)", type: "tel" },
               ]}
             />
+            <div className="mt-6"><BrokerClientReview /></div>
           </aside>
           <div className="lg:col-span-2">
-            <h2 className="font-display text-2xl md:text-3xl text-ink mb-6">What&apos;s included</h2>
+            <h2 className="font-display text-2xl md:text-3xl text-ink mb-3">Representation from pricing through closing</h2>
+            <p className="mb-6 text-sm leading-relaxed text-ink/65">A clear plan for your property, with an experienced broker involved in the decisions that matter.</p>
             <div className="grid sm:grid-cols-2 gap-5">
               {INCLUDED.map((item) => (
                 <div key={item.title} className="bg-white border border-ink/10 rounded-sm p-5">
@@ -117,6 +127,17 @@ export default function SellersPage() {
                 </div>
               ))}
             </div>
+
+            <section className="mt-8 rounded-sm border border-tide/15 bg-white p-6 md:p-8" aria-labelledby="seller-fee-example-heading">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-hibiscus">An illustrative fee example</p>
+              <h2 id="seller-fee-example-heading" className="mt-2 font-display text-2xl text-ink">See the listing-side fee in dollars</h2>
+              <dl className="mt-5 grid gap-4 sm:grid-cols-3">
+                <div><dt className="text-xs text-ink/55">Example sale price</dt><dd className="mt-1 font-display text-2xl text-tide">$600,000</dd></div>
+                <div><dt className="text-xs text-ink/55">Listing-side rate</dt><dd className="mt-1 font-display text-2xl text-tide">0.5%</dd></div>
+                <div><dt className="text-xs text-ink/55">Listing-side fee</dt><dd className="mt-1 font-display text-2xl text-tide">$3,000</dd></div>
+              </dl>
+              <p className="mt-5 text-sm leading-relaxed text-ink/65">$600,000 × 0.005 = $3,000. This example shows the listing-side brokerage fee only. Any authorized buyer-broker compensation and other closing costs are additional. Your property&apos;s fees and services are confirmed in the written listing agreement; commission rates are negotiable.</p>
+            </section>
 
             <div className="mt-10 bg-keystone-dim/60 border border-ink/10 rounded-sm p-6 md:p-8">
               <h2 className="font-display text-xl text-ink mb-4">Important fee disclosures</h2>

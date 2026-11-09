@@ -104,20 +104,21 @@ export default async function HomePage() {
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-3">For Sellers</p>
             <h2 className="font-display text-3xl md:text-4xl text-ink leading-tight mb-4">
-              Full-service representation. A 0.5% listing-side fee.
+              A clear plan for your home sale.
             </h2>
-            <p className="text-ink/70 mb-6 max-w-lg leading-relaxed">
-              Florida Southeast Realty&apos;s 0.5% fee covers the listing side of the transaction,
-              including MLS exposure, marketing, showing coordination, offer negotiation, and
-              support through closing. Commission rates are negotiable and are not set by law;
-              any buyer-broker compensation is separate and negotiable.
+            <p className="text-ink/70 mb-4 max-w-lg leading-relaxed">
+              Start with a personal pricing and selling-cost review from {SITE.brokerName}.
+              Get a price range informed by relevant sales, a discussion of estimated selling
+              costs, and full-service representation if you decide to list.
             </p>
+            <p className="mb-3 text-lg font-medium text-tide">0.5% listing-side brokerage fee.</p>
+            <p className="mb-6 max-w-lg text-sm leading-relaxed text-ink/60">MLS exposure, marketing, showing coordination, negotiation and closing support. Commission rates are negotiable; authorized buyer-broker compensation and other closing costs are separate.</p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Link href="/home-valuation" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-6 py-3 rounded-sm transition-colors">
-                Get Your Free Home Value
+                Get My Pricing &amp; Cost Review
               </Link>
               <Link href="/sellers" className="border border-tide/30 text-tide font-medium text-center px-6 py-3 rounded-sm hover:bg-tide/5 transition-colors">
-                See What 0.5% Includes
+                See the Selling Plan
               </Link>
             </div>
           </div>

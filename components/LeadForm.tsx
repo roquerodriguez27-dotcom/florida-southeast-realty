@@ -243,8 +243,8 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
         <div className="rounded-sm border border-hibiscus/25 bg-hibiscus/5 p-3 text-sm text-ink/75" role="alert">
           <p className="font-medium text-hibiscus">We couldn&apos;t confirm your request.</p>
           <p className="mt-1">
-            Your answers are still here, so you can try again—or call/text{" "}
-            <a href={SITE.phoneHref} className="font-medium text-tide underline">{SITE.phoneDisplay}</a> or email{" "}
+            Your answers are still here. You can try again, call or text{" "}
+            <a href={SITE.phoneHref} className="font-medium text-tide underline">{SITE.phoneDisplay}</a>, or email{" "}
             <a href={`mailto:${SITE.email}`} className="font-medium text-tide underline">{SITE.email}</a>.
           </p>
         </div>

@@ -19,7 +19,7 @@ export default async function GuidesPage() {
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">South Florida Guides</p>
         <h1 className="font-display text-3xl md:text-5xl text-ink mb-3">Research before the decision gets expensive</h1>
         <p className="text-ink/60 max-w-2xl mb-10">
-          Practical guides written for South Florida buyers, sellers, and relocating households — with an emphasis on due diligence, property structure, and questions worth asking early.
+          Practical guides for buying, selling, or moving to South Florida. Learn what to research and which questions to ask before making a decision.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

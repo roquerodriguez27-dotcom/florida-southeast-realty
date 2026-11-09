@@ -18,7 +18,7 @@ const BENEFITS = [
   {
     number: "02",
     title: "Direct access to your broker",
-    body: "Get practical guidance directly from Roque Rodriguez, whose real estate experience dates to 1997—not a support ticket or an anonymous call center.",
+    body: "Get practical guidance directly from Roque Rodriguez, who has worked in real estate since 1997.",
   },
   {
     number: "03",
@@ -106,7 +106,7 @@ const FAQS = [
 const TECHNOLOGY = [
   ["Lead capture", "Website and advertising inquiries organized for timely response."],
   ["CRM visibility", "Contacts, notes, saved searches, and follow-up tasks in one workflow."],
-  ["AI assistance", "Draft outreach and reminders that support—not replace—your judgment."],
+  ["AI assistance", "Draft outreach and reminders, then review them before sending."],
   ["Agent insights", "A growing dashboard for client activity and business priorities."],
 ] as const;
 
@@ -166,8 +166,8 @@ export default function JoinPage() {
           <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-hibiscus">Why Florida Southeast Realty</p>
           <h2 className="font-display text-3xl leading-tight text-ink md:text-4xl">The support you need. The independence you want.</h2>
           <p className="mt-4 leading-relaxed text-ink/65">
-            We build around agent productivity—not layers of management, vague fees, or technology
-            that creates more work than it removes.
+            We focus on helping agents manage their business with direct broker support, clear fees,
+            and practical tools.
           </p>
         </div>
         <div className="mt-12 grid gap-px overflow-hidden rounded-sm border border-ink/10 bg-ink/10 md:grid-cols-2">
@@ -187,8 +187,8 @@ export default function JoinPage() {
             <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-hibiscus">Technology with a purpose</p>
             <h2 className="font-display text-3xl leading-tight text-ink md:text-4xl">Less busywork. More consistent follow-up.</h2>
             <p className="mt-5 leading-relaxed text-ink/70">
-              The goal is a connected path from the first inquiry to the next conversation,
-              property alert, appointment, and closing—not another disconnected stack of apps.
+              Our goal is to keep inquiries, conversations, property alerts, appointments,
+              and closing tasks connected.
             </p>
             <div className="mt-6 border-l-2 border-brass pl-4 text-sm leading-relaxed text-ink/60">
               Availability can vary by workflow and plan. We will tell you what is live today, what
@@ -303,7 +303,7 @@ export default function JoinPage() {
               { name: "primary_market", label: "Primary Market / Area", type: "text" },
               {
                 name: "recent_production",
-                label: "Closed Sides — Last 12 Months",
+                label: "Closed Sides in the Last 12 Months",
                 type: "select",
                 options: [
                   { value: "0", label: "0" },

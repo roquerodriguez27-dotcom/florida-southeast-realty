@@ -7,8 +7,8 @@ export default function PropertyGrid({ listings, compact = false, returnTo }: { 
       <div className="py-20 text-center border border-dashed border-ink/20 rounded-sm">
         <p className="font-display text-xl text-ink/70">No homes match those filters yet.</p>
         <p className="text-sm text-ink/50 mt-2">
-          Widen your price range or clear a filter — or tell an agent what you&apos;re after and
-          we&apos;ll watch the feed for you.
+          Try widening your price range or clearing a filter. You can also tell us what
+          you&apos;re looking for.
         </p>
       </div>
     );

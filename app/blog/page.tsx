@@ -20,7 +20,7 @@ export default async function BlogPage() {
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">South Florida Real Estate Blog</p>
         <h1 className="font-display text-3xl md:text-5xl text-ink mb-3">Practical research for buyers, sellers, and homeowners</h1>
         <p className="text-ink/60 max-w-2xl mb-10">
-          Original guidance focused on the questions that come up in South Florida transactions — property records, condos, waterfront due diligence, seller preparation, and more.
+          Practical articles on South Florida property records, condos, waterfront due diligence, and preparing a home for sale.
         </p>
 
         {lead && (

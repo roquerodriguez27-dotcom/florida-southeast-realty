@@ -45,7 +45,7 @@ export default async function HomeValuationPage({ searchParams }: Props) {
         <header className="max-w-3xl">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">Your Home Sale, Reviewed Personally</p>
           <h1 className="font-display text-4xl md:text-5xl text-ink mb-4 leading-tight">
-            What could your home sell for—and what could you keep?
+            What could your home sell for? What could you keep?
           </h1>
           <p className="text-ink/70 leading-relaxed">
             Get a personal pricing and selling-cost review from Roque Rodriguez. Start with your

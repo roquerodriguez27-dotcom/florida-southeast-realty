@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { SITE } from "@/lib/site-config";
+import { useSavedListings } from "@/components/useSavedListings";
 
 const NAV = [
   { href: "/properties", label: "Search Homes" },
@@ -19,6 +20,7 @@ const NAV = [
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const savedCount = useSavedListings().length;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -54,7 +56,7 @@ export default function Header() {
           />
         </Link>
 
-        <nav className="hidden xl:flex items-center gap-6" aria-label="Primary navigation">
+        <nav className="hidden xl:flex items-center gap-4" aria-label="Primary navigation">
           {NAV.map((item) => (
             <Link
               key={item.href}
@@ -66,7 +68,18 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="hidden xl:flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-1 xl:gap-3 shrink-0">
+          <Link
+            href="/saved-homes"
+            onClick={() => setOpen(false)}
+            aria-label={`Saved homes (${savedCount})`}
+            title="Saved homes"
+            className="inline-flex min-h-11 items-center gap-1 px-2 text-tide hover:text-hibiscus transition-colors"
+          >
+            <span aria-hidden="true" className="text-xl leading-none">♡</span>
+            <span aria-hidden="true" className="font-mono text-xs">{savedCount}</span>
+          </Link>
+        <div className="hidden xl:flex items-center gap-3 shrink-0">
           <a href={SITE.phoneHref} className="font-mono text-xs text-tide/80 hover:text-tide whitespace-nowrap">
             {SITE.phoneDisplay}
           </a>
@@ -93,11 +106,15 @@ export default function Header() {
             )}
           </svg>
         </button>
+        </div>
       </div>
 
       {open && (
         <div className="xl:hidden bg-sand border-t border-tide/10 px-5 pb-7 pt-2 max-h-[calc(100svh-64px)] overflow-y-auto animate-rise">
           <nav className="flex flex-col" aria-label="Mobile navigation">
+            <Link href="/saved-homes" onClick={() => setOpen(false)} className="py-3.5 text-tide/90 border-b border-tide/10 font-sans text-base">
+              Saved homes <span className="font-mono text-sm text-ink/50">({savedCount})</span>
+            </Link>
             {NAV.map((item) => (
               <Link
                 key={item.href}

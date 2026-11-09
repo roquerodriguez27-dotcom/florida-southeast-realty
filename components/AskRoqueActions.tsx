@@ -67,11 +67,18 @@ export default function AskRoqueActions({
           What should I research?
         </Link>
         <a
-          href="#property-inquiry"
+          href="#property-question"
+          onClick={() => track("property_question")}
+          className="rounded-full border border-tide/20 bg-white px-4 py-2 text-sm font-medium text-tide hover:bg-tide/5"
+        >
+          Ask Roque a question
+        </a>
+        <a
+          href="#property-showing"
           onClick={() => track("showing")}
           className="rounded-full bg-hibiscus px-4 py-2 text-sm font-medium text-sand hover:bg-hibiscus-dark"
         >
-          Schedule a showing
+          Request a showing
         </a>
       </div>
       {hoaAnswerVisible ? (

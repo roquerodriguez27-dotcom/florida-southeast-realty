@@ -1,4 +1,4 @@
-import type { Listing, PropertyType } from "@/lib/types";
+import type { IdxAttribution, Listing, PropertyType } from "@/lib/types";
 
 export const MAX_COMPARE_LISTINGS = 3;
 
@@ -18,6 +18,7 @@ export interface SavedComparisonListing {
   waterfront: boolean;
   propertyType: PropertyType;
   associationFeeMonthly?: number;
+  idx?: IdxAttribution;
 }
 
 export function savedComparisonListing(listing: Listing): SavedComparisonListing {
@@ -37,5 +38,6 @@ export function savedComparisonListing(listing: Listing): SavedComparisonListing
     waterfront: listing.waterfront,
     propertyType: listing.propertyType,
     associationFeeMonthly: listing.associationFeeMonthly,
+    idx: listing.idx,
   };
 }

@@ -8,7 +8,8 @@ import { formatFullPrice } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import Tideline from "@/components/Tideline";
 import SampleDataNotice from "@/components/SampleDataNotice";
-import LeadForm from "@/components/LeadForm";
+import PropertyInquiry from "@/components/PropertyInquiry";
+import BrokerIdentity from "@/components/BrokerIdentity";
 import ResearchLinks from "@/components/ResearchLinks";
 import { IDX_PROVIDER } from "@/lib/idx";
 import { SITE } from "@/lib/site-config";
@@ -68,7 +69,11 @@ function getReturnContext(value: string | string[] | undefined) {
 
   try {
     const url = new URL(candidate, SITE.url);
-    if (url.origin !== siteOrigin || url.pathname !== "/properties") return fallback;
+    if (url.origin !== siteOrigin) return fallback;
+    if (url.pathname === "/saved-homes") {
+      return { href: "/saved-homes", label: "Back to saved homes", fromResults: false };
+    }
+    if (url.pathname !== "/properties") return fallback;
 
     return {
       href: `${url.pathname}${url.search}${url.hash || "#property-results"}`,
@@ -115,7 +120,6 @@ export default async function ListingPage({ params, searchParams }: Props) {
   const listing = result.listing;
   const isLiveListing = Boolean(listing.idx);
   const savedListing = savedComparisonListing(listing);
-  const textHref = SITE.phoneHref.replace(/^tel:/, "sms:");
   const canonicalUrl = `${SITE.url}/properties/${listing.slug}`;
 
   const jsonLd = isLiveListing
@@ -158,7 +162,7 @@ export default async function ListingPage({ params, searchParams }: Props) {
     : null;
 
   return (
-    <div className="pt-16 pb-28 md:pb-20">
+    <div className="pt-16 pb-60 lg:pb-20">
       {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />}
 
       <div className="container-fsre py-4 sm:py-5">
@@ -190,6 +194,7 @@ export default async function ListingPage({ params, searchParams }: Props) {
           <div className="flex flex-wrap gap-3 mt-5">
             <Link prefetch={false} href={`/buyer-tools?listing=${listing.slug}&tool=cost`} className="bg-tide text-sand px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide-light transition-colors">Calculate true monthly cost</Link>
             <SaveListingButton listing={savedListing} variant="detail" />
+            <Link prefetch={false} href="/saved-homes" className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">View saved homes</Link>
             <CompareToggle listing={savedListing} variant="detail" />
             <Link prefetch={false} href={returnContext.href} className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">Choose more homes</Link>
           </div>
@@ -229,39 +234,9 @@ export default async function ListingPage({ params, searchParams }: Props) {
         </div>
 
         <aside id="property-inquiry" className="lg:col-span-1 scroll-mt-32">
-          <div className="bg-white border border-ink/10 rounded-sm p-6 sticky top-28">
-            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1">Showing request</p>
-            <p className="font-display text-2xl text-ink">Want to see this home?</p>
-            <p className="text-sm text-ink/60 mt-2">Leave an email or phone number and Roque will follow up about this exact property.</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <a href={textHref} className="rounded-sm border border-tide/25 px-4 py-2.5 text-center text-sm font-medium text-tide">Text Roque</a>
-              <a href={SITE.phoneHref} className="rounded-sm border border-tide/25 px-4 py-2.5 text-center text-sm font-medium text-tide">Call {SITE.phoneDisplay}</a>
-            </div>
-            <div className="mt-5">
-              <LeadForm
-                formName="property-inquiry"
-                submitLabel="Request Showing"
-                successMessage={`Roque will follow up about ${listing.address}.`}
-                hiddenContext={{ listingAddress: listing.address, listingId: listing.mlsId, requestType: "showing" }}
-                fields={[
-                  { name: "email", label: "Email", type: "email", placeholder: "you@example.com" },
-                  { name: "phone", label: "Phone", type: "tel", placeholder: "Best number" },
-                  {
-                    name: "preferred_time",
-                    label: "Best time",
-                    type: "select",
-                    colSpan: 2,
-                    options: [
-                      { value: "today", label: "Today" },
-                      { value: "tomorrow", label: "Tomorrow" },
-                      { value: "this-weekend", label: "This weekend" },
-                      { value: "flexible", label: "I’m flexible" },
-                    ],
-                  },
-                ]}
-              />
-            </div>
-          </div>
+          <PropertyInquiry listingAddress={listing.address} listingId={listing.mlsId}>
+            <BrokerIdentity compact />
+          </PropertyInquiry>
         </aside>
       </div>
 

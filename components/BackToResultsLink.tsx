@@ -25,7 +25,9 @@ export default function BackToResultsLink({
       event.shiftKey ||
       event.altKey;
 
-    if (modifiedClick || !preferHistory || window.history.length <= 1) return;
+    // Question/showing anchors add entries within the listing. In that case,
+    // follow the saved results URL instead of stepping back to another anchor.
+    if (modifiedClick || !preferHistory || window.history.length <= 1 || window.location.hash) return;
 
     event.preventDefault();
     router.back();

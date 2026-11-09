@@ -11,7 +11,7 @@ export default function PropertyConversionBar({ mlsId }: { mlsId: string }) {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-white/95 px-3 py-3 shadow-[0_-6px_24px_rgba(16,34,44,0.08)] backdrop-blur md:hidden" aria-label="Property contact options">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-white/95 px-3 py-3 shadow-[0_-6px_24px_rgba(16,34,44,0.08)] backdrop-blur lg:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }} aria-label="Property contact options">
       <div className="mx-auto grid max-w-xl grid-cols-3 gap-2">
         <a
           href={textHref}
@@ -21,7 +21,7 @@ export default function PropertyConversionBar({ mlsId }: { mlsId: string }) {
           Text Roque
         </a>
         <a
-          href="#property-inquiry"
+          href="#property-showing"
           onClick={() => track("schedule_tour_mobile")}
           className="rounded-sm bg-hibiscus px-3 py-3 text-center text-sm font-medium text-sand"
         >

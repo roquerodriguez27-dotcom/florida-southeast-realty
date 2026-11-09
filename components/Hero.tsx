@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import lakeWorthBeachHero from "@/public/lake-worth-beach-pier.webp";
 import SearchPanel from "./SearchPanel";
+import { SITE } from "@/lib/site-config";
 
 export default function Hero() {
   return (
@@ -33,24 +34,23 @@ export default function Hero() {
             Broward County · Palm Beach County · South Florida
           </p>
           <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-sand max-w-4xl leading-[1.04] animate-rise [animation-delay:100ms]">
-            Search smarter. Research deeper. Sell for 0.5%.
+            Local expertise for your next move.
           </h1>
           <p className="text-sand/85 text-base md:text-lg max-w-2xl mt-5 animate-rise [animation-delay:200ms] leading-relaxed">
-            Florida Southeast Realty combines local brokerage representation, South Florida home
-            search, and property-and-neighborhood research in one place. Sellers can list with our
-            0.5% listing-side brokerage fee; commission rates are negotiable and buyer-broker
-            compensation is separate and negotiable.
+            Work directly with {SITE.brokerName}, Broker and real estate professional since {SITE.brokerSince}.
+            Search South Florida homes or plan your sale with full-service representation.
+          </p>
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-sand/80">
+            Seller representation with a 0.5% listing-side fee. Buyer-broker compensation and
+            other closing costs are separate; commission rates are negotiable.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 mt-8 animate-rise [animation-delay:300ms] max-w-xl">
             <Link href="/home-valuation" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium text-center px-6 py-3.5 rounded-sm transition-colors">
-              Get Your Free Home Value
+              Plan My Home Sale
             </Link>
             <Link href="/properties" className="bg-sand/10 hover:bg-sand/20 border border-sand/40 text-sand font-medium text-center px-6 py-3.5 rounded-sm transition-colors">
               Search Homes
-            </Link>
-            <Link href="/research" className="bg-sand/10 hover:bg-sand/20 border border-sand/40 text-sand font-medium text-center px-6 py-3.5 rounded-sm transition-colors">
-              Research an Area
             </Link>
           </div>
         </div>

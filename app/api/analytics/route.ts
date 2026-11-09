@@ -10,7 +10,7 @@ const noCache = { "Cache-Control": "private, no-store" };
 const analyticsSchema = z.object({
   visitorId: z.uuid(), sessionId: z.uuid(), eventName: z.enum(ANALYTICS_EVENTS),
   path: z.string().min(1).max(600).refine(isPublicAnalyticsPath),
-  referrerHost: z.string().max(253).nullable().optional(),
+  // Referrers are not accepted or persisted; old-client extra fields are stripped.
   metadata: z.record(z.string().max(80), z.union([z.string().max(500), z.number(), z.boolean(), z.null()])).optional().default({}),
 });
 

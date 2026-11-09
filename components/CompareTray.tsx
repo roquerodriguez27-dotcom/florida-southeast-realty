@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { MAX_COMPARE_LISTINGS } from "@/lib/comparison";
 import {
   clearComparisonListings,
@@ -9,13 +10,14 @@ import {
 
 export default function CompareTray() {
   const listings = useComparisonListings();
+  const pathname = usePathname();
+  const onPropertyPage = /^\/properties\/[^/]+\/?$/.test(pathname);
   if (listings.length === 0) return null;
 
   return (
     <aside
       aria-label="Selected homes for comparison"
-      className="fixed z-50 left-3 right-3 md:left-1/2 md:right-auto md:w-[min(760px,calc(100%-2rem))] md:-translate-x-1/2 rounded-sm border border-brass/40 bg-tide text-sand shadow-2xl"
-      style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      className={`fixed z-50 left-3 right-3 md:left-1/2 md:right-auto md:w-[min(760px,calc(100%-2rem))] md:-translate-x-1/2 rounded-sm border border-brass/40 bg-tide text-sand shadow-2xl ${onPropertyPage ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))] lg:bottom-[max(0.75rem,env(safe-area-inset-bottom))]" : "bottom-[max(0.75rem,env(safe-area-inset-bottom))]"}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">

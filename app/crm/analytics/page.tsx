@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireCrmBroker } from "@/lib/crm/auth";
-import { parseVisitorReport, type VisitorReport } from "@/lib/crm/analytics";
+import { parseVisitorReport, type ConversionCounts, type ConversionReport, type VisitorReport } from "@/lib/crm/analytics";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import AnalyticsDeviceControl from "./AnalyticsDeviceControl";
 
@@ -8,6 +8,49 @@ export const metadata = { title: "Visitor report · Broker CRM", robots: { index
 export const dynamic = "force-dynamic";
 const number = (value: number) => new Intl.NumberFormat("en-US").format(value);
 const dateTime = (value: string) => new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(value));
+const conversionRows: Array<[keyof ConversionCounts, string]> = [
+  ["formStarts", "Form starts"], ["submissionAttempts", "Submission attempts"],
+  ["validationErrors", "Validation errors"], ["submissionErrors", "Submission failures"],
+  ["successfulSubmissions", "Successful form submissions"], ["calls", "Call clicks"],
+  ["texts", "Text clicks"], ["emails", "Email clicks"], ["legacyPhoneClicks", "Earlier combined call / text clicks"],
+];
+const formLabels: Record<string, string> = {
+  contact: "Contact", "home-valuation": "Home valuation", "sellers-page": "Seller review",
+  "buyer-inquiry": "Buyer search", "property-inquiry": "Property inquiry", "buyer-tools-review": "Buyer tools",
+  "agent-recruiting": "Agent recruiting", unknown: "Earlier / unlabelled form",
+};
+const requestLabels: Record<string, string> = { showing: "Showing", question: "Question", shortlist: "Saved shortlist" };
+const campaignLabels: Record<string, string> = {
+  "seller-review": "Seller review", "buyer-search": "Buyer search", "property-share": "Shared property", referral: "Referral",
+};
+
+function ConversionActivity({ report }: { report: ConversionReport | null }) {
+  return <section className="rounded-sm border border-ink/10 bg-white p-5">
+    <h2 className="font-display text-xl text-tide">Inquiries and contact activity</h2>
+    {!report ? <p className="mt-3 text-sm text-ink/65">Additional conversion measurements are not available yet. No conversion counts are inferred from missing data.</p> : <>
+      <p className="mt-2 max-w-4xl text-sm text-ink/65">These are recorded events, not distinct prospects or a sequential conversion rate. The first column covers browsers with observed interaction and no automation indicator; unclassified browsers and probable automation remain separate.</p>
+      <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm">
+        <caption className="sr-only">Conversion event counts by browser classification</caption>
+        <thead><tr className="border-b border-ink/10 text-xs text-ink/55">{["Activity", "Observed interaction", "Unclassified", "Probable automation"].map((label) => <th key={label} scope="col" className="px-2 py-2 font-medium">{label}</th>)}</tr></thead>
+        <tbody>{conversionRows.map(([key, label]) => <tr key={key} className="border-b border-ink/5"><th scope="row" className="px-2 py-3 font-normal">{label}</th>{[report.observed, report.unclassified, report.automation].map((counts, index) => <td key={index} className="px-2 py-3">{number(counts[key])}</td>)}</tr>)}</tbody>
+      </table></div>
+      <p className="mt-3 text-xs leading-relaxed text-ink/60">Form starts, attempts, failures, separate call/text events and form labels are collected prospectively from the conversion update. Older activity is not reconstructed. Repeated attempts can produce several events; a call, text or email click does not confirm a conversation. Browser-reported successes can be missed or blocked. <Link href="/crm" className="text-tide underline underline-offset-2">Review the CRM</Link> for stored requests, qualification and follow-up; tests and vendor pitches are not customer leads.</p>
+      <h3 className="mt-6 font-medium text-tide">Forms · observed interaction</h3>
+      {report.forms.length ? <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm">
+        <caption className="sr-only">Form activity for browsers with observed interaction and no automation indicator</caption>
+        <thead><tr className="border-b border-ink/10 text-xs text-ink/55">{["Form", "Request", "Starts", "Attempts", "Validation", "Failures", "Successes"].map((label) => <th key={label} scope="col" className="px-2 py-2 font-medium">{label}</th>)}</tr></thead>
+        <tbody>{report.forms.map((form) => <tr key={`${form.formName}:${form.requestType}`} className="border-b border-ink/5"><th scope="row" className="px-2 py-3 font-normal">{formLabels[form.formName]}</th><td className="px-2 py-3">{requestLabels[form.requestType] ?? "—"}</td>{[form.formStarts, form.submissionAttempts, form.validationErrors, form.submissionErrors, form.successfulSubmissions].map((count, index) => <td key={index} className="px-2 py-3">{number(count)}</td>)}</tr>)}</tbody>
+      </table></div> : <p className="mt-2 text-sm text-ink/60">No qualifying form activity recorded in this period yet.</p>}
+      <h3 className="mt-6 font-medium text-tide">Labelled campaigns · observed interaction</h3>
+      {report.campaigns.length ? <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm">
+        <caption className="sr-only">Activity associated with explicitly labelled campaign links</caption>
+        <thead><tr className="border-b border-ink/10 text-xs text-ink/55">{["Campaign label", "Pageviews", "Form successes", "Contact clicks"].map((label) => <th key={label} scope="col" className="px-2 py-2 font-medium">{label}</th>)}</tr></thead>
+        <tbody>{report.campaigns.map((campaign) => <tr key={campaign.campaign} className="border-b border-ink/5"><th scope="row" className="px-2 py-3 font-normal">{campaignLabels[campaign.campaign]}</th>{[campaign.pageviews, campaign.submissions, campaign.contactClicks].map((count, index) => <td key={index} className="px-2 py-3">{number(count)}</td>)}</tr>)}</tbody>
+      </table></div> : <p className="mt-2 text-sm text-ink/60">No activity from labelled campaign links recorded in this period yet.</p>}
+      <p className="mt-3 text-xs text-ink/55">Only the fixed seller-review, buyer-search, property-share and referral labels are retained, for the current browser session. Unlabelled traffic is not assigned a source. These labels identify links, not verified identities or advertising attribution.</p>
+    </>}
+  </section>;
+}
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   await requireCrmBroker();
@@ -58,6 +101,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             {cards.map(([label, count, description]) => <article key={label} className="rounded-sm border border-ink/10 bg-white p-5"><h3 className="text-sm font-medium text-tide">{label}</h3><p className="mt-3 font-display text-4xl text-tide">{number(count)}</p><p className="mt-3 text-xs leading-relaxed text-ink/60">{description}</p></article>)}
           </section>
           <p className="text-xs leading-relaxed text-ink/60">The three browser classifications are mutually exclusive for this period; an automation indicator takes precedence. One person can use several browsers, and several people can share one browser. Interaction is a signal, not proof of identity or humanity. No raw visitor IDs, contact information or search text appear in this report.</p>
+          <ConversionActivity report={report.conversion} />
           <section className="rounded-sm border border-brass/40 bg-white p-5">
             <h2 className="font-display text-xl text-tide">Earlier measurement · quality unknown</h2>
             <p className="mt-2 text-sm text-ink/65"><strong>{number(report.legacy.browsers)} approximate browser IDs</strong> across <strong>{number(report.legacy.events)} recorded events</strong> in the selected period were collected without the new checks. These records may include staff, testing and automation, and cannot establish human visitors.</p>

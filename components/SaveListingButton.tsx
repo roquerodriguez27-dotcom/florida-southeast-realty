@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import type { SavedComparisonListing } from "@/lib/comparison";
 import { trackSiteEvent } from "@/components/SiteAnalytics";
 import { toggleSavedListing, useSavedListings } from "@/components/useSavedListings";
@@ -14,11 +14,17 @@ export default function SaveListingButton({
 }) {
   const savedListings = useSavedListings();
   const saved = savedListings.some((item) => item.slug === listing.slug);
+  const [error, setError] = useState("");
 
   function toggle(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
     const action = toggleSavedListing(listing);
+    if (action === "storage-unavailable") {
+      setError("Saving is unavailable in this browser. Please check its storage settings.");
+      return;
+    }
+    setError("");
     trackSiteEvent("compare_change", {
       action: action === "added" ? "save_home" : "unsave_home",
       surface: variant,
@@ -28,6 +34,7 @@ export default function SaveListingButton({
 
   if (variant === "detail") {
     return (
+      <span className="inline-flex flex-col items-start gap-2">
       <button
         type="button"
         onClick={toggle}
@@ -41,10 +48,13 @@ export default function SaveListingButton({
         <span aria-hidden="true" className="text-lg leading-none">{saved ? "♥" : "♡"}</span>
         {saved ? "Saved" : "Save home"}
       </button>
+      {error && <span role="alert" className="max-w-xs text-xs text-hibiscus">{error}</span>}
+      </span>
     );
   }
 
   return (
+    <>
     <button
       type="button"
       onClick={toggle}
@@ -59,5 +69,7 @@ export default function SaveListingButton({
     >
       <span aria-hidden="true">{saved ? "♥" : "♡"}</span>
     </button>
+    {error && <p role="alert" className="absolute left-3 right-3 top-16 z-30 rounded-sm border border-hibiscus/20 bg-white p-3 text-xs text-hibiscus shadow-sm">{error}</p>}
+    </>
   );
 }

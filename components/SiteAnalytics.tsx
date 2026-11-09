@@ -2,11 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ANALYTICS_OPTOUT_KEY, ANALYTICS_PREFERENCE_EVENT, ANALYTICS_SIGNAL_VERSION, BOT_USER_AGENT, analyticsMetadata, analyticsPath, isProductionAnalyticsHost, isPublicAnalyticsPath, type AnalyticsEventName } from "@/lib/analytics";
+import { ANALYTICS_OPTOUT_KEY, ANALYTICS_PREFERENCE_EVENT, ANALYTICS_SIGNAL_VERSION, BOT_USER_AGENT, analyticsCampaign, analyticsMetadata, analyticsPath, isProductionAnalyticsHost, isPublicAnalyticsPath, type AnalyticsEventName } from "@/lib/analytics";
 
 const LAST_SEARCH_STORAGE_KEY = "fsr-last-property-search-v1";
 const LAST_SEARCH_UPDATED_EVENT = "fsr-last-property-search-updated";
 const INTERACTION_KEY = "fsr-interaction-v3";
+const CAMPAIGN_KEY = "fsr-analytics-campaign-v1";
 const memoryIds = new Map<string, string>();
 let interactionObserved = false;
 let interactionQueued = false;
@@ -52,15 +53,24 @@ function visitorSignals(): Record<string, string | boolean> {
   };
 }
 
+function campaignSignal() {
+  const current = analyticsCampaign(new URLSearchParams(window.location.search).get("fsr_campaign"));
+  try {
+    if (current) window.sessionStorage.setItem(CAMPAIGN_KEY, current);
+    return current ?? analyticsCampaign(window.sessionStorage.getItem(CAMPAIGN_KEY));
+  } catch { return current; }
+}
+
 async function send(eventName: AnalyticsEventName, metadata: Record<string, string | number | boolean | null> = {}) {
   try {
     const pathname = window.location.pathname;
     if (!isPublicAnalyticsPath(pathname) || !await mayTrack()) return false;
+    const campaign = campaignSignal();
     const body = JSON.stringify({
       visitorId: getOrCreateId("localStorage", "fsr_visitor_id"),
       sessionId: getOrCreateId("sessionStorage", "fsr_session_id"),
       eventName, path: analyticsPath(pathname),
-      metadata: analyticsMetadata({ ...metadata, ...visitorSignals(), eventId: crypto.randomUUID() }),
+      metadata: analyticsMetadata({ ...metadata, ...visitorSignals(), campaign, eventId: crypto.randomUUID() }),
     });
     let queued = false;
     try { queued = navigator.sendBeacon?.("/api/analytics", new Blob([body], { type: "application/json" })) ?? false; } catch {}
@@ -111,7 +121,6 @@ export default function SiteAnalytics() {
     }
     if (pathname.startsWith("/properties/")) void send("property_view");
     if (pathname === "/home-valuation") void send("home_valuation_view");
-    if (pathname === "/buyer-tools") void send("buyer_tool_use");
   }, [pathname, searchParams]);
   useEffect(() => {
     const preferenceChanged = () => { eligibility = undefined; };
@@ -130,7 +139,8 @@ export default function SiteAnalytics() {
       if (!event.isTrusted) return;
       const anchor = event.target instanceof Element ? event.target.closest("a") : null;
       const href = anchor?.getAttribute("href") ?? "";
-      if (href.startsWith("tel:") || href.startsWith("sms:")) void send("phone_click");
+      if (href.startsWith("tel:")) void send("call_click");
+      else if (href.startsWith("sms:")) void send("text_click");
       else if (href.startsWith("mailto:")) void send("email_click");
     };
     window.addEventListener(ANALYTICS_PREFERENCE_EVENT, preferenceChanged);

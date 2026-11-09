@@ -53,7 +53,7 @@ export default async function BuyerToolsPage({ searchParams }: Props) {
     <main className="pt-28 md:pt-32 pb-24">
       <section className="container-fsre max-w-4xl">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">Buyer Decision Tools</p>
-        <h1 className="font-display text-4xl md:text-5xl text-ink leading-tight">Compare the home—and the real cost of owning it.</h1>
+        <h1 className="font-display text-4xl md:text-5xl text-ink leading-tight">Compare homes and the cost of owning them.</h1>
         <p className="text-lg text-ink/65 leading-relaxed mt-5 max-w-3xl">Test monthly-cost and affordability scenarios with the Florida expenses that matter, then compare homes side-by-side before deciding what deserves a showing.</p>
       </section>
       <section className="container-fsre mt-10">

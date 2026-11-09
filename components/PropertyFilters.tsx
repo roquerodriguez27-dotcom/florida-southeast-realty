@@ -440,7 +440,7 @@ export default function PropertyFilters({ current }: { current: CurrentFilters }
 
             <section className="rounded-sm border border-ink/10 bg-white p-4">
               <h3 className="text-sm font-semibold text-ink">Style, view &amp; systems</h3>
-              <p className="mt-1 text-xs text-ink/50">Structured RESO characteristics—not marketing tags.</p>
+              <p className="mt-1 text-xs text-ink/50">Filter by the features recorded in the MLS.</p>
               <div className="mt-3 grid gap-3">
                 <SelectField id="f-style" name="style" label="Architectural style" value={current.style}>
                   <option value="">Any style</option><option value="ranch">Ranch</option><option value="contemporary">Contemporary</option><option value="mediterranean">Mediterranean</option><option value="modern">Modern</option><option value="traditional">Traditional</option>

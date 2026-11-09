@@ -372,7 +372,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
         <section className="mt-6 grid lg:grid-cols-[minmax(0,1fr)_420px] gap-6 items-start" aria-label="Home affordability scenario planner">
           <div className="bg-white border border-ink/10 rounded-sm p-6 md:p-8">
             <h2 className="font-display text-2xl">Test an affordability scenario</h2>
-            <p className="text-sm text-ink/55 mt-1 mb-6">Use household numbers to create a planning range—not a lending decision.</p>
+            <p className="text-sm text-ink/55 mt-1 mb-6">Use your household numbers to estimate a planning range. This is not a lending decision.</p>
             <div className="grid sm:grid-cols-2 gap-4">
               <Input label="Annual household income" value={income} onChange={setIncome} prefix="$" step={5000} />
               <Input label="Monthly debt payments" value={monthlyDebt} onChange={setMonthlyDebt} prefix="$" suffix="/ mo" step={50} />

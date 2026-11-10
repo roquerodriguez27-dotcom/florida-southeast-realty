@@ -5,6 +5,37 @@ const img = (id: string) =>
 
 export const GUIDES: GuideArticle[] = [
   {
+    slug: "moving-from-new-york-new-jersey-to-palm-beach-county",
+    title: "Moving from New York or New Jersey to Palm Beach County",
+    dek: "Plan your home search, compare local communities, and organize the questions to ask before a move from the Northeast to Palm Beach County.",
+    category: "Relocation",
+    readMinutes: 5,
+    image: img("photo-1570737543243-cd82cbd1e8c9"),
+    publishedAt: "2026-11-09",
+    body: [
+      "A move from New York or New Jersey starts with more than choosing a home from listing photos. Write down what you need your Florida routine to include: work and travel, the places you expect to visit, the type of property you want to maintain, and the timing of your current lease or sale. Florida Southeast Realty is based in Boynton Beach, and Broker Roque Rodriguez began his real estate career in New Jersey. We use that starting conversation to build a search around your priorities and welcome buyers moving from any location.",
+      "Choose a small group of places to compare before planning a scouting trip. Our guides cover Boynton Beach, Delray Beach, Boca Raton, Lake Worth Beach, West Palm Beach, Wellington, Palm Beach Gardens, and Jupiter. Use them to explore housing types and property questions, then compare specific addresses. If a listing uses a Lake Worth mailing address, check its actual municipality and county records instead of assuming it is within the City of Lake Worth Beach. Our 33467 search is a separate starting point for properties using that ZIP code.",
+      "Build a monthly and annual ownership worksheet for every serious candidate. Ask for address-specific estimates for insurance and financing, review available property records, and request the current association fees and documents when an association applies. Include maintenance, utilities, any club obligations, and known or proposed assessments in your questions. Use current written information from the relevant professionals and documents; a seller's past expenses are a starting point for research, not a promise of your future costs.",
+      "Set aside time for property research before you travel. Our Research Center links to public records, flood information, permits, and other resources. For a condo, ask what documents are available about the building, association finances, insurance, rules, and planned work. For a single-family home, organize questions about the roof, openings, systems, improvements, and permit history. Inspectors, insurance professionals, lenders, and other specialists can help answer the questions that affect your particular property.",
+      "Make a scouting trip about daily life as well as showings. Plan realistic travel time between appointments, visit the places you would actually use, and test important routes at the hours you expect to travel. If school assignment is part of your decision, verify the specific address with the school district and review official information yourself. Compare observable features and your own needs instead of relying on labels such as the 'best' neighborhood.",
+      "Coordinate the move around the details of your own transaction. Discuss the timing of a New York or New Jersey sale or lease, a Florida purchase, inspections, financing, association applications when applicable, and moving arrangements before committing to a schedule. Ask your lender and closing professionals which steps can be handled remotely and which require your attention in person. Leave room in the plan for information that is still being verified.",
+      "If your first search will be remote, send Roque a short list of priorities and the addresses that interest you. Separate features you need from features you would like, and note the questions you want answered before deciding whether to travel. Use current MLS information and property documents to refine the shortlist. Photos, a video conversation, and a virtual showing can help organize the search, but they do not replace the inspections and independent research you choose for a purchase.",
+      "Ready to talk through a move? Contact Florida Southeast Realty with your preferred areas, property type, approximate timing, and whether another home needs to be sold first. We can help organize the search and identify the next questions to resolve. If you are still comparing locations, start with the local guides below and keep a simple list of what you learn about each area and address.",
+    ],
+    relatedLinks: [
+      { label: "Boynton Beach", href: "/communities/boynton-beach" },
+      { label: "Delray Beach", href: "/communities/delray-beach" },
+      { label: "Boca Raton", href: "/communities/boca-raton" },
+      { label: "Lake Worth Beach", href: "/communities/lake-worth-beach" },
+      { label: "Wellington", href: "/communities/wellington" },
+      { label: "West Palm Beach", href: "/communities/west-palm-beach" },
+      { label: "Palm Beach Gardens", href: "/communities/palm-beach-gardens" },
+      { label: "Jupiter", href: "/communities/jupiter" },
+      { label: "Lake Worth mailing area: 33467", href: "/homes-for-sale/33467" },
+      { label: "Compare communities before relocating", href: "/guides/relocating-to-south-florida-neighborhood-guide" },
+    ],
+  },
+  {
     slug: "buying-waterfront-property-southeast-florida",
     title: "Buying Waterfront Property in South Florida: What to Research First",
     dek: "A practical starting point for evaluating docks, seawalls, bridge access, flood information, insurance, and permits before you commit.",

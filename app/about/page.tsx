@@ -9,7 +9,7 @@ import { SITE } from "@/lib/site-config";
 export const metadata: Metadata = {
   title: "About Roque Rodriguez & Florida Southeast Realty",
   description:
-    "Meet Roque Rodriguez, Broker of Florida Southeast Realty, an independent brokerage serving buyers and sellers across South Florida.",
+    "Meet Roque Rodriguez, a Boynton Beach-based broker helping buyers and sellers in Palm Beach and Broward counties, including New York and New Jersey relocations.",
   alternates: { canonical: "/about" },
 };
 
@@ -26,6 +26,18 @@ const PRINCIPLES = [
     title: "A clear seller fee",
     body: "Florida Southeast Realty advertises a 0.5% listing-side brokerage fee. Commission rates are negotiable, and any buyer-broker compensation is separate and negotiable.",
   },
+];
+
+const LOCAL_GUIDES = [
+  { name: "Boynton Beach", href: "/communities/boynton-beach" },
+  { name: "Delray Beach", href: "/communities/delray-beach" },
+  { name: "Boca Raton", href: "/communities/boca-raton" },
+  { name: "Lake Worth Beach", href: "/communities/lake-worth-beach" },
+  { name: "West Palm Beach", href: "/communities/west-palm-beach" },
+  { name: "Wellington", href: "/communities/wellington" },
+  { name: "Palm Beach Gardens", href: "/communities/palm-beach-gardens" },
+  { name: "Jupiter", href: "/communities/jupiter" },
+  { name: "Fort Lauderdale", href: "/fort-lauderdale-homes-for-sale" },
 ];
 
 export default function AboutPage() {
@@ -45,8 +57,9 @@ export default function AboutPage() {
               platform.
             </p>
             <p className="text-ink/70 leading-relaxed mt-4 max-w-3xl">
-              Our goal is simple: make it easier to understand the property, the neighborhood, the
-              transaction, and the numbers before you make a major decision.
+              Based in {SITE.address.city}, we help buyers and sellers across Palm Beach and Broward
+              counties. Our goal is simple: make it easier to understand the property, the
+              neighborhood, the transaction, and the numbers before you make a major decision.
             </p>
             <div className="flex flex-wrap gap-3 mt-7">
               <Link href="/contact" className="bg-hibiscus hover:bg-hibiscus-dark text-sand font-medium px-5 py-3 rounded-sm transition-colors">
@@ -89,6 +102,53 @@ export default function AboutPage() {
               <p className="text-sm text-ink/65 mt-3 leading-relaxed">{item.body}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="container-fsre pb-16 md:pb-20" aria-labelledby="local-coverage-heading">
+        <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-3">Where we work</p>
+            <h2 id="local-coverage-heading" className="font-display text-3xl text-ink">
+              Start with the places that fit your plans
+            </h2>
+            <p className="mt-4 text-ink/70 leading-relaxed">
+              Compare local guides for housing types, property research, and current listings.
+              Whether you are buying, selling, or planning a move, we can help you narrow the
+              search and identify the questions to ask about a particular address.
+            </p>
+            <nav aria-label="Local community guides" className="mt-5 flex flex-wrap gap-2">
+              {LOCAL_GUIDES.map((guide) => (
+                <Link key={guide.href} href={guide.href} prefetch={false} className="rounded-sm border border-tide/20 px-3 py-2 text-sm text-tide hover:bg-tide/5 transition-colors">
+                  {guide.name}
+                </Link>
+              ))}
+            </nav>
+            <p className="mt-5 text-sm text-ink/65 leading-relaxed">
+              Looking in the Lake Worth mailing area? Use our{" "}
+              <Link href="/homes-for-sale/33467" prefetch={false} className="text-tide underline underline-offset-4">33467 property search</Link>
+              {" "}alongside the Lake Worth Beach city guide, and verify the municipality for each address.
+            </p>
+          </div>
+          <div className="rounded-sm border border-ink/10 bg-white p-6 md:p-8">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-3">Planning a relocation</p>
+            <h2 className="font-display text-3xl text-ink">Moving from New York or New Jersey?</h2>
+            <p className="mt-4 text-ink/70 leading-relaxed">
+              Roque began his real estate career in New Jersey. If you are considering a move to
+              Palm Beach County, start with a practical plan for your travel, home search, ownership
+              costs, and timing. We welcome buyers relocating from anywhere and use your priorities
+              to guide the conversation.
+            </p>
+            <Link href="/guides/moving-from-new-york-new-jersey-to-palm-beach-county" className="mt-5 inline-block text-tide font-medium underline underline-offset-4">
+              Read the Palm Beach County relocation guide
+            </Link>
+            <div className="mt-7 border-t border-ink/10 pt-5">
+              <p className="text-sm text-ink/65">Have a property or a move in mind?</p>
+              <a href={SITE.phoneHref} className="mt-2 inline-block text-tide font-medium underline underline-offset-4">
+                Call {SITE.brokerName}: {SITE.phoneDisplay}
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 

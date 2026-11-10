@@ -73,6 +73,18 @@ export default async function GuidePage({ params }: Props) {
             <p key={index} className="text-ink/80 leading-relaxed">{paragraph}</p>
           ))}
         </div>
+        {guide.relatedLinks?.length ? (
+          <nav aria-label="Related local guides" className="mt-10 rounded-sm border border-ink/10 bg-white p-6">
+            <h2 className="font-display text-2xl text-ink">Explore the places on your shortlist</h2>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+              {guide.relatedLinks.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} prefetch={false} className="text-tide underline underline-offset-4">{link.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ) : null}
         <div className="mt-10 border-t border-ink/10 pt-6 flex flex-wrap gap-4 text-sm">
           <Link href="/research" className="text-tide underline underline-offset-4">Open the Research Center</Link>
           <Link href="/contact" className="text-tide underline underline-offset-4">Ask a South Florida broker</Link>

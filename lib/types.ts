@@ -242,6 +242,7 @@ export interface GuideArticle {
   image: string;
   publishedAt: string;
   body: string[];
+  relatedLinks?: Array<{ label: string; href: string }>;
 }
 
 export interface BlogPost {

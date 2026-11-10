@@ -3,6 +3,7 @@ import { getAllCommunities } from "@/lib/communities";
 import { getGuides, getBlogPosts } from "@/lib/content";
 import { SITE } from "@/lib/site-config";
 import { SEARCH_MARKETS } from "@/lib/seo/search-markets";
+import { HOMEOWNER_UPDATES, HOMEOWNER_UPDATES_PATH } from "@/lib/homeowner-updates";
 
 export const revalidate = 3600;
 
@@ -67,10 +68,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
+  const homeownerUpdatesRoute: MetadataRoute.Sitemap = [{
+    url: `${SITE.url}${HOMEOWNER_UPDATES_PATH}`,
+    lastModified: HOMEOWNER_UPDATES.editorialUpdatedAt,
+    changeFrequency: "weekly",
+    priority: 0.8,
+  }];
+
   // Individual MLS listings remain indexable and are linked from the site, but
   // they are intentionally excluded from the XML sitemap. They are short-lived,
   // widely syndicated URLs and previously caused search crawlers to create large
   // bursts of live BeachesMLS traffic. The sitemap is reserved for durable pages
   // that should accumulate long-term local-search authority.
-  return [...staticRoutes, ...searchMarketRoutes, ...communityRoutes, ...guideRoutes, ...postRoutes];
+  return [...staticRoutes, ...searchMarketRoutes, ...communityRoutes, ...guideRoutes, ...postRoutes, ...homeownerUpdatesRoute];
 }

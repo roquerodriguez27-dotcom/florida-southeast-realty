@@ -9,6 +9,7 @@ import LeadCaptureBand from "@/components/LeadCaptureBand";
 import SampleDataNotice from "@/components/SampleDataNotice";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import ResearchLinks from "@/components/ResearchLinks";
+import HomeownerUpdatesPanel from "@/components/HomeownerUpdatesPanel";
 import Tideline from "@/components/Tideline";
 import HomeEngagement from "@/components/HomeEngagement";
 import Link from "next/link";
@@ -179,6 +180,7 @@ export default async function HomePage() {
             <Link href="/research" className="text-sm text-tide underline underline-offset-4">Open the full research center</Link>
           </div>
           <ResearchLinks limit={4} />
+          <div className="mt-7"><HomeownerUpdatesPanel /></div>
         </div>
       </section>
 

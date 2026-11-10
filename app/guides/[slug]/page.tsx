@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/format";
 import LeadCaptureBand from "@/components/LeadCaptureBand";
 import { SITE } from "@/lib/site-config";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
+import { HOMEOWNER_UPDATES_PATH, HOMEOWNER_UPDATES_TITLE } from "@/lib/homeowner-updates";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -86,6 +87,7 @@ export default async function GuidePage({ params }: Props) {
           </nav>
         ) : null}
         <div className="mt-10 border-t border-ink/10 pt-6 flex flex-wrap gap-4 text-sm">
+          <Link href={HOMEOWNER_UPDATES_PATH} className="text-tide underline underline-offset-4">{HOMEOWNER_UPDATES_TITLE}</Link>
           <Link href="/research" className="text-tide underline underline-offset-4">Open the Research Center</Link>
           <Link href="/contact" className="text-tide underline underline-offset-4">Ask a South Florida broker</Link>
         </div>

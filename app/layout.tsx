@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
-import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 import Header from "@/components/Header";
@@ -10,24 +10,35 @@ import { serializeJsonLd } from "@/lib/seo/json-ld";
 import CompareTray from "@/components/CompareTray";
 import SiteAnalytics from "@/components/SiteAnalytics";
 
-const fraunces = Fraunces({
-  subsets: ["latin"],
+// Version-pinned, self-hosted Google Fonts; see fonts/README.md for provenance.
+const fraunces = localFont({
+  src: [
+    { path: "./fonts/fraunces-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/fraunces-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/fraunces-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/fraunces-italic.woff2", weight: "400", style: "italic" },
+    { path: "./fonts/fraunces-italic.woff2", weight: "500", style: "italic" },
+    { path: "./fonts/fraunces-italic.woff2", weight: "600", style: "italic" },
+  ],
   variable: "--font-fraunces",
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
   display: "swap",
+  adjustFontFallback: "Times New Roman",
 });
 
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: "./fonts/inter-normal.woff2",
   variable: "--font-inter",
+  weight: "100 900",
+  style: "normal",
   display: "swap",
 });
 
-const jetbrains = JetBrains_Mono({
-  subsets: ["latin"],
+const jetbrains = localFont({
+  src: [
+    { path: "./fonts/jetbrains-mono-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/jetbrains-mono-normal.woff2", weight: "500", style: "normal" },
+  ],
   variable: "--font-jetbrains",
-  weight: ["400", "500"],
   display: "swap",
 });
 

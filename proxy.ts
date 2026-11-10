@@ -211,12 +211,18 @@ export async function proxy(request: NextRequest) {
   // Real top-level browsers advertise HTML/document navigation semantics, and
   // Next.js client transitions are tagged as RSC requests. Block browser-UA
   // requests whose headers contradict both legitimate patterns.
+  // Permit the documented Google ownership fetcher on the homepage even with
+  // non-browser headers. Keep this outside the general crawler allowlist.
+  const isHomepageVerificationRequest = request.method === "GET"
+    && pathname === "/"
+    && userAgent === "Mozilla/5.0 (compatible; Google-Site-Verification/1.0)";
   if (
     publicPagePath
     && request.method === "GET"
     && BROWSER_USER_AGENT.test(userAgent)
     && !MAJOR_SEARCH_CRAWLER_USER_AGENT.test(userAgent)
     && !SOCIAL_PREVIEW_USER_AGENT.test(userAgent)
+    && !isHomepageVerificationRequest
     && !isBrowserNavigationRequest(request)
   ) {
     return blockedAutomationResponse();

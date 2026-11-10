@@ -11,7 +11,8 @@
     "prebuild": "node scripts/next-cache-lifecycle.mjs --prepare-build",
     "postbuild": "node scripts/next-cache-lifecycle.mjs --verify-build",
     "test:cache-lifecycle": "node scripts/test-next-cache-lifecycle.mjs",
-    "test:analytics-privacy": "node scripts/test-analytics-privacy.mjs"
+    "test:analytics-privacy": "node scripts/test-analytics-privacy.mjs",
+    "test:proxy-verification": "node scripts/test-proxy-verification.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.4",

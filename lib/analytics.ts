@@ -1,3 +1,5 @@
+import { PLANNING_FORM_NAMES } from "@/lib/lead-contact";
+
 /** Privacy-conscious first-party visitor-report fields. These are estimates, not people counts. */
 export const ANALYTICS_EVENTS = [
   "page_view", "property_search", "property_view", "home_valuation_view", "lead_submit",
@@ -6,7 +8,7 @@ export const ANALYTICS_EVENTS = [
   "form_validation_error", "form_submit_error",
 ] as const;
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
-export const ANALYTICS_FORM_NAMES = ["contact", "home-valuation", "sellers-page", "buyer-inquiry", "property-inquiry", "buyer-tools-review", "agent-recruiting"] as const;
+export const ANALYTICS_FORM_NAMES = ["contact", "home-valuation", "sellers-page", "buyer-inquiry", "property-inquiry", "buyer-tools-review", "agent-recruiting", ...PLANNING_FORM_NAMES] as const;
 export type AnalyticsFormName = (typeof ANALYTICS_FORM_NAMES)[number];
 export const ANALYTICS_REQUEST_TYPES = ["showing", "question", "shortlist"] as const;
 export const ANALYTICS_ERROR_KINDS = ["validation", "network", "server", "storage"] as const;
@@ -42,7 +44,7 @@ export function analyticsPath(path: string): string {
   for (const [section, label] of [["communities", "community"], ["homes-for-sale", "market"], ["guides", "guide"], ["blog", "article"]]) {
     if (new RegExp(`^/${section}/[^/]+/?$`).test(pathname)) return `/${section}/[${label}]`;
   }
-  const allowed = new Set(["/", "/properties", "/home-valuation", "/buyer-tools", "/contact", "/about", "/sellers", "/communities", "/research", "/join", "/guides", "/testimonials", "/terms-of-use", "/privacy-policy", "/fair-housing", "/accessibility-statement", "/blog", "/fort-lauderdale-homes-for-sale", "/compare", "/saved-homes"]);
+  const allowed = new Set(["/", "/properties", "/home-valuation", "/buyer-tools", "/planning", "/planning/buy", "/planning/sell", "/planning/own", "/ask-roque", "/research/homeowner-updates", "/contact", "/about", "/sellers", "/communities", "/research", "/join", "/guides", "/testimonials", "/terms-of-use", "/privacy-policy", "/fair-housing", "/accessibility-statement", "/blog", "/fort-lauderdale-homes-for-sale", "/compare", "/saved-homes"]);
   if (allowed.has(pathname)) return pathname;
   return "/other";
 }

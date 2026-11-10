@@ -14,7 +14,8 @@
     "test:analytics-privacy": "node scripts/test-analytics-privacy.mjs",
     "test:proxy-verification": "node scripts/test-proxy-verification.mjs",
     "validate:homeowner-updates": "node scripts/validate-homeowner-updates.mjs",
-    "test:homeowner-updates": "node scripts/validate-homeowner-updates.mjs --test"
+    "test:homeowner-updates": "node scripts/validate-homeowner-updates.mjs --test",
+    "test:planning-suite": "node scripts/test-planning-handoff.mjs && node scripts/test-seller-planning.mjs && node scripts/test-homeowner-calendar.mjs && node --test tests/buyer-planning.test.mjs tests/buyer-voice-question.test.mjs tests/lead-form-context.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.4",

@@ -193,6 +193,7 @@ export default async function ListingPage({ params, searchParams }: Props) {
 
           <div className="flex flex-wrap gap-3 mt-5">
             <Link prefetch={false} href={`/buyer-tools?listing=${listing.slug}&tool=cost`} className="bg-tide text-sand px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide-light transition-colors">Calculate true monthly cost</Link>
+            <Link href="/planning/buy?tool=checklist" className="border border-tide/25 text-tide px-4 py-2.5 rounded-sm text-sm font-medium hover:bg-tide/5">Build a property checklist</Link>
             <SaveListingButton listing={savedListing} variant="detail" />
             <Link prefetch={false} href="/saved-homes" className="px-2 py-2.5 text-sm text-tide underline underline-offset-4">View saved homes</Link>
             <CompareToggle listing={savedListing} variant="detail" />

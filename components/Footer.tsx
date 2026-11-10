@@ -46,6 +46,8 @@ export default async function Footer() {
             <ul className="space-y-2 text-sm">
               <li><Link href="/communities" className="hover:text-sand">Community Guides</Link></li>
               <li><Link href="/research" className="hover:text-sand">Research Center</Link></li>
+              <li><Link href="/planning" className="hover:text-sand">Planning Tools</Link></li>
+              <li><Link href="/ask-roque" className="hover:text-sand">Ask Roque</Link></li>
               <li><Link href="/guides" className="hover:text-sand">Buyer &amp; Seller Guides</Link></li>
               <li><Link href="/blog" className="hover:text-sand">Market &amp; Local Articles</Link></li>
             </ul>

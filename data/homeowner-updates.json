@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "publishedAt": "2026-11-10T04:00:47Z",
-  "editorialUpdatedAt": "2026-11-10T04:00:47Z",
+  "editorialUpdatedAt": "2026-11-10T04:49:04Z",
   "topics": [
     {
       "id": "amendment-3-2026",
@@ -14,7 +14,7 @@
       },
       "appliesTo": "Florida owners and people establishing homestead; residence timing affects eligibility.",
       "publishedAt": "2026-11-10T04:00:47Z",
-      "editorialUpdatedAt": "2026-11-10T04:00:47Z",
+      "editorialUpdatedAt": "2026-11-10T04:49:04Z",
       "facts": [
         {
           "id": "election-result",
@@ -45,11 +45,20 @@
           "id": "exemption-meaning",
           "text": "These exemption amounts are not dollar-for-dollar tax savings and do not apply to school levies.",
           "sourceIds": ["senate-summary"]
+        },
+        {
+          "id": "pbc-estimator",
+          "text": "Palm Beach County's Amendment 3 calculator is intended for properties currently receiving a homestead exemption. Its figures are estimates, not an official tax calculation or a guarantee of savings. The calculator is a planning resource, not evidence of election certification.",
+          "sourceIds": ["pbc-amendment-estimator"]
         }
       ],
       "actions": [
         {
           "text": "Confirm homestead eligibility and residence dates with the county property appraiser."
+        },
+        {
+          "text": "Palm Beach County owners: open the Property Appraiser's Amendment 3 estimator.",
+          "href": "https://pbcpao.gov/Property/Amendment3Calculator"
         },
         {
           "text": "Discuss your property plans.",
@@ -83,6 +92,13 @@
           "label": "Florida Senate: CS/HJR 1-F summary",
           "url": "https://www.flsenate.gov/Committees/BillSummaries/2026F/html/1",
           "lastSuccessfulCheckAt": "2026-11-10T03:57:34Z",
+          "accessMethod": "direct"
+        },
+        {
+          "id": "pbc-amendment-estimator",
+          "label": "Palm Beach County Property Appraiser: Amendment 3 estimator",
+          "url": "https://pbcpao.gov/Property/Amendment3Calculator",
+          "lastSuccessfulCheckAt": "2026-11-10T04:49:04Z",
           "accessMethod": "direct"
         }
       ]
@@ -199,6 +215,11 @@
     }
   ],
   "history": [
+    {
+      "at": "2026-11-10T04:49:04Z",
+      "summary": "Added the official Palm Beach County Amendment 3 estimator and its limits. The election result remains labeled unofficial; earlier source-review dates are unchanged.",
+      "topicIds": ["amendment-3-2026"]
+    },
     {
       "at": "2026-11-10T04:00:47Z",
       "summary": "Published sourced homeowner updates on Amendment 3, condominium reserve planning and Citizens flood-insurance requirements.",

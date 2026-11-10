@@ -3,6 +3,7 @@ import { readSameOriginJson } from "@/lib/api/request";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { sendBrokerNotification } from "@/lib/broker-notification";
 import { z } from "zod";
+import { contactValidationError } from "@/lib/lead-contact";
 
 /**
  * Lead delivery seam
@@ -73,6 +74,9 @@ export async function POST(req: Request) {
   if (payload.fields.contact_consent !== "yes") {
     return NextResponse.json({ delivered: false, reason: "invalid_payload" }, { status: 400 });
   }
+  if (contactValidationError(payload.formName, payload.fields)) {
+    return NextResponse.json({ delivered: false, reason: "invalid_payload" }, { status: 400 });
+  }
 
   let stored = false;
   try {
@@ -96,7 +100,7 @@ export async function POST(req: Request) {
         "interest",
         "scenario",
       ]),
-      p_message: first(fields, ["message", "comments", "notes", "goals", "criteria", "scenario"]),
+      p_message: first(fields, ["message", "comments", "notes", "goals", "criteria", "scenario", "plan_summary"]),
       p_fields: fields,
       p_consent: fields.contact_consent === "yes",
     });

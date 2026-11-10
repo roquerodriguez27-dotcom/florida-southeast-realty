@@ -15,6 +15,7 @@ const OFFICIAL_SOURCE_HOSTS = new Set([
   "condos.myfloridalicense.com",
   "citizensfla.com",
   "www.citizensfla.com",
+  "pbcpao.gov",
 ]);
 
 const ELECTION_SOURCE_HOSTS = new Set([

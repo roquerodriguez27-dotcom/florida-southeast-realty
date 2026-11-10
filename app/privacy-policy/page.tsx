@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
     <div className="pt-28 md:pt-32 pb-24">
       <div className="container-fsre max-w-3xl">
         <h1 className="font-display text-3xl md:text-4xl text-ink mb-2">Privacy Policy</h1>
-        <p className="text-xs text-ink/45 mb-8">Last updated November 9, 2026</p>
+        <p className="text-xs text-ink/45 mb-8">Last updated November 10, 2026</p>
 
         <div className="space-y-7 text-ink/80 leading-relaxed text-sm">
           <section>
@@ -36,6 +36,12 @@ export default function PrivacyPolicyPage() {
               your questions, understand the kind of property information you requested, and provide
               relevant service. You may ask us to delete this information subject to the retention needs below.
             </p>
+          </section>
+
+          <section>
+            <h2 className="font-display text-xl text-ink mb-2">Planning worksheets, reports and voice questions</h2>
+            <p>Planning worksheet entries are held in the open page until you choose to send a request, download or share a report. A submitted report and your preferred reply details become part of your private brokerage inquiry. Downloaded reports and calendar files are controlled by you and any app or person you share them with. Save a copy before leaving a worksheet if you want to retain it.</p>
+            <p className="mt-3">Optional voice input starts only when you activate it. Your browser or its speech service may process audio under its own privacy terms. This website does not store an audio recording. You can edit the transcript or type a question, and nothing is sent to the brokerage until you submit the request.</p>
           </section>
 
           <section>

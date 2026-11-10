@@ -1,6 +1,7 @@
 import type { Listing, ListingFilters, ListingSearchPage, ListingSort } from "./types";
 import { fetchLiveListingBySlug, fetchLiveListingPage } from "./idx";
 import { southFloridaCityCounty } from "./south-florida-locations";
+import { SITE } from "./site-config";
 
 const img = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1600&q=80`;
@@ -46,7 +47,7 @@ export const LISTINGS: Listing[] = [
     lng: -80.0989,
     mileMarker: 12.4,
     daysOnMarket: 14,
-    agent: { name: "Florida Southeast Realty", phone: "(973) 985-6011", email: "roque@floridasoutheastrealty.com" },
+    agent: { name: SITE.shortName, phone: SITE.phoneDisplay, email: SITE.email },
   },
   {
     mlsId: "DEMO-002",
@@ -81,7 +82,7 @@ export const LISTINGS: Listing[] = [
     lng: -80.1373,
     mileMarker: 8.1,
     daysOnMarket: 6,
-    agent: { name: "Florida Southeast Realty", phone: "(973) 985-6011", email: "roque@floridasoutheastrealty.com" },
+    agent: { name: SITE.shortName, phone: SITE.phoneDisplay, email: SITE.email },
   },
   {
     mlsId: "DEMO-003",
@@ -116,7 +117,7 @@ export const LISTINGS: Listing[] = [
     lng: -80.1275,
     mileMarker: 9.6,
     daysOnMarket: 21,
-    agent: { name: "Florida Southeast Realty", phone: "(973) 985-6011", email: "roque@floridasoutheastrealty.com" },
+    agent: { name: SITE.shortName, phone: SITE.phoneDisplay, email: SITE.email },
   },
   {
     mlsId: "DEMO-004",
@@ -153,7 +154,7 @@ export const LISTINGS: Listing[] = [
     lng: -80.0831,
     mileMarker: 26.2,
     daysOnMarket: 33,
-    agent: { name: "Florida Southeast Realty", phone: "(973) 985-6011", email: "roque@floridasoutheastrealty.com" },
+    agent: { name: SITE.shortName, phone: SITE.phoneDisplay, email: SITE.email },
   },
 ];
 

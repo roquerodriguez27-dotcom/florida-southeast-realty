@@ -34,8 +34,9 @@ function optedOut() {
   catch { return false; }
 }
 
-async function mayTrack() {
+async function mayTrack(refreshEligibility = false) {
   if (!isProductionAnalyticsHost(window.location.host) || optedOut()) return false;
+  if (refreshEligibility) eligibility = undefined;
   eligibility ??= fetch("/api/analytics", { cache: "no-store", credentials: "same-origin" })
     .then(async (response) => response.ok && (await response.json()).eligible === true)
     .catch(() => false);
@@ -61,11 +62,44 @@ function campaignSignal() {
   } catch { return current; }
 }
 
+function sendGoogleContactEvent(eventName: AnalyticsEventName, metadata: Record<string, string | number | boolean | null>) {
+  const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+  if (!measurementId || !/^G-[A-Z0-9]+$/.test(measurementId)) return;
+  // A stored lead and a contact-link click are different outcomes. Never send
+  // form attempts, validation failures, or client-entered contact details.
+  const googleEvent = eventName === "lead_submit" ? "generate_lead"
+    : eventName === "call_click" ? "contact_phone_click"
+    : eventName === "text_click" ? "contact_text_click"
+    : eventName === "email_click" ? "contact_email_click" : null;
+  if (!googleEvent) return;
+  const safe = analyticsMetadata(metadata);
+  const params: Record<string, string | boolean> = {
+    send_to: measurementId,
+    page_location: `${window.location.origin}${analyticsPath(window.location.pathname)}`,
+    page_referrer: "",
+  };
+  if (safe.formName) params.form_name = safe.formName;
+  if (safe.requestType) params.request_type = safe.requestType;
+  if (safe.campaign) params.fsr_campaign = safe.campaign;
+  try {
+    const analyticsWindow = window as Window & {
+      gtag?: (command: "event", name: string, parameters: Record<string, string | boolean>) => void;
+    };
+    analyticsWindow.gtag?.("event", googleEvent, params);
+  } catch {
+    // Optional third-party measurement must never interrupt first-party reporting.
+  }
+}
+
 async function send(eventName: AnalyticsEventName, metadata: Record<string, string | number | boolean | null> = {}) {
   try {
     const pathname = window.location.pathname;
-    if (!isPublicAnalyticsPath(pathname) || !await mayTrack()) return false;
+    // A CRM sign-in in another tab may change cookies without a storage event.
+    // Recheck before forwarding contact events outside our server-side guard.
+    const contactEvent = ["lead_submit", "call_click", "text_click", "email_click"].includes(eventName);
+    if (!isPublicAnalyticsPath(pathname) || !await mayTrack(contactEvent)) return false;
     const campaign = campaignSignal();
+    sendGoogleContactEvent(eventName, { ...metadata, campaign: campaign ?? null });
     const body = JSON.stringify({
       visitorId: getOrCreateId("localStorage", "fsr_visitor_id"),
       sessionId: getOrCreateId("sessionStorage", "fsr_session_id"),

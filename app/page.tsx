@@ -100,6 +100,13 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <section className="container-fsre pt-12 md:pt-16" aria-label="Planning tools">
+        <div className="rounded-sm border border-tide/15 bg-white p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="max-w-2xl"><p className="font-mono text-xs uppercase tracking-widest text-hibiscus">Plan your next move</p><h2 className="mt-2 font-display text-2xl md:text-3xl text-tide">Work through the numbers. Keep the right questions.</h2><p className="mt-3 text-sm leading-relaxed text-ink/65">Selling proceeds, buying costs, moving plans, property checklists and homeowner reminders. Save a report or ask Roque to review your next step.</p></div>
+          <Link href="/planning" className="shrink-0 rounded-sm bg-tide px-6 py-3 text-center text-sm font-medium text-white">Explore Planning Tools</Link>
+        </div>
+      </section>
+
       <section className="container-fsre py-16 md:py-24">
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div>

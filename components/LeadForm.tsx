@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { SITE } from "@/lib/site-config";
 import { trackSiteEvent } from "@/components/SiteAnalytics";
+import { contactValidationError, usesFlexibleContact } from "@/lib/lead-contact";
 
 export interface LeadFormField {
   name: string;
@@ -39,15 +40,19 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
   const [status, setStatus] = useState<Status>("idle");
   const [validationError, setValidationError] = useState<{ message: string; requestType?: string } | null>(null);
   const [receipt, setReceipt] = useState<DeliveryReceipt | null>(null);
+  const [submittedContext, setSubmittedContext] = useState<string | null>(null);
+  const [lastSubmittedFields, setLastSubmittedFields] = useState<Record<string, string>>({});
   const formId = useId();
   const started = useRef(false);
   const submitting = useRef(false);
-  const compactContact = formName === "property-inquiry" || formName === "buyer-tools-review";
+  const compactContact = usesFlexibleContact(formName);
   const renderedFields = formName === "buyer-tools-review"
     ? fields.filter((field) => field.name !== "name")
     : fields;
   const visibleFields = renderedFields.filter((field) => !field.hidden);
   const errorMessage = validationError?.requestType === hiddenContext?.requestType ? validationError?.message : "";
+  const currentContext = JSON.stringify({ formName, context: hiddenContext ?? {} });
+  const contextChanged = submittedContext !== null && submittedContext !== currentContext;
 
   function measurement(requestType = hiddenContext?.requestType) {
     return { formName, ...(requestType ? { requestType } : {}) };
@@ -66,6 +71,7 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
     e.preventDefault();
     if (submitting.current) return;
     const form = new FormData(e.currentTarget);
+    const contextAtSubmission = currentContext;
     const honeypot = String(form.get("company_website") || "");
 
     const values: Record<string, string> = { ...hiddenContext };
@@ -89,25 +95,8 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
       }
     }
 
-    if (compactContact && !values.email && !values.phone) {
-      invalid("Enter an email address or phone number so Roque can follow up.");
-      return;
-    }
-
-    const email = values.email;
-    if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
-      invalid("Enter a valid email address.");
-      return;
-    }
-
-    if (values.phone && values.phone.length > 40) {
-      invalid("Enter a phone number with no more than 40 characters.");
-      return;
-    }
-    if (compactContact && !email && (values.phone || "").replace(/\D/g, "").length < 7) {
-      invalid("Enter a phone number with at least 7 digits, or use your email address.");
-      return;
-    }
+    const contactError = contactValidationError(formName, values);
+    if (contactError) { invalid(contactError); return; }
 
     if (form.get("contact_consent") !== "yes") {
       invalid("Please confirm that we may contact you about this request.");
@@ -115,6 +104,10 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
     }
 
     values.contact_consent = "yes";
+    if (new TextEncoder().encode(JSON.stringify({ formName, honeypot, fields: values })).byteLength > 31000) {
+      invalid("Your request is too long to send. Save the full report, then shorten your notes and try again. No details have been sent or removed.");
+      return;
+    }
     setValidationError(null);
     submitting.current = true;
     setStatus("submitting");
@@ -127,6 +120,8 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
       });
       const data = await res.json();
       if (data.delivered && data.stored) {
+        setLastSubmittedFields({ ...values });
+        setSubmittedContext(contextAtSubmission);
         setReceipt({
           stored: true,
           notificationConfigured: data.notificationConfigured === true,
@@ -157,6 +152,10 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
       <div className="bg-seagrass/10 border border-seagrass/30 rounded-sm p-8 text-center" role="status">
         <p className="font-display text-2xl text-tide">Request received.</p>
         <p className="text-sm text-ink/70 mt-2 max-w-md mx-auto">{receipt?.message ?? successMessage}</p>
+        {contextChanged && <div className="mt-5 border-t border-seagrass/25 pt-4">
+          <p className="mx-auto max-w-xl text-sm text-ink/75">You changed the worksheet or request details after this submission. The earlier version is saved; the revised version has not been sent.</p>
+          <button type="button" onClick={() => { setStatus("idle"); setReceipt(null); setSubmittedContext(null); }} className="mt-3 rounded-sm border border-tide/30 bg-white px-4 py-2.5 text-sm font-medium text-tide">Send updated request</button>
+        </div>}
         {receipt?.stored && receipt.notificationConfigured && !receipt.notificationDelivered ? (
           <p className="mt-3 text-xs text-hibiscus">Your request is saved, but we couldn&apos;t confirm the email alert to Roque. Please call if your request is urgent.</p>
         ) : null}
@@ -188,7 +187,7 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
                   name={field.name}
                   required={displayRequired}
                   placeholder={field.placeholder}
-                  defaultValue={field.defaultValue}
+                  defaultValue={lastSubmittedFields[field.name] ?? field.defaultValue}
                   rows={4}
                   maxLength={5000}
                   className="w-full border border-ink/15 rounded-sm px-3 py-2.5 text-base md:text-sm focus:border-tide outline-none"
@@ -198,7 +197,7 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
                   id={id}
                   name={field.name}
                   required={displayRequired}
-                  defaultValue={field.defaultValue ?? ""}
+                  defaultValue={lastSubmittedFields[field.name] ?? field.defaultValue ?? ""}
                   className="w-full border border-ink/15 rounded-sm px-3 py-2.5 text-base md:text-sm bg-white focus:border-tide outline-none"
                 >
                   <option value="" disabled={displayRequired}>Select one</option>
@@ -213,7 +212,7 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
                   type={field.type}
                   required={displayRequired}
                   placeholder={field.placeholder}
-                  defaultValue={field.defaultValue}
+                  defaultValue={lastSubmittedFields[field.name] ?? field.defaultValue}
                   maxLength={field.name === "email" ? 254 : field.name === "phone" ? 40 : field.name === "name" ? 120 : 5000}
                   autoComplete={field.name === "name" ? "name" : field.name === "email" ? "email" : field.name === "phone" ? "tel" : undefined}
                   className="w-full border border-ink/15 rounded-sm px-3 py-2.5 text-base md:text-sm focus:border-tide outline-none"

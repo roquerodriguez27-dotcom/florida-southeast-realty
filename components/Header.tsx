@@ -10,7 +10,7 @@ const NAV = [
   { href: "/properties", label: "Search Homes" },
   { href: "/sellers", label: "Sell for 0.5%" },
   { href: "/communities", label: "Communities" },
-  { href: "/buyer-tools", label: "Buyer Tools" },
+  { href: "/planning", label: "Planning Tools" },
   { href: "/research", label: "Research" },
   { href: "/home-valuation", label: "Home Value" },
   { href: "/about", label: "About" },

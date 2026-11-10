@@ -3,7 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import LeadForm from "@/components/LeadForm";
+import PlanHandoff from "@/components/planning/PlanHandoff";
+import ReportActions from "@/components/planning/ReportActions";
+import { buyerScenarioReport } from "@/lib/planning/buyer";
 import {
   clearComparisonListings,
   removeComparisonListing,
@@ -38,7 +40,6 @@ interface ComparisonHome {
 }
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const decimal = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 function emptyComparisonHome(index: number): ComparisonHome {
   return {
@@ -117,6 +118,7 @@ function ComparisonField({
           value={value}
           min={type === "number" ? "0" : undefined}
           step={step}
+          maxLength={type === "text" ? 1000 : undefined}
           inputMode={type === "number" ? "decimal" : undefined}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
@@ -224,6 +226,7 @@ function CostBreakdown({ price, downPayment, rate, years, taxRate, insurance, fl
 
 export default function BuyerTools({ initialListing, initialTool = "cost" }: BuyerToolsProps) {
   const [tool, setTool] = useState<Tool>(initialTool);
+  const [propertyReference, setPropertyReference] = useState(() => initialListing ? comparisonAddress(savedComparisonListing(initialListing)) : "");
   const [price, setPrice] = useState(initialListing?.price ?? 600000);
   const [downPercent, setDownPercent] = useState(20);
   const [rate, setRate] = useState(6.5);
@@ -279,11 +282,9 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
   const affordablePrice = Math.max(0, Math.min(paymentLimitedPrice, cashLimitedPrice));
 
   const enteredHomes = comparisonHomes.filter((home) => home.address.trim());
-  const scenarioSummary = tool === "cost"
-    ? `${money.format(price)} purchase; ${downPercent}% down; ${decimal.format(rate)}% rate; ${years}-year term; ${money.format(hoa)}/mo HOA; ${money.format(insurance)}/mo insurance; ${money.format(flood)}/mo flood estimate.`
-    : tool === "affordability"
-      ? `${money.format(income)} annual income; ${money.format(monthlyDebt)}/mo debts; ${money.format(cash)} available cash; estimated planning range ${money.format(affordablePrice)}.`
-      : `Compared properties: ${enteredHomes.map((home) => `${home.address}${positiveNumber(home.price) ? ` (${money.format(positiveNumber(home.price))})` : ""}`).join(", ") || "none entered yet"}.`;
+  const scenarioSummary = buyerScenarioReport(tool,
+    { property: propertyReference, price, downPercent, rate, years, taxRate, insurance, flood, hoa, cdd, pmiRate },
+    { income, monthlyDebt, cash, dti, affordablePrice }, comparisonHomes);
 
   function updateComparisonHome(index: number, field: keyof Omit<ComparisonHome, "id" | "sourceSlug">, value: string) {
     const home = comparisonHomes[index];
@@ -342,6 +343,8 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
           </button>
         ))}
       </div>
+
+      {tool !== "compare" && <label className="block mt-5 max-w-xl"><span className="block text-sm font-medium mb-1.5">Property address or scenario name (optional)</span><input className="w-full rounded-sm border border-ink/20 bg-white p-3 focus:border-tide outline-none" value={propertyReference} maxLength={180} onChange={event => setPropertyReference(event.target.value)} placeholder="Label the property or assumptions for your report" /></label>}
 
       {tool === "cost" && (
         <section className="mt-6 grid lg:grid-cols-[minmax(0,1fr)_420px] gap-6 items-start" aria-label="True monthly ownership cost calculator">
@@ -513,13 +516,11 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-hibiscus">Keep the scenario</p>
           <h2 className="font-display text-3xl mt-2">Want Roque to review these numbers?</h2>
           <p className="text-ink/65 mt-3 max-w-lg">Send the current assumptions to Florida Southeast Realty. We can flag property costs worth verifying, compare homes, or help narrow the search.</p>
-          <p className="mt-5 bg-keystone p-4 rounded-sm text-sm text-ink/65"><span className="font-medium text-ink">Current scenario:</span> {scenarioSummary}</p>
+          <ReportActions title="Buyer planning worksheet" report={scenarioSummary} />
+          <details className="mt-5 bg-keystone p-4 rounded-sm text-sm text-ink/65"><summary className="font-medium text-ink cursor-pointer">Review the full worksheet</summary><pre className="mt-3 whitespace-pre-wrap break-words font-sans">{scenarioSummary}</pre></details>
+          <Link href="/planning/buy" className="mt-4 inline-block text-sm text-tide underline">Build a property checklist, visit plan or Loan Estimate comparison</Link>
         </div>
-        <LeadForm formName="buyer-tools-review" submitLabel="Send This Scenario to Roque" successMessage="Florida Southeast Realty will review your saved buyer scenario and follow up." hiddenContext={{ tool, scenario: scenarioSummary }} fields={[
-          { name: "name", label: "Name", type: "text" },
-          { name: "email", label: "Email", type: "email", required: true },
-          { name: "phone", label: "Phone", type: "tel" },
-        ]} />
+        <PlanHandoff formName="buyer-tools-review" title="Send this worksheet to Roque" summary={scenarioSummary} successMessage="Your complete buyer worksheet and reply preferences are saved for Roque to review." />
       </section>
     </div>
   );

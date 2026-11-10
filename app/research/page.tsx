@@ -60,6 +60,7 @@ export default function ResearchPage() {
           <Link href="/buyer-tools" className="border border-tide/25 text-tide font-medium px-5 py-3 rounded-sm hover:bg-tide/5 transition-colors">
             Compare Costs & Homes
           </Link>
+          <Link href="/planning/buy?tool=checklist" className="border border-tide/25 text-tide font-medium px-5 py-3 rounded-sm hover:bg-tide/5 transition-colors">Build My Property Checklist</Link>
         </div>
       </section>
 

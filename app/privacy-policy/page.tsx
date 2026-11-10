@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
     <div className="pt-28 md:pt-32 pb-24">
       <div className="container-fsre max-w-3xl">
         <h1 className="font-display text-3xl md:text-4xl text-ink mb-2">Privacy Policy</h1>
-        <p className="text-xs text-ink/45 mb-8">Last updated August 16, 2026</p>
+        <p className="text-xs text-ink/45 mb-8">Last updated November 9, 2026</p>
 
         <div className="space-y-7 text-ink/80 leading-relaxed text-sm">
           <section>
@@ -62,9 +62,18 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="font-display text-xl text-ink mb-2">Cookies and analytics</h2>
             <p>
-              The site may use cookies or similar technologies required for security and functionality.
-              If analytics is enabled, it may collect aggregated usage information such as pages viewed,
-              device type, and referral source. We do not use this website to sell your personal information.
+              The site uses cookies or similar technologies for security, functionality, and website
+              measurement. Our own visitor report and, when enabled, Google Analytics help us understand
+              which parts of the site people use and whether they choose a contact option or submit an
+              inquiry. These tools may process browser identifiers, device information, page categories,
+              and interaction events to produce usage reports.
+            </p>
+            <p className="mt-3">
+              We configure our Google Analytics integration to omit contact-form responses, search text,
+              URL query strings, and referring-page addresses, and to disable advertising personalization
+              features. Google may use cookies to provide its analytics service; see{" "}
+              <a href="https://policies.google.com/privacy" className="text-tide underline">Google&apos;s privacy policy</a>
+              {" "}for information about its processing. We do not use this website to sell your personal information.
             </p>
           </section>
 

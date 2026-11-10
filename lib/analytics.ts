@@ -11,7 +11,7 @@ export type AnalyticsFormName = (typeof ANALYTICS_FORM_NAMES)[number];
 export const ANALYTICS_REQUEST_TYPES = ["showing", "question", "shortlist"] as const;
 export const ANALYTICS_ERROR_KINDS = ["validation", "network", "server", "storage"] as const;
 // Explicit campaign labels only. Never retain arbitrary UTMs, query text or referrers.
-export const ANALYTICS_CAMPAIGNS = ["seller-review", "buyer-search", "property-share", "referral"] as const;
+export const ANALYTICS_CAMPAIGNS = ["seller-review", "buyer-search", "property-share", "referral", "relocation"] as const;
 export type AnalyticsCampaign = (typeof ANALYTICS_CAMPAIGNS)[number];
 export const ANALYTICS_OPTOUT_KEY = "fsr-analytics-opt-out";
 export const ANALYTICS_OPTOUT_COOKIE = "fsr_analytics_opt_out";

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ResearchLinks from "@/components/ResearchLinks";
+import HomeownerUpdatesPanel from "@/components/HomeownerUpdatesPanel";
 import { serializeJsonLd } from "@/lib/seo/json-ld";
 
 export const metadata: Metadata = {
@@ -61,6 +62,10 @@ export default function ResearchPage() {
           </Link>
         </div>
       </section>
+
+      <div className="container-fsre mt-10 md:mt-12">
+        <HomeownerUpdatesPanel />
+      </div>
 
       <section className="container-fsre py-14 md:py-16">
         <h2 className="font-display text-2xl md:text-3xl text-ink mb-3">Independent research resources</h2>

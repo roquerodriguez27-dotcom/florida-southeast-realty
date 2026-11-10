@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "publishedAt": "2026-11-10T04:00:47Z",
+  "editorialUpdatedAt": "2026-11-10T04:00:47Z",
+  "topics": [
+    {
+      "id": "amendment-3-2026",
+      "title": "Florida’s 2026 Amendment 3: property-tax changes",
+      "summary": "The reported vote is above the approval threshold, but official certification remains pending.",
+      "status": {
+        "code": "unofficial-results",
+        "label": "Unofficial results",
+        "detail": "Results are not yet certified. A scheduled certification date does not establish certification."
+      },
+      "appliesTo": "Florida owners and people establishing homestead; residence timing affects eligibility.",
+      "publishedAt": "2026-11-10T04:00:47Z",
+      "editorialUpdatedAt": "2026-11-10T04:00:47Z",
+      "facts": [
+        {
+          "id": "election-result",
+          "text": "Unofficial November 3, 2026 results show 61.98% Yes, above the required 60%.",
+          "sourceIds": ["election-results", "senate-summary"]
+        },
+        {
+          "id": "certification-schedule",
+          "text": "State certification is scheduled for November 17, 2026 at 8 a.m.",
+          "sourceIds": ["election-timeline"]
+        },
+        {
+          "id": "effective-date",
+          "text": "If approved, changes begin January 1, 2027. Qualifying people with permanent Florida residence as of December 31, 2026 who establish homestead could receive non-school assessed-value exemptions up to $150,000 in 2027 and $250,000 in 2028.",
+          "sourceIds": ["amendment-record", "senate-summary"]
+        },
+        {
+          "id": "new-resident-phase-in",
+          "text": "People establishing Florida permanent residence from January 1, 2027 who establish homestead follow a separate phase-in: initially up to $50,000, with the higher exemption potentially available from their fifth exemption year.",
+          "sourceIds": ["senate-summary"]
+        },
+        {
+          "id": "assessment-cap",
+          "text": "The nonhomestead annual assessment-growth cap would fall from 10% to 5%.",
+          "sourceIds": ["senate-summary"]
+        },
+        {
+          "id": "exemption-meaning",
+          "text": "These exemption amounts are not dollar-for-dollar tax savings and do not apply to school levies.",
+          "sourceIds": ["senate-summary"]
+        }
+      ],
+      "actions": [
+        {
+          "text": "Confirm homestead eligibility and residence dates with the county property appraiser."
+        },
+        {
+          "text": "Discuss your property plans.",
+          "href": "/contact"
+        }
+      ],
+      "sources": [
+        {
+          "id": "amendment-record",
+          "label": "Florida Division of Elections: Amendment 3 record",
+          "url": "https://constitutionalinitiatives.dos.fl.gov/Home/InitDetail?account=10&seqnum=110",
+          "lastSuccessfulCheckAt": "2026-11-10T03:57:34Z",
+          "accessMethod": "official-index"
+        },
+        {
+          "id": "election-results",
+          "label": "Florida Election Watch: unofficial Amendment 3 results",
+          "url": "https://floridaelectionwatch.gov/CompareStateToCounty/900003",
+          "lastSuccessfulCheckAt": "2026-11-10T03:57:34Z",
+          "accessMethod": "official-index"
+        },
+        {
+          "id": "election-timeline",
+          "label": "Florida Election Watch: results timeline",
+          "url": "https://floridaelectionwatch.gov/Timeline",
+          "lastSuccessfulCheckAt": "2026-11-10T03:57:34Z",
+          "accessMethod": "official-index"
+        },
+        {
+          "id": "senate-summary",
+          "label": "Florida Senate: CS/HJR 1-F summary",
+          "url": "https://www.flsenate.gov/Committees/BillSummaries/2026F/html/1",
+          "lastSuccessfulCheckAt": "2026-11-10T03:57:34Z",
+          "accessMethod": "direct"
+        }
+      ]
+    },
+    {
+      "id": "condo-reserves-and-assessments",
+      "title": "Condo reserves, inspections and assessments",
+      "summary": "A monthly condo fee does not show every future ownership cost. Review inspection findings, reserves and funding decisions together.",
+      "status": {
+        "code": "guidance",
+        "label": "Owner checklist",
+        "detail": "Requirements and timing depend on the building and association. Confirm applicable obligations with the association and its qualified advisers."
+      },
+      "appliesTo": "Florida condominium owners and buyers, particularly in buildings subject to structural inspection and reserve-study requirements.",
+      "publishedAt": "2026-11-10T04:00:47Z",
+      "editorialUpdatedAt": "2026-11-10T04:00:47Z",
+      "facts": [
+        {
+          "id": "reserve-study",
+          "text": "A Structural Integrity Reserve Study (SIRS) estimates covered components' remaining life and costs and recommends a funding schedule.",
+          "sourceIds": ["condo-statute"]
+        },
+        {
+          "id": "milestone-inspection",
+          "text": "A milestone inspection evaluates the building's structure. It serves a different purpose from the reserve study.",
+          "sourceIds": ["dbpr-faqs"]
+        },
+        {
+          "id": "funding-documents",
+          "text": "Funding can involve regular assessments, special assessments, loans or lines of credit under the statute's conditions. Review the association's actual plan.",
+          "sourceIds": ["condo-statute"]
+        },
+        {
+          "id": "association-records",
+          "text": "Inspection reports and reserve studies belong in the association's records. Obtain current versions when reviewing a unit.",
+          "sourceIds": ["dbpr-faqs"]
+        }
+      ],
+      "actions": [
+        {
+          "text": "Request the latest SIRS, milestone reports, adopted budget, reserve balances and funding plan."
+        },
+        {
+          "text": "Ask about approved or proposed assessments, borrowing, payment dates and planned repairs."
+        },
+        {
+          "text": "Bring your document questions to a property consultation.",
+          "href": "/contact"
+        }
+      ],
+      "sources": [
+        {
+          "id": "condo-statute",
+          "label": "Florida Senate: 2026 statute 718.112",
+          "url": "https://flsenate.gov/Laws/Statutes/2026/0718.112",
+          "lastSuccessfulCheckAt": "2026-11-10T03:57:34Z",
+          "accessMethod": "direct"
+        },
+        {
+          "id": "dbpr-faqs",
+          "label": "Florida DBPR: condominium FAQs",
+          "url": "https://condos.myfloridalicense.com/faqs/",
+          "lastSuccessfulCheckAt": "2026-11-10T03:57:34Z",
+          "accessMethod": "direct"
+        }
+      ]
+    },
+    {
+      "id": "citizens-flood-insurance",
+      "title": "Citizens flood-insurance requirement",
+      "summary": "Citizens is expanding its flood-insurance requirement for affected new and renewing policies.",
+      "status": {
+        "code": "scheduled",
+        "label": "2027 phase scheduled",
+        "detail": "The next phase begins January 1, 2027. Confirm your policy's requirements with your insurance agent."
+      },
+      "appliesTo": "Citizens personal residential policies with wind coverage, subject to stated exclusions.",
+      "publishedAt": "2026-11-10T04:00:47Z",
+      "editorialUpdatedAt": "2026-11-10T04:00:47Z",
+      "facts": [
+        {
+          "id": "flood-hazard-area",
+          "text": "Affected policies for homes inside a Special Flood Hazard Area already require flood insurance.",
+          "sourceIds": ["citizens-flood"]
+        },
+        {
+          "id": "outside-area-phase-in",
+          "text": "Outside that area, the 2026 threshold is Coverage A of at least $400,000. From January 1, 2027, the requirement covers all insured values.",
+          "sourceIds": ["citizens-flood"]
+        },
+        {
+          "id": "excluded-policies",
+          "text": "Condominium unit-owner policies, tenant contents policies and policies excluding windstorm or hail are exempt from this Citizens requirement.",
+          "sourceIds": ["citizens-flood"]
+        }
+      ],
+      "actions": [
+        {
+          "text": "Ask your agent to check policy type, wind coverage, flood zone, Coverage A and renewal date."
+        },
+        {
+          "text": "Compare flood coverage and costs before renewal or closing."
+        }
+      ],
+      "sources": [
+        {
+          "id": "citizens-flood",
+          "label": "Citizens: flood-insurance requirements",
+          "url": "https://www.citizensfla.com/flood",
+          "lastSuccessfulCheckAt": "2026-11-10T03:57:34Z",
+          "accessMethod": "direct"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "at": "2026-11-10T04:00:47Z",
+      "summary": "Published sourced homeowner updates on Amendment 3, condominium reserve planning and Citizens flood-insurance requirements.",
+      "topicIds": [
+        "amendment-3-2026",
+        "condo-reserves-and-assessments",
+        "citizens-flood-insurance"
+      ]
+    }
+  ]
+}

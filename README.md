@@ -26,6 +26,7 @@ Visit `http://localhost:3000`. Copy `.env.example` to `.env.local` and add only 
 
 ```bash
 npm run lint
+npm run test:analytics-privacy
 npm run build
 ```
 
@@ -38,6 +39,16 @@ See `.env.example` for the supported variable names.
 - Resend or a webhook can provide immediate lead notifications in addition to CRM storage.
 - GA4 and Google Search Console values are optional.
 - `RESO_ACCESS_TOKEN` is the preferred server-only BeachesMLS credential. The existing `SPARK_ACCESS_TOKEN` and `IDX_PROVIDER_API_KEY` names remain supported so credentials can be migrated without downtime. `RESO_API_BASE_URL` should remain `https://replication.sparkapi.com/Version/3/Reso/OData`, and `IDX_ORIGINATING_SYSTEM_ID=M00000170` keeps public results scoped to the approved BeachesMLS system.
+
+### Google measurement
+
+Set `NEXT_PUBLIC_GA_MEASUREMENT_ID` only for production and rebuild. Before activation, turn **Enhanced measurement off** for the GA4 web stream; its automatic history, search, and form events bypass this application's filtering. The application loads the Google tag only after a fresh same-origin eligibility check, excludes private routes/staff/opted-out browsers, and manually sends sanitized `page_view` events with default pageviews disabled. Google signals and advertising personalization are disabled in the tag configuration. An early consent default denies `ad_storage`, `ad_user_data`, and `ad_personalization` without asserting an analytics-consent choice.
+
+Accepted, stored inquiries send `generate_lead`. Contact links send separate `contact_phone_click`, `contact_text_click`, and `contact_email_click` events. Optional event-scoped dimensions are `form_name`, `request_type`, and `fsr_campaign`; all use fixed allowlists. Supported campaign values are `seller-review`, `buyer-search`, `property-share`, `referral`, and `relocation`. Attribution covers those labels and general page categories, not arbitrary UTM values or referring URLs. Query strings, fragments, contact-form responses, listing identifiers, and free-form document titles are omitted.
+
+The Google tag is optional: blockers or delivery failures do not interrupt first-party reporting. Contact outcomes that complete after opening another app are held in a small, sanitized in-memory queue until a fresh eligibility check on return; closing the page before returning loses those deferred Google events. Staff/opt-out/private-route rejection discards the queue. `npm run test:analytics-privacy` checks eligibility, cross-tab changes, navigation races, sanitization, and failure isolation with synthetic browser state and no live requests. After activation, verify a public pageview in GA4 and confirm excluded/private browsing sends no Google collection requests; do not submit fake production leads.
+
+`NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` accepts only the content value from Search Console's HTML tag. It is rendered in server HTML for URL-prefix verification; keep it after verification. A Domain property requires DNS verification instead.
 
 ## Current launch dependencies
 

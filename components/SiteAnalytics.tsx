@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ANALYTICS_OPTOUT_KEY, ANALYTICS_PREFERENCE_EVENT, ANALYTICS_SIGNAL_VERSION, BOT_USER_AGENT, analyticsCampaign, analyticsMetadata, analyticsPath, isProductionAnalyticsHost, isPublicAnalyticsPath, type AnalyticsEventName } from "@/lib/analytics";
+import { excludeGoogleAnalytics, isGoogleAnalyticsEvent, pauseGoogleAnalytics, sendGoogleAnalyticsEvent } from "@/lib/google-analytics";
 
 const LAST_SEARCH_STORAGE_KEY = "fsr-last-property-search-v1";
 const LAST_SEARCH_UPDATED_EVENT = "fsr-last-property-search-updated";
@@ -54,52 +55,35 @@ function visitorSignals(): Record<string, string | boolean> {
   };
 }
 
-function campaignSignal() {
+function campaignSignal(persist = true) {
   const current = analyticsCampaign(new URLSearchParams(window.location.search).get("fsr_campaign"));
   try {
-    if (current) window.sessionStorage.setItem(CAMPAIGN_KEY, current);
+    if (current && persist) window.sessionStorage.setItem(CAMPAIGN_KEY, current);
     return current ?? analyticsCampaign(window.sessionStorage.getItem(CAMPAIGN_KEY));
   } catch { return current; }
-}
-
-function sendGoogleContactEvent(eventName: AnalyticsEventName, metadata: Record<string, string | number | boolean | null>) {
-  const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-  if (!measurementId || !/^G-[A-Z0-9]+$/.test(measurementId)) return;
-  // A stored lead and a contact-link click are different outcomes. Never send
-  // form attempts, validation failures, or client-entered contact details.
-  const googleEvent = eventName === "lead_submit" ? "generate_lead"
-    : eventName === "call_click" ? "contact_phone_click"
-    : eventName === "text_click" ? "contact_text_click"
-    : eventName === "email_click" ? "contact_email_click" : null;
-  if (!googleEvent) return;
-  const safe = analyticsMetadata(metadata);
-  const params: Record<string, string | boolean> = {
-    send_to: measurementId,
-    page_location: `${window.location.origin}${analyticsPath(window.location.pathname)}`,
-    page_referrer: "",
-  };
-  if (safe.formName) params.form_name = safe.formName;
-  if (safe.requestType) params.request_type = safe.requestType;
-  if (safe.campaign) params.fsr_campaign = safe.campaign;
-  try {
-    const analyticsWindow = window as Window & {
-      gtag?: (command: "event", name: string, parameters: Record<string, string | boolean>) => void;
-    };
-    analyticsWindow.gtag?.("event", googleEvent, params);
-  } catch {
-    // Optional third-party measurement must never interrupt first-party reporting.
-  }
 }
 
 async function send(eventName: AnalyticsEventName, metadata: Record<string, string | number | boolean | null> = {}) {
   try {
     const pathname = window.location.pathname;
+    const navigation = `${pathname}${window.location.search}`;
+    if (!isPublicAnalyticsPath(pathname)) { excludeGoogleAnalytics(); return false; }
+    const campaign = campaignSignal(false);
     // A CRM sign-in in another tab may change cookies without a storage event.
-    // Recheck before forwarding contact events outside our server-side guard.
-    const contactEvent = ["lead_submit", "call_click", "text_click", "email_click"].includes(eventName);
-    if (!isPublicAnalyticsPath(pathname) || !await mayTrack(contactEvent)) return false;
-    const campaign = campaignSignal();
-    sendGoogleContactEvent(eventName, { ...metadata, campaign: campaign ?? null });
+    // Recheck before loading Google or forwarding any event to it.
+    const googleEvent = isGoogleAnalyticsEvent(eventName);
+    const contactOutcome = googleEvent && eventName !== "page_view";
+    if (googleEvent) pauseGoogleAnalytics();
+    if (!await mayTrack(googleEvent) || !isPublicAnalyticsPath(window.location.pathname)) {
+      excludeGoogleAnalytics();
+      return false;
+    }
+    // A completed inquiry/contact outcome belongs to its original public
+    // page even if the buyer navigates while the eligibility check completes.
+    const navigationChanged = navigation !== `${window.location.pathname}${window.location.search}`;
+    if (!contactOutcome && navigationChanged) return false;
+    if (campaign && !navigationChanged) { try { window.sessionStorage.setItem(CAMPAIGN_KEY, campaign); } catch {} }
+    sendGoogleAnalyticsEvent(eventName, { ...metadata, campaign: campaign ?? null }, pathname);
     const body = JSON.stringify({
       visitorId: getOrCreateId("localStorage", "fsr_visitor_id"),
       sessionId: getOrCreateId("sessionStorage", "fsr_session_id"),
@@ -147,7 +131,9 @@ export default function SiteAnalytics() {
     const navigation = `${pathname}?${searchParams.toString()}`;
     if (lastNavigation.current === navigation) return;
     lastNavigation.current = navigation;
-    if (!isPublicAnalyticsPath(pathname)) return;
+    pauseGoogleAnalytics();
+    eligibility = undefined;
+    if (!isPublicAnalyticsPath(pathname)) { excludeGoogleAnalytics(); return; }
     void send("page_view");
     if (pathname === "/properties" && searchParams.toString()) {
       void send("property_search");
@@ -157,7 +143,19 @@ export default function SiteAnalytics() {
     if (pathname === "/home-valuation") void send("home_valuation_view");
   }, [pathname, searchParams]);
   useEffect(() => {
-    const preferenceChanged = () => { eligibility = undefined; };
+    const recheckGoogle = () => {
+      eligibility = undefined;
+      pauseGoogleAnalytics();
+      if (!isPublicAnalyticsPath(window.location.pathname)) { excludeGoogleAnalytics(); return; }
+      if (document.visibilityState === "hidden") return;
+      const navigation = `${window.location.pathname}${window.location.search}`;
+      void mayTrack(true).then((allowed) => {
+        if (!allowed) { excludeGoogleAnalytics(); return; }
+        if (allowed && navigation === `${window.location.pathname}${window.location.search}`) {
+          sendGoogleAnalyticsEvent("page_view", { campaign: campaignSignal() });
+        }
+      });
+    };
     const recordInteraction = (event: Event) => {
       if (!event.isTrusted || !isPublicAnalyticsPath(window.location.pathname)) return;
       interactionObserved = true;
@@ -177,14 +175,21 @@ export default function SiteAnalytics() {
       else if (href.startsWith("sms:")) void send("text_click");
       else if (href.startsWith("mailto:")) void send("email_click");
     };
-    window.addEventListener(ANALYTICS_PREFERENCE_EVENT, preferenceChanged);
-    window.addEventListener("storage", preferenceChanged);
+    window.addEventListener(ANALYTICS_PREFERENCE_EVENT, recheckGoogle);
+    window.addEventListener("storage", recheckGoogle);
+    window.addEventListener("focus", recheckGoogle);
+    window.addEventListener("blur", pauseGoogleAnalytics);
+    document.addEventListener("visibilitychange", recheckGoogle);
     document.addEventListener("pointerdown", recordInteraction, true);
     document.addEventListener("keydown", recordInteraction, true);
     document.addEventListener("click", handler, true);
     return () => {
-      window.removeEventListener(ANALYTICS_PREFERENCE_EVENT, preferenceChanged);
-      window.removeEventListener("storage", preferenceChanged);
+      pauseGoogleAnalytics();
+      window.removeEventListener(ANALYTICS_PREFERENCE_EVENT, recheckGoogle);
+      window.removeEventListener("storage", recheckGoogle);
+      window.removeEventListener("focus", recheckGoogle);
+      window.removeEventListener("blur", pauseGoogleAnalytics);
+      document.removeEventListener("visibilitychange", recheckGoogle);
       document.removeEventListener("pointerdown", recordInteraction, true);
       document.removeEventListener("keydown", recordInteraction, true);
       document.removeEventListener("click", handler, true);

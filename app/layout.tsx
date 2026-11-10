@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import { Suspense } from "react";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import "leaflet/dist/leaflet.css";
@@ -32,7 +31,6 @@ const jetbrains = JetBrains_Mono({
   display: "swap",
 });
 
-const analyticsId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION;
 
 export const viewport: Viewport = {
@@ -139,14 +137,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable}`}>
       <body className="antialiased">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
-        {analyticsId && (
-          <>
-            <Script src={`https://www.googletagmanager.com/gtag/js?id=${analyticsId}`} strategy="afterInteractive" />
-            <Script id="google-analytics" strategy="afterInteractive">
-              {`window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${analyticsId}', { anonymize_ip: true });`}
-            </Script>
-          </>
-        )}
         <Suspense fallback={null}><SiteAnalytics /></Suspense>
         <a
           href="#main-content"

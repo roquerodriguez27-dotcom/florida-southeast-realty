@@ -6,16 +6,16 @@ export function buyerPlanTool(value: string | string[] | undefined): BuyerPlanTo
 }
 
 export const CHECKLIST_ITEMS = [
-  { id: "condition", label: "Condition and inspections", question: "What should a qualified inspector investigate, and which repairs need estimates?" },
-  { id: "permits", label: "Permits and property records", question: "Do the records match the improvements and intended use? Ask the relevant local authority." },
-  { id: "taxes", label: "Property taxes", question: "What could taxes be after the purchase? Confirm assumptions with the property appraiser." },
-  { id: "insurance", label: "Home and flood insurance", question: "Obtain property-specific quotes, deductibles and coverage details before relying on an estimate." },
-  { id: "title", label: "Title, survey and restrictions", question: "Which title, boundary, use or easement questions need the closing professional's review?" },
-  { id: "financing", label: "Financing and cash to close", question: "Confirm loan terms, available funds and the lender's closing requirements." },
-  { id: "association", label: "Association documents and fees", question: "Review applicable rules, financials, fees, approval requirements and restrictions." },
-  { id: "reserves", label: "Condo reserves and inspections", question: "If applicable, request SIRS, milestone reports, the reserve plan and current financials." },
-  { id: "assessments", label: "Assessments and borrowing", question: "Ask about approved or proposed assessments, association loans and payment dates." },
-  { id: "timing", label: "Contract dates and next steps", question: "Confirm applicable contract deadlines with your broker and appropriate advisers." },
+  { id: "condition", label: "Condition and inspections", question: "What problems or repairs should a licensed home inspector check? Ask for estimates before deciding what they might cost." },
+  { id: "permits", label: "Permits and property records", question: "Were additions or renovations properly permitted? Check the records with the city or county." },
+  { id: "taxes", label: "Property taxes", question: "How much might property taxes be after you buy? The seller’s current bill may not reflect your future bill." },
+  { id: "insurance", label: "Home and flood insurance", question: "What would home and flood insurance cost for this property? Ask insurers about coverage, deductibles and exclusions." },
+  { id: "title", label: "Title, survey and restrictions", question: "Are there ownership, property-line, access or restrictions issues? Ask your title or closing professional to review them." },
+  { id: "financing", label: "Financing and cash to close", question: "What will the monthly payment and total cash needed at closing be? Confirm the terms and requirements with your lender." },
+  { id: "association", label: "Association documents and fees", question: "Does the HOA or condo association have fees, rules, approvals or restrictions that affect your plans? Ask for its documents." },
+  { id: "reserves", label: "Condo reserves and inspections", question: "For a condo, have you reviewed required structural inspections, reserve studies, budgets and planned repairs? Ask the association for applicable documents." },
+  { id: "assessments", label: "Assessments and borrowing", question: "Could you face extra condo or HOA payments? Ask about current or proposed special assessments, association loans and due dates." },
+  { id: "timing", label: "Contract dates and next steps", question: "What dates must you meet for deposits, inspections, financing and closing? Review your contract with your agent or attorney." },
 ] as const;
 
 export const CHECKLIST_STATES = ["Not reviewed", "Requested", "Received", "Questions remain", "Not applicable"] as const;

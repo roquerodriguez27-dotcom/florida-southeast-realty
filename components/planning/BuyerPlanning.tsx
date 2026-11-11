@@ -53,7 +53,7 @@ function LoanCard({ loan, index, onChange, onRemove }: { loan: LoanEstimate; ind
     <dl className="mt-5 border-t border-ink/10 pt-4 text-sm space-y-3">
       <div><dt className="text-ink/65">A + B less lender credits</dt><dd className="font-medium">{dollars(metrics.lenderCosts)} <span className="font-normal text-xs">(not total closing costs)</span></dd></div>
       <div><dt className="text-ink/65">Monthly P&amp;I + mortgage insurance + escrow</dt><dd className="font-medium">{dollars(metrics.monthlyTotal)} <span className="font-normal text-xs">(other ownership costs may apply)</span></dd></div>
-      <div><dt className="text-ink/65">Five-year interest and fees</dt><dd className="font-medium">{metrics.fiveYearError ? "Check page 3 entries" : dollars(metrics.fiveYearCost)}</dd></div>
+      <div><dt className="text-ink/65">Five-year borrowing costs, including reported mortgage insurance</dt><dd className="font-medium">{metrics.fiveYearError ? "Check page 3 entries" : dollars(metrics.fiveYearCost)}</dd></div>
     </dl>
     {onRemove && <button type="button" className={`${buttonClass} mt-5`} onClick={onRemove}>Remove lender {index + 1}</button>}
   </fieldset>;
@@ -115,7 +115,7 @@ export default function BuyerPlanning({ initialTool = "checklist" }: { initialTo
 
       {tool === "loans" && <div className="mt-5">
         <p className="text-sm text-ink/65 max-w-3xl">Have two or three written Loan Estimates from lenders? Enter the numbers from each one to compare payments and fees side by side. For a fair comparison, ask lenders to use the same home price, loan amount and loan type. This tool does not supply rates or recommend a lender.</p>
-        <p className="mt-3 text-sm text-ink/65 max-w-3xl">Keep lender charges separate from taxes, prepaids and escrow. Lower escrow does not make a loan cheaper. Page 3 total paid minus principal paid gives the five-year interest and fees illustration; adjustable rates can change that outcome.</p>
+        <p className="mt-3 text-sm text-ink/65 max-w-3xl">Keep lender charges separate from taxes, prepaids and escrow. Lower escrow does not make a loan cheaper. Page 3 total paid minus principal paid gives the five-year borrowing-cost illustration, including reported mortgage insurance; adjustable rates can change that outcome.</p>
         <p className="mt-3 text-sm"><a href="https://www.consumerfinance.gov/owning-a-home/compare/compare-loan-estimates/" target="_blank" rel="noreferrer" className="text-tide underline">CFPB guidance on comparing Loan Estimates</a></p>
         <div className="space-y-6 mt-6">{loans.map((loan, index) => <LoanCard key={index} loan={loan} index={index} onChange={(key, value) => setLoans(previous => previous.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item))} onRemove={loans.length > 1 ? () => setLoans(previous => previous.filter((_, itemIndex) => itemIndex !== index)) : undefined} />)}</div>
         {loans.length < 3 && <button type="button" className={`${buttonClass} bg-white mt-5`} onClick={() => setLoans(previous => [...previous, emptyLoanEstimate()])}>Add lender {loans.length + 1}</button>}

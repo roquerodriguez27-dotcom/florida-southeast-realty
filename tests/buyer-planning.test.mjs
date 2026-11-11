@@ -1,11 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import ts from "typescript";
-
-const source = readFileSync(new URL("../lib/planning/buyer.ts", import.meta.url), "utf8");
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
-const buyer = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+import { loadPlanningModule } from "../scripts/planning-test-loader.mjs";
+const buyer = await loadPlanningModule("lib/planning/buyer.ts");
 const loan = values => ({ ...buyer.emptyLoanEstimate(), ...values });
 
 test("route selectors accept only a single public tool label", () => {
@@ -64,7 +60,7 @@ test("unrated tour criteria do not reduce the personal score", () => {
 });
 
 const cost = { property: "123 Test Avenue", price: 120000, downPercent: 0, rate: 0, years: 10, taxRate: 1.2, insurance: 100, flood: 25, hoa: 50, cdd: 10, pmiRate: 1.2 };
-const affordability = { income: 90000, monthlyDebt: 300, cash: 45000, dti: 36, affordablePrice: 250000 };
+const affordability = { income: 90000, monthlyDebt: 300, cash: 45000, dti: 36, housingPercent: 28, closingCosts: 18000, closingCredits: 0, affordablePrice: 250000 };
 
 test("zero-interest ownership estimate includes tax, insurance, flood, HOA, CDD and PMI", () => {
   const totals = buyer.monthlyPlanningCost(cost);
@@ -77,9 +73,10 @@ test("zero-interest ownership estimate includes tax, insurance, flood, HOA, CDD 
 
 test("full cost and affordability reports retain the assumptions behind the output", () => {
   const report = buyer.buyerScenarioReport("cost", cost, affordability, []);
-  for (const fragment of ["123 Test Avenue", "1.2%", "CDD / other assessments / month: $10.00", "Annual PMI assumption: 1.2%", "$1,425.00"]) assert.ok(report.includes(fragment), fragment);
+  for (const fragment of ["123 Test Avenue", "Annual tax assumption (% of purchase price, not millage): 1.2", "CDD / other assessments / month: $10.00", "Annual PMI assumption (% of initial loan): 1.2", "$1,425.00"]) assert.ok(report.includes(fragment), fragment);
   const range = buyer.buyerScenarioReport("affordability", cost, affordability, []);
-  for (const fragment of ["$90,000.00", "$300.00", "$45,000.00", "36%", "$18,000", "28%", "$250,000.00"]) assert.ok(range.includes(fragment), fragment);
+  for (const fragment of ["Annual household income: 90000", "Other monthly debt payments: 300", "Cash available for this purchase: 45000", "Total debt-to-income assumption (%): 36", "$18,000", "Housing-income assumption (%): 28", "Calculated planning price:"]) assert.ok(range.includes(fragment), fragment);
+  assert.ok(!range.includes("$250,000.00"), "A caller-supplied budget must not override the recalculated result");
 });
 
 test("every compared property and zero HOA survive export; empty slots do not become properties", () => {

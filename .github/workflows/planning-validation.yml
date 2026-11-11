@@ -45,7 +45,7 @@ jobs:
           import subprocess, tarfile
           from pathlib import Path
           paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
-          suffixes = {'.ts', '.tsx', '.js', '.mjs', '.cjs', '.json', '.md', '.css', '.yml'}
+          suffixes = {'.ts', '.tsx', '.js', '.mjs', '.cjs', '.json', '.md', '.css', '.yml', '.py'}
           with tarfile.open('review-evidence/source-text.tar.gz', 'w:gz') as out:
               for name in paths:
                   path = Path(name)
@@ -84,15 +84,24 @@ jobs:
             fi
           }
           check planning npm run test:planning-suite
-          if [ -f scripts/test-calculator-accuracy.mjs ]; then
-            check calculator-accuracy node scripts/test-calculator-accuracy.mjs
-          fi
+          check calculator-accuracy node scripts/test-calculator-accuracy.mjs
           check analytics-privacy npm run test:analytics-privacy
           check homeowner-updates npm run test:homeowner-updates
           check lint npm run lint
           check production-build npm run build
           check types node node_modules/typescript/bin/tsc --noEmit
           exit "$failed"
+      - name: Install isolated pinned browser test tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="$PATH" npm install --prefix "$RUNNER_TEMP/fsr-browser" --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          env -i HOME="$HOME" PATH="$PATH" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/fsr-browsers" node "$RUNNER_TEMP/fsr-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Exercise production build without production data or messages
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="$PATH" CI=true NEXT_TELEMETRY_DISABLED=1 PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/fsr-browsers" FSR_BROWSER_MODULES="$RUNNER_TEMP/fsr-browser" xvfb-run -a node scripts/test-planning-browser.mjs 2>&1 | tee review-evidence/browser-smoke.log
       - name: Save bounded review evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -1,20 +1,13 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import vm from "node:vm";
-import ts from "typescript";
+import { loadPlanningModule } from "./planning-test-loader.mjs";
 
-const compiled = ts.transpileModule(fs.readFileSync(new URL("../lib/planning/seller.ts", import.meta.url), "utf8"), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-}).outputText;
-const compiledModule = { exports: {} };
-vm.runInNewContext(`(function(module,exports){${compiled}\n})`, { Date, Intl }, { filename: "seller.ts" })(compiledModule, compiledModule.exports);
 const {
-  SELLER_COST_FIELDS, newSellerCosts, sellerNumber, readSellerCosts, calculateSellerProceeds,
+  SELLER_COST_FIELDS, newSellerCosts, chooseListingBrokerage, sellerNumber, readSellerCosts, calculateSellerProceeds,
   sellerDaysBetween, shiftSellerDate, sellerTimingPlan, newSellerOffer,
   buildSellerProceedsReport, buildSellerOfferReport, buildSellerTimingReport,
-} = compiledModule.exports;
+} = await loadPlanningModule("lib/planning/seller.ts");
 
-const completeForm = () => ({ ...newSellerCosts(), ...Object.fromEntries(SELLER_COST_FIELDS.map(({ key }) => [key, "0"])), buyerFee: "0" });
+const completeForm = () => ({ ...chooseListingBrokerage(newSellerCosts(), "fsr"), buyerFeeFunding: "seller-extra", ...Object.fromEntries(SELLER_COST_FIELDS.map(({ key }) => [key, "0"])), buyerFee: "0" });
 const baseline = readSellerCosts(completeForm());
 assert.equal(baseline.missing.length, 0);
 assert.equal(calculateSellerProceeds(600000, baseline.costs).netAtClosing, 597000);
@@ -72,8 +65,8 @@ assert.equal(sellerTimingPlan({ ...timing, preparationDays: "3.5" }).errors.leng
 // Offers use their own concession amounts, and deposits are not deducted twice.
 const offer = { ...newSellerOffer(1), price: "600000", concessions: "1000", deposit: "10000" };
 const offerReport = buildSellerOfferReport([offer], { ...completeForm(), sellerConcessions: "99999" }, "Test property", "");
-assert.match(offerReport, /Net at closing from entered amounts: \$596,000\.00/);
-assert.match(buildSellerOfferReport([{ ...offer, deposit: "90000" }], completeForm(), "Test property", ""), /Net at closing from entered amounts: \$596,000\.00/);
+assert.match(offerReport, /Estimated seller proceeds: \$596,000\.00/);
+assert.match(buildSellerOfferReport([{ ...offer, deposit: "90000" }], completeForm(), "Test property", ""), /Estimated seller proceeds: \$596,000\.00/);
 
 // Largest permitted text entries must remain complete within the handoff target.
 const longestOffers = [1, 2, 3].map((index) => ({

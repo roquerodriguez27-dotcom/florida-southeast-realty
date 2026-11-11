@@ -1,0 +1,116 @@
+name: Planning validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'app/planning/**'
+      - 'app/buyer-tools/**'
+      - 'components/BuyerTools.tsx'
+      - 'components/planning/**'
+      - 'lib/planning/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'package*.json'
+      - '.github/workflows/planning-validation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: planning-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Record reviewed head and public source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p review-evidence
+          git rev-parse HEAD > review-evidence/head-sha.txt
+          git rev-parse HEAD^{tree} > review-evidence/tree-sha.txt
+          git ls-tree -r HEAD > review-evidence/source-manifest.txt
+          python3 - <<'PY'
+          import subprocess, tarfile
+          from pathlib import Path
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          suffixes = {'.ts', '.tsx', '.js', '.mjs', '.cjs', '.json', '.md', '.css', '.yml', '.py'}
+          with tarfile.open('review-evidence/source-text.tar.gz', 'w:gz') as out:
+              for name in paths:
+                  path = Path(name)
+                  if name and path.suffix in suffixes and path.is_file():
+                      out.add(path, arcname=name, recursive=False)
+          PY
+      - name: Install locked dependencies without application secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="$PATH" CI=true NEXT_TELEMETRY_DISABLED=1 npm ci --no-audit --no-fund 2>&1 | tee review-evidence/install.log
+      - name: Retain installed framework guides
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -p 'JSON.stringify({node:process.version,next:require("next/package.json").version,typescript:require("typescript/package.json").version})' > review-evidence/tool-versions.json
+          if [ -d node_modules/next/dist/docs ]; then
+            tar -czf review-evidence/installed-next-guides.tar.gz -C node_modules/next/dist docs
+          else
+            printf '%s\n' 'Installed Next package has no dist/docs directory.' > review-evidence/framework-guides-note.txt
+          fi
+      - name: Validate planning, privacy, homeowner content, lint, build and types
+        shell: bash
+        run: |
+          set -uo pipefail
+          failed=0
+          check() {
+            local label="$1"
+            shift
+            if env -i HOME="$HOME" PATH="$PATH" CI=true NEXT_TELEMETRY_DISABLED=1 "$@" > "review-evidence/$label.log" 2>&1; then
+              printf '%s PASS\n' "$label" | tee -a review-evidence/results.txt
+            else
+              printf '%s FAIL\n' "$label" | tee -a review-evidence/results.txt
+              tail -n 80 "review-evidence/$label.log"
+              failed=1
+            fi
+          }
+          check planning npm run test:planning-suite
+          check calculator-accuracy node scripts/test-calculator-accuracy.mjs
+          check analytics-privacy npm run test:analytics-privacy
+          check homeowner-updates npm run test:homeowner-updates
+          check lint npm run lint
+          check production-build npm run build
+          check types node node_modules/typescript/bin/tsc --noEmit
+          exit "$failed"
+      - name: Install isolated pinned browser test tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ubuntu-24.04 already supplies Chromium runtime libraries and Xvfb.
+          # Browser launch remains mandatory and fails if a required library is absent.
+          # Avoid apt's unrelated optional font downloads; do not skip browser tests.
+          command -v xvfb-run
+          env -i HOME="$HOME" PATH="$PATH" npm install --prefix "$RUNNER_TEMP/fsr-browser" --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          env -i HOME="$HOME" PATH="$PATH" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/fsr-browsers" node "$RUNNER_TEMP/fsr-browser/node_modules/playwright/cli.js" install chromium
+      - name: Exercise production build without production data or messages
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="$PATH" CI=true NEXT_TELEMETRY_DISABLED=1 PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/fsr-browsers" FSR_BROWSER_MODULES="$RUNNER_TEMP/fsr-browser" xvfb-run -a node scripts/test-planning-browser.mjs 2>&1 | tee review-evidence/browser-smoke.log
+      - name: Save bounded review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: planning-review-${{ github.event.pull_request.head.sha }}
+          path: review-evidence/
+          retention-days: 1
+          if-no-files-found: error

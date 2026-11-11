@@ -1,3 +1,6 @@
+import { buyerMonthlyCosts, moneyCents } from "./calculator-core";
+import { buyerPlannerReport, newBuyerPlannerInputs } from "./buyer-calculations";
+
 export type BuyerPlanTool = "checklist" | "relocation" | "tour" | "loans";
 
 export function buyerPlanTool(value: string | string[] | undefined): BuyerPlanTool {
@@ -6,16 +9,16 @@ export function buyerPlanTool(value: string | string[] | undefined): BuyerPlanTo
 }
 
 export const CHECKLIST_ITEMS = [
-  { id: "condition", label: "Condition and inspections", question: "What should a qualified inspector investigate, and which repairs need estimates?" },
-  { id: "permits", label: "Permits and property records", question: "Do the records match the improvements and intended use? Ask the relevant local authority." },
-  { id: "taxes", label: "Property taxes", question: "What could taxes be after the purchase? Confirm assumptions with the property appraiser." },
-  { id: "insurance", label: "Home and flood insurance", question: "Obtain property-specific quotes, deductibles and coverage details before relying on an estimate." },
-  { id: "title", label: "Title, survey and restrictions", question: "Which title, boundary, use or easement questions need the closing professional's review?" },
-  { id: "financing", label: "Financing and cash to close", question: "Confirm loan terms, available funds and the lender's closing requirements." },
-  { id: "association", label: "Association documents and fees", question: "Review applicable rules, financials, fees, approval requirements and restrictions." },
-  { id: "reserves", label: "Condo reserves and inspections", question: "If applicable, request SIRS, milestone reports, the reserve plan and current financials." },
-  { id: "assessments", label: "Assessments and borrowing", question: "Ask about approved or proposed assessments, association loans and payment dates." },
-  { id: "timing", label: "Contract dates and next steps", question: "Confirm applicable contract deadlines with your broker and appropriate advisers." },
+  { id: "condition", label: "Condition and inspections", question: "What problems or repairs should a licensed home inspector check? Ask for estimates before deciding what they might cost." },
+  { id: "permits", label: "Permits and property records", question: "Were additions or renovations properly permitted? Check the records with the city or county." },
+  { id: "taxes", label: "Property taxes", question: "How much might property taxes be after you buy? The seller’s current bill may not reflect your future bill." },
+  { id: "insurance", label: "Home and flood insurance", question: "What would home and flood insurance cost for this property? Ask insurers about coverage, deductibles and exclusions." },
+  { id: "title", label: "Title, survey and restrictions", question: "Are there ownership, property-line, access or restrictions issues? Ask your title or closing professional to review them." },
+  { id: "financing", label: "Financing and cash to close", question: "What will the monthly payment and total cash needed at closing be? Confirm the terms and requirements with your lender." },
+  { id: "association", label: "Association documents and fees", question: "Does the HOA or condo association have fees, rules, approvals or restrictions that affect your plans? Ask for its documents." },
+  { id: "reserves", label: "Condo reserves and inspections", question: "For a condo, have you reviewed required structural inspections, reserve studies, budgets and planned repairs? Ask the association for applicable documents." },
+  { id: "assessments", label: "Assessments and borrowing", question: "Could you face extra condo or HOA payments? Ask about current or proposed special assessments, association loans and due dates." },
+  { id: "timing", label: "Contract dates and next steps", question: "What dates must you meet for deposits, inspections, financing and closing? Review your contract with your agent or attorney." },
 ] as const;
 
 export const CHECKLIST_STATES = ["Not reviewed", "Requested", "Received", "Questions remain", "Not applicable"] as const;
@@ -93,10 +96,10 @@ export function loanMetrics(loan: LoanEstimate) {
   const pi = read("monthlyPI"), mi = read("monthlyMI"), escrow = read("monthlyEscrow");
   const invalidFields = LOAN_FIELDS.filter(([key, , kind]) => loan[key].trim() && (read(key) === null || ((key === "purchasePrice" || key === "loanAmount" || key === "termYears") && read(key) === 0) || ((kind === "percent" || key === "termYears") && (read(key) ?? 0) > 100))).map(([, label]) => label);
   return {
-    lenderCosts: a !== null && b !== null && credits !== null ? a + b - credits : null,
-    fiveYearCost: total5 !== null && principal5 !== null && principal5 <= total5 ? total5 - principal5 : null,
+    lenderCosts: a !== null && b !== null && credits !== null ? (moneyCents(a) + moneyCents(b) - moneyCents(credits)) / 100 : null,
+    fiveYearCost: total5 !== null && principal5 !== null && principal5 <= total5 ? (moneyCents(total5) - moneyCents(principal5)) / 100 : null,
     fiveYearError: total5 !== null && principal5 !== null && principal5 > total5,
-    monthlyTotal: pi !== null && mi !== null && escrow !== null ? pi + mi + escrow : null,
+    monthlyTotal: pi !== null && mi !== null && escrow !== null ? (moneyCents(pi) + moneyCents(mi) + moneyCents(escrow)) / 100 : null,
     invalidFields,
   };
 }
@@ -125,7 +128,7 @@ export function loansReport(property: string, loans: LoanEstimate[]): string {
         }),
         `A + B less lender credits: ${dollars(metrics.lenderCosts)} (not total closing costs)`,
         `Monthly P&I + mortgage insurance + escrow: ${dollars(metrics.monthlyTotal)} (not all ownership costs)`,
-        `Five-year interest and fees: ${metrics.fiveYearError ? "Check the two page 3 figures" : dollars(metrics.fiveYearCost)}`,
+        `Five-year borrowing costs (including reported mortgage insurance): ${metrics.fiveYearError ? "Check the two page 3 figures" : dollars(metrics.fiveYearCost)}`,
         ...(metrics.invalidFields.length ? [`Check these entries: ${metrics.invalidFields.join(", ")}`] : []),
         `Questions: ${text(loan.notes)}`, ""];
     }), "COMPARABILITY CHECK", ...loanComparisonNotes(loans.slice(0, 3)), "",
@@ -137,22 +140,19 @@ export function loansReport(property: string, loans: LoanEstimate[]): string {
 export type CostScenario = { property: string; price: number; downPercent: number; rate: number; years: number; taxRate: number; insurance: number; flood: number; hoa: number; cdd: number; pmiRate: number };
 export type ComparisonReportHome = { address: string; price: string; beds: string; baths: string; sqft: string; hoa: string; yearBuilt: string; notes: string };
 export function monthlyPlanningCost(cost: CostScenario) {
-  const loan = Math.max(0, cost.price * (1 - cost.downPercent / 100));
-  const months = cost.years * 12, rate = cost.rate / 1200;
-  const factor = Math.expm1(months * Math.log1p(rate));
-  const principalInterest = loan <= 0 || months <= 0 ? 0 : rate === 0 ? loan / months : loan * rate * (1 + 1 / factor);
-  const taxes = cost.price * cost.taxRate / 1200;
-  const pmi = cost.downPercent < 20 ? loan * cost.pmiRate / 1200 : 0;
-  return { loan, principalInterest, taxes, pmi, total: principalInterest + taxes + pmi + cost.insurance + cost.flood + cost.hoa + cost.cdd };
+  return buyerMonthlyCosts(cost);
 }
-export function buyerScenarioReport(tool: "cost" | "affordability" | "compare", cost: CostScenario, affordability: { income: number; monthlyDebt: number; cash: number; dti: number; affordablePrice: number }, homes: ComparisonReportHome[]): string {
-  const assumptions = [`Property: ${text(cost.property)}`, `Purchase price: ${dollars(cost.price)}`, `Down payment: ${cost.downPercent}% (${dollars(cost.price * cost.downPercent / 100)})`, `Interest rate assumption: ${cost.rate}%`, `Term: ${cost.years} years`, `Annual property-tax assumption: ${cost.taxRate}% of purchase price`, `Home insurance / month: ${dollars(cost.insurance)}`, `Flood insurance / month: ${dollars(cost.flood)}`, `HOA / condo / month: ${dollars(cost.hoa)}`, `CDD / other assessments / month: ${dollars(cost.cdd)}`, `Annual PMI assumption: ${cost.pmiRate}% of loan when down payment is below 20%`];
-  const propertyDetails = homes.filter(home => [home.address, home.price, home.beds, home.baths, home.sqft, home.hoa, home.yearBuilt, home.notes].some(value => value.trim())).flatMap((home, index) => [`HOME ${index + 1}: ${text(home.address)}`, ...[["Price", home.price], ["Bedrooms", home.beds], ["Bathrooms", home.baths], ["Living area (sq ft)", home.sqft], ["HOA / month", home.hoa], ["Year built", home.yearBuilt], ["Notes", home.notes]].map(([label, value]) => `${label}: ${text(value)}`), ""]);
-  const monthly = monthlyPlanningCost(cost);
-  return ["BUYER PLANNING WORKSHEET", `Selected tool: ${tool}`, "Editable planning assumptions, not current loan or insurance quotes. Verify property facts and all costs. This is not a financing approval.", "",
-    ...(tool === "compare" ? propertyDetails.length ? propertyDetails : ["No comparison properties entered."] : assumptions),
-    ...(tool === "cost" ? ["", `Estimated loan amount: ${dollars(monthly.loan)}`, `Estimated monthly principal and interest: ${dollars(monthly.principalInterest)}`, `Estimated monthly property taxes: ${dollars(monthly.taxes)}`, `Estimated monthly PMI: ${dollars(monthly.pmi)}`, `Estimated total monthly ownership cost: ${dollars(monthly.total)}`] : []),
-    ...(tool === "affordability" ? ["", `Annual income entered: ${dollars(affordability.income)}`, `Other monthly debt: ${dollars(affordability.monthlyDebt)}`, `Available cash: ${dollars(affordability.cash)}`, `Debt-to-income assumption: ${affordability.dti}%`, "Model also limits housing to 28% of gross income and reserves $18,000 of cash for illustrative closing expenses; actual requirements can differ.", `Calculated planning price: ${dollars(affordability.affordablePrice)}`] : []),
-    "", "Next step: review the assumptions and open questions with Roque and the relevant lender, insurer or association.",
-  ].join("\n");
+
+/** Compatibility adapter: recalculate results; never trust a caller-supplied purchase budget. */
+export function buyerScenarioReport(tool: "cost" | "affordability" | "compare", cost: CostScenario, affordability: {
+  income: number; monthlyDebt: number; cash: number; dti: number;
+  closingCosts?: number; closingCredits?: number; housingPercent?: number; affordablePrice?: number;
+}, homes: ComparisonReportHome[]): string {
+  const form = newBuyerPlannerInputs();
+  const values = { ...cost, ...affordability };
+  for (const key of Object.keys(form) as (keyof typeof form)[]) {
+    const value = values[key as keyof typeof values];
+    form[key] = typeof value === "number" ? String(value) : "";
+  }
+  return buyerPlannerReport(tool, form, cost.property, homes);
 }

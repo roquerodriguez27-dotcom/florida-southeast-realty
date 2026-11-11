@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import PlanHandoff from "@/components/planning/PlanHandoff";
 import ReportActions from "@/components/planning/ReportActions";
-import { buyerScenarioReport } from "@/lib/planning/buyer";
+import { analyzeBuyerPlanner, buyerPlannerReport, newBuyerPlannerInputs, MONTHLY_COST_LABELS, BUYER_MODEL_LIMITS, type BuyerInputKey } from "@/lib/planning/buyer-calculations";
+import { planningNumber } from "@/lib/planning/calculator-core";
 import {
   clearComparisonListings,
   removeComparisonListing,
@@ -39,7 +40,7 @@ interface ComparisonHome {
   notes: string;
 }
 
-const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function emptyComparisonHome(index: number): ComparisonHome {
   return {
@@ -129,118 +130,62 @@ function ComparisonField({
   );
 }
 
-function payment(principal: number, annualRate: number, years: number) {
-  if (principal <= 0 || years <= 0) return 0;
-  const months = years * 12;
-  const rate = annualRate / 100 / 12;
-  if (rate === 0) return principal / months;
-  return principal * (rate * (1 + rate) ** months) / ((1 + rate) ** months - 1);
-}
-
-function Input({ label, value, onChange, prefix, suffix, step = 1, min = 0 }: {
+function Input({ label, value, onChange, prefix, suffix, step = 1, min = 0, disabled = false }: {
   label: string;
-  value: number;
-  onChange: (value: number) => void;
+  value: string;
+  onChange: (value: string) => void;
   prefix?: string;
   suffix?: string;
   step?: number;
   min?: number;
+  disabled?: boolean;
 }) {
-  const [draft, setDraft] = useState(() => String(value));
-
   return (
-    <label className="block">
-      <span className="block text-[11px] font-mono uppercase tracking-wide text-ink/55 mb-1">{label}</span>
+    <label className="block min-w-0">
+      <span className="block text-[11px] font-mono uppercase tracking-wide text-ink/70 mb-1">{label}</span>
       <span className="price-field flex items-center bg-white border border-ink/15 rounded-sm focus-within:border-tide">
-        {prefix && <span className="pl-3 text-ink/45">{prefix}</span>}
-        <input
-          type="number"
-          value={draft}
-          min={min}
-          step={step}
-          onChange={(event) => {
-            const next = event.target.value;
-            setDraft(next);
-            if (next !== "") onChange(Number(next));
-          }}
-          onBlur={() => {
-            if (draft === "") {
-              setDraft("0");
-              onChange(0);
-            }
-          }}
-          onFocus={(event) => event.currentTarget.select()}
-          className="price-field-input w-full min-w-0 bg-transparent px-2.5 py-2.5 outline-none tabular-nums"
-        />
-        {suffix && <span className="pr-3 text-ink/45 text-sm">{suffix}</span>}
+        {prefix && <span className="pl-3 text-ink/60">{prefix}</span>}
+        <input type="number" value={value} min={min} step={step} disabled={disabled}
+          placeholder={disabled ? "Not applicable" : "Unknown"}
+          onChange={event => onChange(event.target.value)}
+          onFocus={event => event.currentTarget.select()}
+          className="price-field-input w-full min-w-0 bg-transparent px-2.5 py-2.5 outline-none tabular-nums disabled:opacity-50" />
+        {suffix && <span className="pr-3 text-ink/60 text-sm">{suffix}</span>}
       </span>
+      {disabled && <span className="mt-1 block text-xs text-ink/65">Not used for the selected down payment.</span>}
     </label>
   );
 }
 
-function CostBreakdown({ price, downPayment, rate, years, taxRate, insurance, flood, hoa, cdd, pmiRate }: {
-  price: number;
-  downPayment: number;
-  rate: number;
-  years: number;
-  taxRate: number;
-  insurance: number;
-  flood: number;
-  hoa: number;
-  cdd: number;
-  pmiRate: number;
-}) {
-  const loan = Math.max(0, price - downPayment);
-  const principalInterest = payment(loan, rate, years);
-  const taxes = price * (taxRate / 100) / 12;
-  const pmi = price > 0 && downPayment / price < 0.2 ? loan * (pmiRate / 100) / 12 : 0;
-  const total = principalInterest + taxes + insurance + flood + hoa + cdd + pmi;
-  const rows = [
-    ["Principal & interest", principalInterest],
-    ["Estimated property taxes", taxes],
-    ["Homeowners insurance", insurance],
-    ["Flood insurance", flood],
-    ["HOA / condo fees", hoa],
-    ["CDD / other assessments", cdd],
-    ["Estimated PMI", pmi],
-  ] as const;
+function BuyerInputWarnings({ review }: { review: ReturnType<typeof analyzeBuyerPlanner> }) {
+  return <>
+    {review.errors.length > 0 && <p role="alert" className="mt-4 text-sm leading-relaxed">Correct: {review.errors.join(" ")}</p>}
+    {review.missing.length > 0 && <p role="status" className="mt-4 text-sm leading-relaxed">Still unknown: {review.missing.join("; ")}. Enter 0 only when you have confirmed no amount applies. No complete estimate is shown yet.</p>}
+  </>;
+}
 
-  return (
-    <div className="bg-tide text-sand rounded-sm p-6 md:p-7">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-brass">Estimated true monthly cost</p>
-      <p className="font-display text-4xl mt-2">{money.format(total)}</p>
-      <p className="text-xs text-sand/55 mt-1">Estimated loan amount: {money.format(loan)}</p>
-      <div className="mt-5 divide-y divide-white/10">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex justify-between gap-4 py-2.5 text-sm">
-            <span className="text-sand/65">{label}</span><span className="font-mono">{money.format(value)}</span>
-          </div>
-        ))}
-      </div>
-      <p className="text-[11px] text-sand/45 leading-relaxed mt-4">
-        Planning estimate only. Taxes, insurance, flood coverage, assessments, PMI, rates, and lender terms must be independently verified.
-      </p>
-    </div>
-  );
+function CostBreakdown({ review }: { review: ReturnType<typeof analyzeBuyerPlanner> }) {
+  const costs = review.monthly;
+  return <div className="bg-tide text-sand rounded-sm p-6 md:p-7" data-calculator="buyer-monthly-summary">
+    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-brass">Estimated monthly total of included costs</p>
+    <p className="font-display text-4xl mt-2">{costs ? money.format(costs.total) : "Not calculated"}</p>
+    <BuyerInputWarnings review={review} />
+    {costs && <>
+      <p className="text-sm text-sand/85 mt-3">Loan amount: {money.format(costs.loan)}. Down payment: {money.format(costs.downPayment)}.</p>
+      <dl className="mt-5 divide-y divide-white/20">{MONTHLY_COST_LABELS.map(([key, label]) => <div key={key} className="flex justify-between gap-4 py-2.5 text-sm"><dt className="text-sand/85">{label}</dt><dd className="font-mono shrink-0">{money.format(costs[key])}</dd></div>)}</dl>
+    </>}
+    <p className="text-xs text-sand/85 leading-relaxed mt-5">{BUYER_MODEL_LIMITS}</p>
+  </div>;
 }
 
 export default function BuyerTools({ initialListing, initialTool = "cost" }: BuyerToolsProps) {
   const [tool, setTool] = useState<Tool>(initialTool);
   const [propertyReference, setPropertyReference] = useState(() => initialListing ? comparisonAddress(savedComparisonListing(initialListing)) : "");
-  const [price, setPrice] = useState(initialListing?.price ?? 600000);
-  const [downPercent, setDownPercent] = useState(20);
-  const [rate, setRate] = useState(6.5);
-  const [years, setYears] = useState(30);
-  const [taxRate, setTaxRate] = useState(1.8);
-  const [insurance, setInsurance] = useState(650);
-  const [flood, setFlood] = useState(0);
-  const [hoa, setHoa] = useState(initialListing?.associationFeeMonthly ?? 0);
-  const [cdd, setCdd] = useState(0);
-  const [pmiRate, setPmiRate] = useState(0.7);
-  const [income, setIncome] = useState(150000);
-  const [monthlyDebt, setMonthlyDebt] = useState(900);
-  const [cash, setCash] = useState(120000);
-  const [dti, setDti] = useState(36);
+  const [form, setForm] = useState(() => newBuyerPlannerInputs(initialListing));
+  const { price, downPercent, rate, years, taxRate, insurance, flood, hoa, cdd, pmiRate, income, monthlyDebt, cash, dti, housingPercent, closingCosts, closingCredits } = form;
+  const updateInput = (key: BuyerInputKey, value: string) => setForm(previous => ({ ...previous, [key]: value }));
+  const noLoan = planningNumber(downPercent, 100) === 100;
+  const noPmi = (planningNumber(downPercent, 100) ?? -1) >= 20;
   const selectedListings = useComparisonListings();
   const [dismissedInitialListing, setDismissedInitialListing] = useState(false);
   const [manualComparisonHomes, setManualComparisonHomes] = useState<ComparisonHome[]>(() => [
@@ -265,26 +210,11 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
     };
   });
 
-  const downPayment = price * downPercent / 100;
-  const monthlyIncome = income / 12;
-  const maxHousing = Math.max(0, Math.min(monthlyIncome * 0.28, monthlyIncome * dti / 100 - monthlyDebt));
-  const fixedHousingCosts = insurance + flood + hoa + cdd;
-  const availableForLoanAndTax = Math.max(0, maxHousing - fixedHousingCosts);
-  const monthlyRate = rate / 100 / 12;
-  const months = years * 12;
-  const paymentPerBorrowedDollar = monthlyRate === 0 ? 1 / months : monthlyRate * (1 + monthlyRate) ** months / ((1 + monthlyRate) ** months - 1);
-  const downFraction = Math.min(1, Math.max(0, downPercent / 100));
-  const pmiPerPriceDollar = downFraction < 0.2 ? (1 - downFraction) * pmiRate / 100 / 12 : 0;
-  const monthlyCostPerPriceDollar = (1 - downFraction) * paymentPerBorrowedDollar + taxRate / 100 / 12 + pmiPerPriceDollar;
-  const paymentLimitedPrice = monthlyCostPerPriceDollar > 0 ? availableForLoanAndTax / monthlyCostPerPriceDollar : 0;
-  const cashLimitedDown = Math.max(0, cash - 18000);
-  const cashLimitedPrice = downFraction > 0 ? cashLimitedDown / downFraction : paymentLimitedPrice;
-  const affordablePrice = Math.max(0, Math.min(paymentLimitedPrice, cashLimitedPrice));
-
-  const enteredHomes = comparisonHomes.filter((home) => home.address.trim());
-  const scenarioSummary = buyerScenarioReport(tool,
-    { property: propertyReference, price, downPercent, rate, years, taxRate, insurance, flood, hoa, cdd, pmiRate },
-    { income, monthlyDebt, cash, dti, affordablePrice }, comparisonHomes);
+  const monthlyReview = analyzeBuyerPlanner("cost", form);
+  const affordabilityReview = analyzeBuyerPlanner("affordability", form);
+  const budget = affordabilityReview.budget;
+  const enteredHomes = comparisonHomes.filter(home => home.address.trim());
+  const scenarioSummary = buyerPlannerReport(tool, form, propertyReference, comparisonHomes);
 
   function updateComparisonHome(index: number, field: keyof Omit<ComparisonHome, "id" | "sourceSlug">, value: string) {
     const home = comparisonHomes[index];
@@ -329,7 +259,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
   }
 
   const tabs: { id: Tool; label: string }[] = [
-    { id: "cost", label: "True Monthly Cost" },
+    { id: "cost", label: "Monthly Cost Estimate" },
     { id: "affordability", label: "Affordability" },
     { id: "compare", label: "Compare Homes" },
   ];
@@ -344,30 +274,32 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
         ))}
       </div>
 
+      {tool !== "compare" && <aside className="mt-5 rounded-sm border border-brass/35 bg-brass/10 p-4 text-sm leading-relaxed text-ink/80"><strong>Start with your own numbers.</strong> Only a selected listing’s price and any reported HOA fee are loaded from listing data; verify both. Other costs start unknown, not at zero. The 20% down payment, 30-year term and 28% / 36% budget ratios are editable planning assumptions, not quotes or lender rules. Rates, insurance and tax amounts are not fetched for the property.</aside>}
+
       {tool !== "compare" && <label className="block mt-5 max-w-xl"><span className="block text-sm font-medium mb-1.5">Property address or scenario name (optional)</span><input className="w-full rounded-sm border border-ink/20 bg-white p-3 focus:border-tide outline-none" value={propertyReference} maxLength={180} onChange={event => setPropertyReference(event.target.value)} placeholder="Label the property or assumptions for your report" /></label>}
 
       {tool === "cost" && (
-        <section className="mt-6 grid lg:grid-cols-[minmax(0,1fr)_420px] gap-6 items-start" aria-label="True monthly ownership cost calculator">
+        <section className="mt-6 grid lg:grid-cols-[minmax(0,1fr)_420px] gap-6 items-start" aria-label="Monthly cost estimate calculator">
           <div className="bg-white border border-ink/10 rounded-sm p-6 md:p-8">
             <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
               <div><h2 className="font-display text-2xl">Build a Florida ownership estimate</h2><p className="text-sm text-ink/55 mt-1">Include the costs generic mortgage calculators often miss.</p></div>
               {initialListing && <p className="text-xs bg-brass/10 px-3 py-2 rounded-sm">Using {initialListing.address}</p>}
             </div>
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              <Input label="Purchase price" value={price} onChange={setPrice} prefix="$" step={5000} />
-              <Input label="Down payment" value={downPercent} onChange={setDownPercent} suffix="%" step={1} />
-              <Input label="Interest rate" value={rate} onChange={setRate} suffix="%" step={0.125} />
-              <Input label="Loan term" value={years} onChange={setYears} suffix="years" step={5} />
-              <Input label="Property-tax rate" value={taxRate} onChange={setTaxRate} suffix="% / yr" step={0.05} />
-              <Input label="Home insurance" value={insurance} onChange={setInsurance} prefix="$" suffix="/ mo" step={25} />
-              <Input label="Flood insurance" value={flood} onChange={setFlood} prefix="$" suffix="/ mo" step={25} />
-              <Input label="HOA / condo" value={hoa} onChange={setHoa} prefix="$" suffix="/ mo" step={25} />
-              <Input label="CDD / assessments" value={cdd} onChange={setCdd} prefix="$" suffix="/ mo" step={25} />
-              <Input label="PMI rate" value={pmiRate} onChange={setPmiRate} suffix="% / yr" step={0.1} />
+              <Input label="Purchase price" value={price} onChange={value => updateInput("price", value)} prefix="$" step={5000} />
+              <Input label="Down payment" value={downPercent} onChange={value => updateInput("downPercent", value)} suffix="%" step={1} />
+              <Input label="Interest rate assumption" disabled={noLoan} value={rate} onChange={value => updateInput("rate", value)} suffix="%" step={0.125} />
+              <Input label="Loan term" disabled={noLoan} value={years} onChange={value => updateInput("years", value)} suffix="years" step={1} />
+              <Input label="Assumed annual tax (% of price)" value={taxRate} onChange={value => updateInput("taxRate", value)} suffix="% / yr" step={0.05} />
+              <Input label="Home insurance" value={insurance} onChange={value => updateInput("insurance", value)} prefix="$" suffix="/ mo" step={25} />
+              <Input label="Flood insurance" value={flood} onChange={value => updateInput("flood", value)} prefix="$" suffix="/ mo" step={25} />
+              <Input label="HOA / condo" value={hoa} onChange={value => updateInput("hoa", value)} prefix="$" suffix="/ mo" step={25} />
+              <Input label="CDD / assessments" value={cdd} onChange={value => updateInput("cdd", value)} prefix="$" suffix="/ mo" step={25} />
+              <Input label="PMI rate assumption" disabled={noPmi} value={pmiRate} onChange={value => updateInput("pmiRate", value)} suffix="% / yr" step={0.1} />
             </div>
-            <p className="text-xs text-ink/45 mt-5">Down payment: {money.format(downPayment)}. Enter quotes or known property costs whenever available.</p>
+            <p className="text-xs text-ink/45 mt-5">Tax input is an effective annual percentage of the assumed purchase price, not a county millage rate. Use official county estimates and written insurance quotes. Supported loan terms are 1–50 whole years. Do not count an assessment twice if it is already in another entered amount.</p>
           </div>
-          <CostBreakdown price={price} downPayment={downPayment} rate={rate} years={years} taxRate={taxRate} insurance={insurance} flood={flood} hoa={hoa} cdd={cdd} pmiRate={pmiRate} />
+          <CostBreakdown review={monthlyReview} />
         </section>
       )}
 
@@ -377,27 +309,38 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
             <h2 className="font-display text-2xl">Test an affordability scenario</h2>
             <p className="text-sm text-ink/55 mt-1 mb-6">Use your household numbers to estimate a planning range. This is not a lending decision.</p>
             <div className="grid sm:grid-cols-2 gap-4">
-              <Input label="Annual household income" value={income} onChange={setIncome} prefix="$" step={5000} />
-              <Input label="Monthly debt payments" value={monthlyDebt} onChange={setMonthlyDebt} prefix="$" suffix="/ mo" step={50} />
-              <Input label="Cash available" value={cash} onChange={setCash} prefix="$" step={5000} />
-              <Input label="Down-payment target" value={downPercent} onChange={setDownPercent} suffix="%" />
-              <Input label="Interest rate" value={rate} onChange={setRate} suffix="%" step={0.125} />
-              <Input label="Debt-to-income ceiling" value={dti} onChange={setDti} suffix="%" />
-              <Input label="Property-tax rate" value={taxRate} onChange={setTaxRate} suffix="% / yr" step={0.05} />
-              <Input label="Insurance estimate" value={insurance} onChange={setInsurance} prefix="$" suffix="/ mo" step={25} />
-              <Input label="Flood estimate" value={flood} onChange={setFlood} prefix="$" suffix="/ mo" step={25} />
-              <Input label="HOA / condo target" value={hoa} onChange={setHoa} prefix="$" suffix="/ mo" step={25} />
+              <Input label="Annual household income" value={income} onChange={value => updateInput("income", value)} prefix="$" step={5000} />
+              <Input label="Monthly debt payments" value={monthlyDebt} onChange={value => updateInput("monthlyDebt", value)} prefix="$" suffix="/ mo" step={50} />
+              <Input label="Cash available" value={cash} onChange={value => updateInput("cash", value)} prefix="$" step={5000} />
+              <Input label="Down-payment target" value={downPercent} onChange={value => updateInput("downPercent", value)} suffix="%" />
+              <Input label="Interest rate assumption" disabled={noLoan} value={rate} onChange={value => updateInput("rate", value)} suffix="%" step={0.125} />
+              <Input label="Debt-to-income planning assumption" value={dti} onChange={value => updateInput("dti", value)} suffix="%" />
+              <Input label="Assumed annual tax (% of price)" value={taxRate} onChange={value => updateInput("taxRate", value)} suffix="% / yr" step={0.05} />
+              <Input label="Insurance estimate" value={insurance} onChange={value => updateInput("insurance", value)} prefix="$" suffix="/ mo" step={25} />
+              <Input label="Flood estimate" value={flood} onChange={value => updateInput("flood", value)} prefix="$" suffix="/ mo" step={25} />
+              <Input label="HOA / condo target" value={hoa} onChange={value => updateInput("hoa", value)} prefix="$" suffix="/ mo" step={25} />
+              <Input label="CDD / other assessments" value={cdd} onChange={value => updateInput("cdd", value)} prefix="$" suffix="/ mo" />
+              <Input label="Loan term" value={years} onChange={value => updateInput("years", value)} disabled={noLoan} suffix="whole years" />
+              <Input label="PMI rate assumption" value={pmiRate} onChange={value => updateInput("pmiRate", value)} disabled={noPmi} suffix="% / yr" step={0.1} />
+              <Input label="Housing-income planning assumption" value={housingPercent} onChange={value => updateInput("housingPercent", value)} suffix="%" />
+              <Input label="Closing costs before credits" value={closingCosts} onChange={value => updateInput("closingCosts", value)} prefix="$" />
+              <Input label="Confirmed closing credits (0 if none)" value={closingCredits} onChange={value => updateInput("closingCredits", value)} prefix="$" />
             </div>
           </div>
-          <div className="bg-tide text-sand rounded-sm p-6 md:p-7">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-brass">Estimated planning range</p>
-            <p className="font-display text-4xl mt-2">{money.format(affordablePrice)}</p>
-            <div className="mt-5 space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-sand/65">Target housing budget</span><span>{money.format(maxHousing)}/mo</span></div>
-              <div className="flex justify-between"><span className="text-sand/65">Assumed cash reserve</span><span>{money.format(18000)}</span></div>
-              <div className="flex justify-between"><span className="text-sand/65">Loan term</span><span>{years} years</span></div>
-            </div>
-            <p className="text-[11px] text-sand/45 leading-relaxed mt-5">This simplified scenario does not include every lender guideline, closing cost, escrow adjustment, credit factor, or property-specific expense. It is not a preapproval.</p>
+          <div className="bg-tide text-sand rounded-sm p-6 md:p-7" data-calculator="buyer-budget-summary">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-brass">Purchase budget under your assumptions</p>
+            <p className="font-display text-4xl mt-2">{budget?.cashShortfall ? "Cash shortfall" : budget?.affordablePrice !== null && budget?.affordablePrice !== undefined ? money.format(budget.affordablePrice) : "Not calculated"}</p>
+            <BuyerInputWarnings review={affordabilityReview} />
+            {budget && <div className="mt-5 space-y-3 text-sm">
+              <div className="flex justify-between gap-3"><span>Monthly housing budget</span><span>{money.format(budget.maxHousing)}</span></div>
+              <div className="flex justify-between gap-3"><span>Closing costs after credits</span><span>{money.format(budget.netClosingCosts)}</span></div>
+              <div className="flex justify-between gap-3"><span>Cash left for down payment</span><span>{money.format(budget.cashForDownPayment)}</span></div>
+              {budget.cashShortfall > 0 && <p role="status" className="rounded-sm border border-brass/60 p-3">Your entered funds are short by {money.format(budget.cashShortfall)}. No purchase budget is shown until this funding gap is addressed, even with 0% down. Discuss any other funding with your lender.</p>}
+              {budget.status === "model-limit" && <p>This result reaches the calculator’s $1 billion limit; it is not a verified maximum budget.</p>}
+              {budget.projected && <><p className="pt-3 font-semibold">Monthly costs at this planning price</p><dl className="divide-y divide-white/20">{MONTHLY_COST_LABELS.map(([key, label]) => <div key={key} className="flex justify-between gap-3 py-2"><dt>{label}</dt><dd className="shrink-0">{money.format(budget.projected![key])}</dd></div>)}</dl><p className="font-medium">Included monthly total: {money.format(budget.projected.total)}</p></>}
+            </div>}
+            <p className="text-xs text-sand/85 leading-relaxed mt-5">Ratios are your planning assumptions, not lender qualification rules. Closing credits must be confirmed and apply only to entered allowable closing costs, not the down payment. No assistance program, credit limit or loan eligibility is checked.</p>
+            <p className="text-xs text-sand/85 leading-relaxed mt-3">{BUYER_MODEL_LIMITS}</p>
           </div>
         </section>
       )}
@@ -494,7 +437,7 @@ export default function BuyerTools({ initialListing, initialTool = "cost" }: Buy
                       ["Price per sq. ft.", (home: ComparisonHome) => positiveNumber(home.price) && positiveNumber(home.sqft) ? money.format(positiveNumber(home.price) / positiveNumber(home.sqft)) : "Not entered"],
                       ["Bedrooms / bathrooms", (home: ComparisonHome) => home.beds || home.baths ? `${home.beds || "—"} / ${home.baths || "—"}` : "Not entered"],
                       ["Living area", (home: ComparisonHome) => positiveNumber(home.sqft) ? `${positiveNumber(home.sqft).toLocaleString()} sq. ft.` : "Not entered"],
-                      ["HOA / month", (home: ComparisonHome) => positiveNumber(home.hoa) ? money.format(positiveNumber(home.hoa)) : "$0 or not entered"],
+                      ["HOA / month", (home: ComparisonHome) => !home.hoa.trim() ? "Not entered" : planningNumber(home.hoa) === null ? "Check entry" : money.format(planningNumber(home.hoa)!)],
                       ["Year built", (home: ComparisonHome) => home.yearBuilt || "Not entered"],
                       ["Notes", (home: ComparisonHome) => home.notes || "None entered"],
                     ].map(([label, getValue]) => <tr key={label as string}><th className="sticky left-0 z-10 w-36 min-w-36 bg-keystone p-4 text-left font-medium text-ink/60">{label as string}</th>{enteredHomes.map((home) => <td key={home.id} className="w-64 min-w-64 p-4 align-top">{(getValue as (item: ComparisonHome) => string)(home)}</td>)}</tr>)}

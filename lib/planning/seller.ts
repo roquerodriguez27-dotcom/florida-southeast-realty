@@ -1,3 +1,5 @@
+import { moneyCents, percentOfMoney, planningNumber, roundPlanningMoney } from "./calculator-core";
+
 export const SELLER_TOOLS = [
   { id: "proceeds", label: "Sale proceeds" },
   { id: "timing", label: "Sell & buy timing" },
@@ -7,12 +9,27 @@ export const SELLER_TOOLS = [
 ] as const;
 export type SellerTool = (typeof SELLER_TOOLS)[number]["id"];
 export type FeeMode = "percent" | "flat";
+export type ListingBrokerage = "undecided" | "fsr" | "other";
+export type BuyerFeeFunding = "undecided" | "seller-extra" | "listing-fee" | "seller-credit" | "other-payer" | "none";
+export const LISTING_BROKERAGES: { value: ListingBrokerage; label: string }[] = [
+  { value: "undecided", label: "Not decided / not entered" },
+  { value: "fsr", label: "Florida Southeast Realty is listing for the seller" },
+  { value: "other", label: "Another listing brokerage" },
+];
+export const BUYER_FEE_FUNDING: { value: BuyerFeeFunding; label: string }[] = [
+  { value: "undecided", label: "Not decided / confirm the agreement" },
+  { value: "seller-extra", label: "Additional amount paid by this seller" },
+  { value: "listing-fee", label: "Already included in the listing brokerage fee" },
+  { value: "seller-credit", label: "Already included in the entered seller credit" },
+  { value: "other-payer", label: "Paid by buyer or another party, not this seller" },
+  { value: "none", label: "No buyer-broker compensation applies" },
+];
 
 export const SELLER_COST_FIELDS = [
   { key: "mortgagePayoff", label: "First mortgage payoff", group: "charge" },
   { key: "otherLiens", label: "Other loans or liens to pay off", group: "charge" },
   { key: "sellerConcessions", label: "Credit or concessions to buyer", group: "charge" },
-  { key: "repairs", label: "Repairs paid by seller", group: "charge" },
+  { key: "repairs", label: "Repair costs due at closing", group: "charge" },
   { key: "titleSettlement", label: "Title, settlement and recording costs", group: "charge" },
   { key: "transferTaxes", label: "Transfer taxes — seller’s share", group: "charge" },
   { key: "propertyTaxDebit", label: "Property-tax proration owed by seller", group: "charge" },
@@ -25,6 +42,7 @@ export const SELLER_COST_FIELDS = [
 
 export type SellerCostKey = (typeof SELLER_COST_FIELDS)[number]["key"];
 export type SellerCostForm = Record<SellerCostKey, string> & {
+  listingBrokerage: ListingBrokerage; buyerFeeFunding: BuyerFeeFunding;
   listingFeeMode: FeeMode; listingFee: string; buyerFeeMode: FeeMode; buyerFee: string;
 };
 export type SellerCosts = Record<SellerCostKey, number> & {
@@ -34,14 +52,17 @@ export type SellerCosts = Record<SellerCostKey, number> & {
 
 export function newSellerCosts(): SellerCostForm {
   const amounts = Object.fromEntries(SELLER_COST_FIELDS.map((field) => [field.key, ""])) as Record<SellerCostKey, string>;
-  return { ...amounts, listingFeeMode: "percent", listingFee: "0.5", buyerFeeMode: "percent", buyerFee: "" };
+  return { ...amounts, listingBrokerage: "undecided", buyerFeeFunding: "undecided", listingFeeMode: "percent", listingFee: "", buyerFeeMode: "percent", buyerFee: "" };
+}
+
+/** A brokerage change clears old assumptions. Only an explicit FSR selection supplies its advertised fee. */
+export function chooseListingBrokerage(form: SellerCostForm, listingBrokerage: ListingBrokerage): SellerCostForm {
+  if (!LISTING_BROKERAGES.some(option => option.value === listingBrokerage)) throw new RangeError("Choose a listed brokerage option.");
+  return { ...form, listingBrokerage, listingFeeMode: "percent", listingFee: listingBrokerage === "fsr" ? "0.5" : "" };
 }
 
 export function sellerNumber(raw: string, maximum = 1_000_000_000): number | null {
-  const text = raw.trim().replaceAll(",", "");
-  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return null;
-  const value = Number(text);
-  return Number.isFinite(value) && value >= 0 && value <= maximum ? value : null;
+  return planningNumber(raw, maximum);
 }
 
 export function sellerMoney(value: number): string {
@@ -53,7 +74,7 @@ export function sellerAmountText(raw: string): string {
   return value === null ? raw.trim() ? "Invalid amount — please correct" : "Not entered" : sellerMoney(value);
 }
 
-const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100 || 0;
+const roundMoney = roundPlanningMoney;
 
 export function readSellerCosts(form: SellerCostForm, omitConcessions = false) {
   const missing: string[] = [];
@@ -65,40 +86,93 @@ export function readSellerCosts(form: SellerCostForm, omitConcessions = false) {
     return value ?? 0;
   };
   const amounts = Object.fromEntries(SELLER_COST_FIELDS.map((field) => [
-    field.key, field.key === "sellerConcessions" && omitConcessions ? 0 : read(form[field.key], field.label),
+    field.key, field.key === "sellerConcessions" && omitConcessions ? 0
+      : field.key === "taxReserve" && !form[field.key].trim() ? 0 : read(form[field.key], field.label),
   ])) as Record<SellerCostKey, number>;
+  if (!LISTING_BROKERAGES.some(option => option.value === form.listingBrokerage)) errors.push("Choose who is listing the property.");
+  if (!BUYER_FEE_FUNDING.some(option => option.value === form.buyerFeeFunding)) errors.push("Choose how buyer-broker compensation is funded.");
+  const listingKnown = form.listingBrokerage === "fsr" || form.listingBrokerage === "other";
+  if (!listingKnown) missing.push("Listing brokerage and agreed listing fee");
+  if (form.buyerFeeFunding === "undecided") missing.push("Buyer-broker compensation funding");
   const costs: SellerCosts = {
     ...amounts,
-    listingFee: { mode: form.listingFeeMode, value: read(form.listingFee, "Listing-side brokerage fee", form.listingFeeMode === "percent" ? 100 : undefined) },
-    buyerFee: { mode: form.buyerFeeMode, value: read(form.buyerFee, "Separately authorized buyer-broker compensation", form.buyerFeeMode === "percent" ? 100 : undefined) },
+    listingFee: { mode: form.listingFeeMode, value: listingKnown ? read(form.listingFee, "Listing-side brokerage fee", form.listingFeeMode === "percent" ? 100 : undefined) : 0 },
+    buyerFee: { mode: form.buyerFeeMode, value: form.buyerFeeFunding === "seller-extra" ? read(form.buyerFee, "Additional seller-paid buyer-broker compensation", form.buyerFeeMode === "percent" ? 100 : undefined) : 0 },
   };
+  if (!["percent", "flat"].includes(form.listingFeeMode) || !["percent", "flat"].includes(form.buyerFeeMode)) errors.push("Choose a percentage or fixed fee.");
   return { costs, missing, errors };
 }
 
 export function calculateSellerProceeds(salePrice: number, costs: SellerCosts) {
-  if (!Number.isFinite(salePrice) || salePrice <= 0 || salePrice > 1_000_000_000) throw new RangeError("Enter a valid positive sale price.");
+  if (!Number.isFinite(salePrice) || salePrice < 0.01 || salePrice > 1_000_000_000) throw new RangeError("Enter a valid positive sale price.");
   const price = roundMoney(salePrice);
   for (const field of SELLER_COST_FIELDS) {
     if (!Number.isFinite(costs[field.key]) || costs[field.key] < 0 || costs[field.key] > 1_000_000_000) throw new RangeError(`Invalid ${field.label}.`);
   }
   const feeAmount = (fee: SellerCosts["listingFee"]) => {
     if (!["percent", "flat"].includes(fee.mode) || !Number.isFinite(fee.value) || fee.value < 0 || fee.value > (fee.mode === "percent" ? 100 : 1_000_000_000)) throw new RangeError("Invalid brokerage fee.");
-    return roundMoney(fee.mode === "percent" ? price * fee.value / 100 : fee.value);
+    return fee.mode === "percent" ? percentOfMoney(price, fee.value) : roundMoney(fee.value);
   };
   const listingFee = feeAmount(costs.listingFee);
   const buyerFee = feeAmount(costs.buyerFee);
-  const charges = roundMoney(listingFee + buyerFee + SELLER_COST_FIELDS.filter((field) => field.group === "charge").reduce((sum, field) => sum + roundMoney(costs[field.key]), 0));
-  const credits = roundMoney(roundMoney(costs.propertyTaxCredit) + roundMoney(costs.otherCredits));
-  const netAtClosing = roundMoney(price - charges + credits);
-  const afterTaxReserve = roundMoney(netAtClosing - roundMoney(costs.taxReserve));
+  const chargeCents = moneyCents(listingFee) + moneyCents(buyerFee) + SELLER_COST_FIELDS.filter((field) => field.group === "charge").reduce((sum, field) => sum + moneyCents(costs[field.key]), 0);
+  const creditCents = moneyCents(costs.propertyTaxCredit) + moneyCents(costs.otherCredits);
+  const charges = chargeCents / 100, credits = creditCents / 100;
+  const netAtClosing = (moneyCents(price) - chargeCents + creditCents) / 100;
+  const afterTaxReserve = (moneyCents(netAtClosing) - moneyCents(costs.taxReserve)) / 100;
   return { listingFee, buyerFee, charges, credits, netAtClosing, afterTaxReserve };
+}
+
+export function sellerCalculation(salePrice: number, form: SellerCostForm, offerConcessions?: string) {
+  const effectiveForm = offerConcessions === undefined ? form : { ...form, sellerConcessions: offerConcessions };
+  const read = readSellerCosts(effectiveForm);
+  const priceValid = Number.isFinite(salePrice) && salePrice >= 0.01 && salePrice <= 1_000_000_000;
+  const result = priceValid && !read.errors.length ? calculateSellerProceeds(salePrice, read.costs) : null;
+  const brokerage = LISTING_BROKERAGES.find(option => option.value === form.listingBrokerage)?.label ?? "Not entered";
+  const funding = BUYER_FEE_FUNDING.find(option => option.value === form.buyerFeeFunding)?.label ?? "Not entered";
+  const rateLabel = form.listingFee.trim() ? form.listingFeeMode === "percent" ? `${form.listingFee}%` : "fixed amount" : "not entered";
+  const rows: { label: string; kind: "charge" | "credit"; amount: number | null }[] = [
+    { label: `Listing brokerage fee (${rateLabel})`, kind: "charge", amount: form.listingBrokerage !== "undecided" && form.listingFee.trim() && result ? result.listingFee : null },
+    { label: "Additional seller-paid buyer-broker compensation", kind: "charge", amount: form.buyerFeeFunding === "undecided" || (form.buyerFeeFunding === "seller-extra" && !form.buyerFee.trim()) ? null : result?.buyerFee ?? null },
+    ...SELLER_COST_FIELDS.filter(field => field.group !== "reserve").map(field => ({
+      label: field.label, kind: field.group as "charge" | "credit",
+      amount: effectiveForm[field.key].trim() && sellerNumber(effectiveForm[field.key]) !== null ? roundMoney(read.costs[field.key]) : null,
+    })),
+  ];
+  return {
+    result, rows, missing: read.missing, errors: read.errors, brokerage, funding,
+    resultLabel: read.missing.length ? "Subtotal before missing costs" : "Estimated seller proceeds",
+    reserve: form.taxReserve.trim() && sellerNumber(form.taxReserve) !== null ? roundMoney(read.costs.taxReserve) : null,
+  };
+}
+
+export function sellerCalculationLines(salePrice: number, form: SellerCostForm, offerConcessions?: string): string[] {
+  const c = sellerCalculation(salePrice, form, offerConcessions);
+  const concessionText = offerConcessions === undefined ? form.sellerConcessions : offerConcessions;
+  const concession = sellerNumber(concessionText);
+  const otherCharges = c.result ? (moneyCents(c.result.charges) - moneyCents(c.result.listingFee)
+    - moneyCents(c.result.buyerFee) - moneyCents(concession ?? 0)) / 100 : null;
+  return [
+    `Sale price: ${sellerMoney(salePrice)}`,
+    ...c.rows.slice(0, 2).map(row => `${row.label}: ${row.amount === null ? "Not confirmed" : `Deduct ${sellerMoney(row.amount)}`}`),
+    `Seller credit / concessions: ${concession === null ? "Not entered" : `Deduct ${sellerMoney(roundMoney(concession))}`}`,
+    `Other charges (itemized below): ${otherCharges === null ? "Not calculated" : sellerMoney(otherCharges)}; seller credits: ${c.result ? sellerMoney(c.result.credits) : "Not calculated"}`,
+    `${c.resultLabel}: ${c.result ? sellerMoney(c.result.netAtClosing) : "Not calculated"}`,
+    ...(c.missing.length ? [`${c.missing.length} inputs are not confirmed; see shared assumptions. Missing amounts are not zero.`] : []),
+    ...(c.errors.length ? [`Correct: ${c.errors.join("; ")}`] : []),
+    c.reserve === null ? "Optional after-closing tax reserve: Not entered; income tax is not calculated."
+      : `After entered tax reserve: ${c.result ? sellerMoney(c.result.afterTaxReserve) : "Not calculated"}`,
+  ];
 }
 
 export function sellerCostReport(form: SellerCostForm, omitConcessions = false): string[] {
   const fee = (raw: string, mode: FeeMode) => raw.trim() ? mode === "percent" ? `${raw}% of sale price` : sellerAmountText(raw) : "Not entered";
   return [
-    `Listing-side fee: ${fee(form.listingFee, form.listingFeeMode)}`,
-    `Separately authorized buyer-broker compensation: ${fee(form.buyerFee, form.buyerFeeMode)}`,
+    "FSR’s advertised 0.5% excludes buyer-broker compensation; use the actual agreed fees.",
+    `Listing arrangement: ${LISTING_BROKERAGES.find(option => option.value === form.listingBrokerage)?.label ?? "Not entered"}`,
+    `Listing-side fee: ${form.listingBrokerage === "undecided" ? "Not confirmed" : fee(form.listingFee, form.listingFeeMode)}`,
+    `Buyer-broker funding: ${BUYER_FEE_FUNDING.find(option => option.value === form.buyerFeeFunding)?.label ?? "Not entered"}`,
+    `Additional seller-paid buyer-broker compensation: ${form.buyerFeeFunding === "seller-extra" ? fee(form.buyerFee, form.buyerFeeMode) : form.buyerFeeFunding === "undecided" ? "Not confirmed" : "No separate deduction under selected funding arrangement"}`,
     ...SELLER_COST_FIELDS.filter((field) => !omitConcessions || field.key !== "sellerConcessions").map((field) => `${field.label}: ${sellerAmountText(form[field.key])}`),
   ];
 }
@@ -112,11 +186,10 @@ export function buildSellerProceedsReport(prices: readonly string[], form: Selle
     ...prices.slice(0, 3).flatMap((raw, index) => {
       const price = sellerNumber(raw);
       if (!price || read.errors.length) return [`Scenario ${index + 1}: ${raw.trim() ? "Enter valid price and costs" : "Price not entered"}`];
-      const result = calculateSellerProceeds(price, read.costs);
-      return [`Scenario ${index + 1}: sale ${sellerMoney(price)}; charges ${sellerMoney(result.charges)}; seller credits ${sellerMoney(result.credits)}; net at closing ${sellerMoney(result.netAtClosing)}; after entered tax reserve ${sellerMoney(result.afterTaxReserve)}.`];
+      return [`Scenario ${index + 1}`, ...sellerCalculationLines(price, form)];
     }),
     "", "SHARED ASSUMPTIONS", ...sellerCostReport(form),
-    read.missing.length ? "Unentered amounts above are excluded; enter 0 only where none applies." : "Every listed cost input has an entered amount.",
+    read.missing.length ? "Unentered amounts above are excluded; enter 0 only where none applies." : "All required closing-cost inputs have an entered amount.",
     "Income/capital-gains tax is not calculated. Any tax reserve is entered by the user.",
     `Notes: ${notes.trim() || "None entered"}`,
   ].join("\n");
@@ -142,7 +215,8 @@ export function sellerDaysBetween(from: string, to: string): number | null {
 export function shiftSellerDate(date: string, days: number): string | null {
   const stamp = dateTimestamp(date);
   if (stamp === null || !Number.isInteger(days) || Math.abs(days) > 3650) return null;
-  return new Date(stamp + days * 86_400_000).toISOString().slice(0, 10);
+  const shifted = new Date(stamp + days * 86_400_000).toISOString().slice(0, 10);
+  return dateTimestamp(shifted) === null ? null : shifted;
 }
 
 export interface SellerTimingDraft {
@@ -153,6 +227,7 @@ export interface SellerTimingDraft {
 
 export function sellerTimingPlan(draft: SellerTimingDraft) {
   const errors: string[] = [];
+  if (!["sell-first", "buy-first"].includes(draft.mode)) errors.push("Choose a sell-first or buy-first sequence.");
   const duration = (raw: string, label: string) => {
     const value = sellerNumber(raw, 3650);
     if (raw && (value === null || !Number.isInteger(value))) errors.push(`${label}: enter a whole number of days from 0 to 3,650.`);
@@ -171,7 +246,12 @@ export function sellerTimingPlan(draft: SellerTimingDraft) {
   const contractDate = contractDays === null ? null : shiftSellerDate(draft.saleDate, -contractDays);
   const listDate = contractDate && marketingDays !== null ? shiftSellerDate(contractDate, -marketingDays) : null;
   const prepareDate = listDate && preparationDays !== null ? shiftSellerDate(listDate, -preparationDays) : null;
-  const estimatedGapCost = gapDays !== null && gapDays >= 0 && dailyCost !== null ? roundMoney(gapDays * dailyCost) : null;
+  if (gapDays !== null && gapDays > 3650) errors.push("This timing planner supports at most 3,650 days between closings.");
+  if ((contractDays !== null && dateTimestamp(draft.saleDate) !== null && !contractDate)
+    || (contractDate && marketingDays !== null && !listDate)
+    || (listDate && preparationDays !== null && !prepareDate)) errors.push("A calculated planning date is outside the supported calendar range.");
+  const estimatedGapCost = !errors.length && gapDays !== null && gapDays >= 0 && dailyCost !== null
+    ? moneyCents(dailyCost) * gapDays / 100 : null;
   return { errors, gapDays, estimatedGapCost, contractDate, listDate, prepareDate };
 }
 
@@ -213,11 +293,11 @@ export function buildSellerOfferReport(offers: readonly SellerOfferDraft[], form
       const price = sellerNumber(offer.price);
       const concessions = sellerNumber(offer.concessions);
       const valid = price !== null && price > 0 && read.errors.length === 0 && (!offer.concessions.trim() || concessions !== null);
-      const result = valid ? calculateSellerProceeds(price!, { ...read.costs, sellerConcessions: concessions ?? 0 }) : null;
+      const lines = valid ? sellerCalculationLines(price!, form, offer.concessions) : ["Seller proceeds: Not calculated; check price and costs."];
       return [
         "", offer.label || "Unnamed offer",
-        `Price: ${sellerAmountText(offer.price)}; seller concessions: ${sellerAmountText(offer.concessions)}; deposit: ${sellerAmountText(offer.deposit)}`,
-        `Net at closing from entered amounts: ${result ? sellerMoney(result.netAtClosing) : "Not calculated"}; after entered tax reserve: ${result ? sellerMoney(result.afterTaxReserve) : "Not calculated"}`,
+        `Deposit (part of price): ${sellerAmountText(offer.deposit)}`,
+        ...lines,
         `Financing: ${offer.financing}; target close: ${sellerDate(offer.closingDate)}`,
         `Inspection: ${offer.inspection.trim() || "Not entered"}; appraisal: ${offer.appraisal}`,
         `Financing terms: ${offer.financingTerms.trim() || "Not entered"}`,
@@ -225,7 +305,7 @@ export function buildSellerOfferReport(offers: readonly SellerOfferDraft[], form
       ];
     }),
     "", "COMMON COST ASSUMPTIONS", ...sellerCostReport(form, true),
-    "Each offer’s concessions replace the proceeds worksheet’s concession input. Deposits are part of the price and are not deducted again. Unentered costs are excluded; estimates are not closing statements.",
+    "Offer concessions replace shared concessions. Deposits are part of the price, not another deduction. Missing costs are excluded; estimates are not closing statements.",
     `Questions for review: ${notes.trim() || "None entered"}`,
   ].join("\n");
 }

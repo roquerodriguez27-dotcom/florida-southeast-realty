@@ -6,10 +6,11 @@ import PlanHandoff from "@/components/planning/PlanHandoff";
 import ReportActions from "@/components/planning/ReportActions";
 import {
   SELLER_TOOLS, SELLER_COST_FIELDS, newSellerCosts, readSellerCosts,
-  calculateSellerProceeds, sellerNumber, sellerMoney, sellerAmountText,
+  sellerCalculation, chooseListingBrokerage, LISTING_BROKERAGES, BUYER_FEE_FUNDING,
+  sellerNumber, sellerMoney, sellerAmountText,
   sellerDate, sellerDaysBetween, sellerTimingPlan, newSellerOffer,
   buildSellerProceedsReport, buildSellerTimingReport, buildSellerOfferReport,
-  type SellerTool, type SellerCostForm, type SellerTimingDraft, type SellerOfferDraft,
+  type SellerTool, type SellerCostForm, type SellerTimingDraft, type SellerOfferDraft, type ListingBrokerage, type BuyerFeeFunding,
 } from "@/lib/planning/seller";
 
 const inputClass = "mt-1.5 w-full rounded-sm border border-tide/20 bg-white px-3 py-2.5 text-base text-ink outline-none focus:border-tide md:text-sm";
@@ -51,22 +52,57 @@ function WorksheetReport({ title, report, formName, ready, hint }: { title: stri
 
 function CostFields({ costs, onChange, offers = false }: { costs: SellerCostForm; onChange: (next: SellerCostForm) => void; offers?: boolean }) {
   return <div className="space-y-6">
+    <div className="grid gap-5 md:grid-cols-2">
+      <label className="block"><span className="text-sm font-medium text-ink">Who is listing the property?</span>
+        <select className={inputClass} value={costs.listingBrokerage} onChange={event => onChange(chooseListingBrokerage(costs, event.target.value as ListingBrokerage))}>
+          {LISTING_BROKERAGES.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+      </label>
+      <label className="block"><span className="text-sm font-medium text-ink">How is buyer-broker compensation being paid?</span>
+        <select className={inputClass} value={costs.buyerFeeFunding} onChange={event => onChange({ ...costs, buyerFeeFunding: event.target.value as BuyerFeeFunding, buyerFee: "" })}>
+          {BUYER_FEE_FUNDING.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+      </label>
+    </div>
+    <p className="rounded-sm border-l-2 border-brass bg-brass/10 p-4 text-sm leading-relaxed text-ink/80">The advertised 0.5% is Florida Southeast Realty’s listing-side fee only when we list for the seller, subject to the actual written agreement. Selecting FSR supplies an editable starting assumption, not a signed agreement. No rate is assumed for another brokerage. The advertised 0.5% excludes buyer-broker compensation; an included payment requires a different express agreement and its agreed total fee. Compensation is negotiable; enter only the seller’s agreed costs and do not count a payment twice.</p>
     <div className="grid gap-5 sm:grid-cols-2">
-      {(["listing", "buyer"] as const).map((side) => {
+      {(["listing", "buyer"] as const).map(side => {
+        const showAmount = side === "listing" ? costs.listingBrokerage !== "undecided" : costs.buyerFeeFunding === "seller-extra";
         const modeKey = side === "listing" ? "listingFeeMode" : "buyerFeeMode";
         const amountKey = side === "listing" ? "listingFee" : "buyerFee";
-        const label = side === "listing" ? "Listing-side brokerage fee" : "Separately authorized buyer-broker compensation";
+        const label = side === "listing" ? "Listing-side brokerage fee" : "Additional seller-paid buyer-broker compensation";
         return <fieldset key={side} className="rounded-sm border border-ink/10 p-4"><legend className="px-1 text-sm font-medium text-tide">{label}</legend>
-          <label className="block text-xs text-ink/60">Fee basis<select value={costs[modeKey]} onChange={(event) => onChange({ ...costs, [modeKey]: event.target.value })} className={inputClass}><option value="percent">Percentage of sale price</option><option value="flat">Fixed dollar amount</option></select></label>
-          <div className="mt-3"><Field label={side === "listing" ? "Listing fee" : "Buyer-broker compensation"} type="number" suffix={costs[modeKey] === "percent" ? "%" : "$"} max={costs[modeKey] === "percent" ? 100 : 1_000_000_000} value={costs[amountKey]} onChange={(value) => onChange({ ...costs, [amountKey]: value })} /></div>
+          {showAmount ? <>
+            <label className="block text-xs text-ink/70">Fee basis<select value={costs[modeKey]} onChange={event => onChange({ ...costs, [modeKey]: event.target.value })} className={inputClass}><option value="percent">Percentage of sale price</option><option value="flat">Fixed dollar amount</option></select></label>
+            <div className="mt-3"><Field label={side === "listing" ? "Listing fee" : "Additional buyer-broker amount paid by seller"} type="number" suffix={costs[modeKey] === "percent" ? "%" : "$"} max={costs[modeKey] === "percent" ? 100 : 1_000_000_000} value={costs[amountKey]} onChange={value => onChange({ ...costs, [amountKey]: value })} /></div>
+          </> : <p className="text-sm leading-relaxed text-ink/70">{side === "listing" ? "Choose the listing brokerage before entering its fee. Until then, the fee is unknown, not zero." : costs.buyerFeeFunding === "undecided" ? "Confirm who pays this compensation. No amount has been assumed." : "No separate seller deduction is added under the selected funding arrangement. Any included payment must already be in the listing fee or seller credit you enter."}</p>}
         </fieldset>;
       })}
     </div>
-    <p className="text-xs leading-relaxed text-ink/60">The editable 0.5% starting listing fee reflects our advertised listing-side service. Commission rates are negotiable and confirmed in the listing agreement. Separately authorized buyer-broker compensation and other costs are additional. <Link href="/sellers" className="text-tide underline underline-offset-4">See the selling plan.</Link></p>
+    <p className="text-xs leading-relaxed text-ink/70">Check the listing, compensation and purchase agreements with your broker or closing professional. The calculator does not decide who owes a fee. <Link href="/sellers" className="text-tide underline underline-offset-4">Read the FSR listing-side fee explanation.</Link></p>
     <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-      {SELLER_COST_FIELDS.filter((field) => !offers || field.key !== "sellerConcessions").map((field) => <Field key={field.key} label={field.label} type="number" suffix="$" value={costs[field.key]} onChange={(value) => onChange({ ...costs, [field.key]: value })} help={field.key === "taxReserve" ? "Your own reserve amount; this tool does not calculate income or capital-gains tax." : field.key === "mortgagePayoff" ? "Use a current payoff estimate, including applicable lender charges." : undefined} />)}
+      {SELLER_COST_FIELDS.filter(field => !offers || field.key !== "sellerConcessions").map(field => <Field key={field.key} label={field.label} type="number" suffix="$" value={costs[field.key]} onChange={value => onChange({ ...costs, [field.key]: value })} help={field.key === "taxReserve" ? "Optional amount kept after closing; this tool does not calculate income or capital-gains tax." : field.key === "mortgagePayoff" ? "Use a current payoff estimate, including applicable lender charges." : undefined} />)}
     </div>
-    <p className="rounded-sm border-l-2 border-brass bg-brass/10 px-4 py-3 text-sm leading-relaxed text-ink/75">Blank amounts are excluded from the calculation, not confirmed to be zero. Enter 0 where no amount applies. Use each cost once; for example, do not enter the same assessment under both HOA costs and other costs.</p>
+    <p className="text-sm leading-relaxed text-ink/75">Blank costs remain unknown and are excluded from the subtotal. Enter 0 only after confirming none applies. Enter each assessment, seller credit and compensation payment once. Include only amounts due at closing; do not deduct expenses already paid before closing again.</p>
+  </div>;
+}
+
+function SellerAmountSummary({ price, costs, concessions }: { price: number | null; costs: SellerCostForm; concessions?: string }) {
+  if (!price) return <p className="text-sm text-ink/70">Enter a positive sale price to see the breakdown.</p>;
+  const calculation = sellerCalculation(price, costs, concessions);
+  if (!calculation.result) return <p role="status" className="text-sm text-hibiscus">Correct the invalid cost entries before relying on a total.</p>;
+  return <div className="mt-4" data-calculator="seller-summary">
+    <p className="text-sm font-semibold text-tide">{calculation.resultLabel}</p>
+    <p className="mt-1 font-display text-3xl text-tide">{sellerMoney(calculation.result.netAtClosing)}</p>
+    <p className="mt-3 text-xs leading-relaxed text-ink/75">{calculation.brokerage}. Buyer-broker funding: {calculation.funding}.</p>
+    <dl className="mt-4 divide-y divide-ink/10 text-sm">
+      <div className="flex justify-between gap-4 py-2"><dt>Sale price</dt><dd className="shrink-0">{sellerMoney(price)}</dd></div>
+      {calculation.rows.map(row => <div key={row.label} className="flex justify-between gap-4 py-2"><dt className="min-w-0">{row.label}</dt><dd className="shrink-0 text-right">{row.amount === null ? "Not entered" : `${row.kind === "charge" && row.amount !== 0 ? "−" : row.kind === "credit" && row.amount !== 0 ? "+" : ""}${sellerMoney(row.amount)}`}</dd></div>)}
+    </dl>
+    {calculation.missing.length > 0 && <div role="status" className="mt-4 rounded-sm border border-brass/40 bg-brass/10 p-3 text-xs leading-relaxed text-ink/80"><strong>Not a final proceeds figure.</strong> Still missing: {calculation.missing.join("; ")}. Unknown amounts are not zero.</div>}
+    {calculation.reserve !== null && <p className="mt-4 text-xs text-ink/75">After your optional {sellerMoney(calculation.reserve)} after-closing tax reserve: {sellerMoney(calculation.result.afterTaxReserve)}. This is separate from closing proceeds; income tax is not calculated.</p>}
+    {calculation.result.netAtClosing < 0 && <p className="mt-3 text-sm font-medium text-hibiscus">The entered costs exceed the sale price and credits. Additional seller funds may be needed.</p>}
+    <p className="mt-3 text-xs leading-relaxed text-ink/70">Estimate from entered assumptions, not a closing statement. Confirm payoffs, credits, compensation and all costs with your closing professional.</p>
   </div>;
 }
 
@@ -80,7 +116,7 @@ function ProceedsTool({ costs, setCosts }: { costs: SellerCostForm; setCosts: (c
   const report = buildSellerProceedsReport(prices, costs, property, notes);
   const ready = prices.some((raw) => (sellerNumber(raw) ?? 0) > 0) && errors.length === 0;
   return <>
-    <ToolIntro eyebrow="Seller proceeds" title="See what three sale prices could mean.">Compare sale-price scenarios using your actual payoff, negotiated fees and expected closing costs. The same cost assumptions carry into the offer comparison tab.</ToolIntro>
+    <ToolIntro eyebrow="Seller proceeds" title="See what three sale prices could mean.">Wondering what you might take home after selling? Enter up to three possible sale prices, your mortgage payoff and the costs you know. Blank costs are not counted, so this is only an estimate. You can reuse these costs when comparing offers.</ToolIntro>
     <div className="rounded-sm border border-ink/10 bg-white p-5 md:p-7">
       <Field label="Property address or private label (optional)" value={property} onChange={setProperty} />
       <div className="mt-5 grid gap-4 sm:grid-cols-3">{prices.map((price, index) => <Field key={index} label={`Scenario ${index + 1} sale price`} type="number" suffix="$" value={price} onChange={(value) => setPrices(prices.map((existing, position) => position === index ? value : existing))} />)}</div>
@@ -92,10 +128,8 @@ function ProceedsTool({ costs, setCosts }: { costs: SellerCostForm; setCosts: (c
     <div className="mt-6 grid gap-4 md:grid-cols-3">
       {prices.map((raw, index) => {
         const price = sellerNumber(raw);
-        const result = price && read.errors.length === 0 ? calculateSellerProceeds(price, read.costs) : null;
-        return <section key={index} className="rounded-sm bg-tide p-5 text-sand"><h3 className="font-mono text-xs uppercase tracking-[0.15em] text-brass">Scenario {index + 1}</h3>
-          <p className="mt-2 font-display text-2xl">{price ? sellerMoney(price) : "Enter a sale price"}</p>
-          {result ? <><dl className="mt-5 space-y-3 text-sm"><div className="flex justify-between gap-3"><dt className="text-sand/65">Entered deductions</dt><dd>{sellerMoney(result.charges)}</dd></div><div className="flex justify-between gap-3"><dt className="text-sand/65">Credits to seller</dt><dd>{sellerMoney(result.credits)}</dd></div><div className="border-t border-sand/20 pt-3"><dt className="text-sand/70">{read.missing.length ? "Proceeds before unentered items" : "Estimated net at closing"}</dt><dd className="mt-1 font-display text-3xl">{sellerMoney(result.netAtClosing)}</dd></div><div className="flex justify-between gap-3"><dt className="text-sand/65">After entered tax reserve</dt><dd>{sellerMoney(result.afterTaxReserve)}</dd></div></dl>{result.netAtClosing < 0 ? <p className="mt-4 text-xs text-sand/80">Entered deductions exceed the sale price and credits. Review the additional funds that may be needed.</p> : null}</> : <p className="mt-4 text-sm text-sand/65">Your calculation will appear after a positive price and valid cost amounts are entered.</p>}
+        return <section key={index} className="rounded-sm border border-tide/20 bg-white p-5 text-ink"><h3 className="font-mono text-xs uppercase tracking-[0.15em] text-hibiscus">Scenario {index + 1}</h3>
+          <SellerAmountSummary price={price} costs={costs} />
         </section>;
       })}
     </div>
@@ -121,7 +155,7 @@ function TimingTool() {
     return left.date.localeCompare(right.date);
   });
   return <>
-    <ToolIntro eyebrow="Two transactions, one plan" title="Put your sale and next purchase on a timeline.">Compare a sell-first or buy-first sequence using your own target dates and calendar-day assumptions. Use the gaps to identify questions before you make commitments.</ToolIntro>
+    <ToolIntro eyebrow="Two transactions, one plan" title="Put your sale and next purchase on a timeline.">Selling your current home and buying another? Choose which closing might happen first and enter your target dates. See where you may need temporary housing or carry two homes at once. These are planning dates, not confirmed contract deadlines.</ToolIntro>
     <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
       <div className="space-y-5 rounded-sm border border-ink/10 bg-white p-5 md:p-7">
         <Field label="Current property or private label (optional)" value={property} onChange={setProperty} />
@@ -137,7 +171,7 @@ function TimingTool() {
         <section className="rounded-sm bg-tide p-6 text-sand"><h3 className="font-display text-2xl">Your planning timeline</h3><ol className="mt-6 space-y-5">{stages.map((stage, index) => <li key={stage.label} className="flex gap-4"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brass/60 font-mono text-xs text-brass">{index + 1}</span><div><p className="text-sm text-sand/70">{stage.label}</p><p className="mt-1 font-medium">{stage.date ? sellerDate(stage.date) : "Add the relevant dates / durations"}</p></div></li>)}</ol>
           <div className="mt-6 border-t border-sand/20 pt-5"><p className="text-sm text-sand/65">{draft.mode === "sell-first" ? "Between closing dates" : "Ownership overlap between closings"}</p><p className="mt-1 font-display text-3xl">{plan.gapDays !== null && plan.gapDays >= 0 ? `${plan.gapDays} calendar days` : "Dates needed"}</p><p className="mt-3 text-sm">Entered gap / overlap cost: <strong>{plan.estimatedGapCost === null ? "Not calculated" : sellerMoney(plan.estimatedGapCost)}</strong></p></div>
         </section>
-        <div className="mt-5 rounded-sm border border-brass/35 bg-brass/10 p-5 text-sm leading-relaxed text-ink/75"><h3 className="font-medium text-tide">Before committing</h3><ul className="mt-3 list-disc space-y-2 pl-5"><li>Confirm when sale proceeds would be available for your next purchase.</li><li>Confirm possession and move-in arrangements separately from closing dates.</li><li>Review lending, contingencies and actual contract deadlines with your advisers.</li></ul>{draft.mode === "buy-first" && saleFunds === "Yes" ? <p className="mt-3 font-medium text-tide">Your plan uses sale proceeds after the proposed purchase. Ask your lender how that purchase would be funded before relying on this sequence.</p> : null}</div>
+        <div className="mt-5 rounded-sm border border-brass/35 bg-brass/10 p-5 text-sm leading-relaxed text-ink/75"><h3 className="font-medium text-tide">Before committing</h3><ul className="mt-3 list-disc space-y-1 pl-5"><li>Confirm when sale proceeds would be available for your next purchase.</li><li>Confirm possession and move-in arrangements separately from closing dates.</li><li>Review lending, contingencies and actual contract deadlines with your advisers.</li></ul>{draft.mode === "buy-first" && saleFunds === "Yes" ? <p className="mt-3 font-medium text-tide">Your plan uses sale proceeds after the proposed purchase. Ask your lender how that purchase would be funded before relying on this sequence.</p> : null}</div>
       </div>
     </div>
     <Errors items={plan.errors} />
@@ -161,10 +195,10 @@ function PreparationTool() {
   const report = ["PREPARE-TO-SELL REVIEW", `Property: ${property.trim() || "Not entered"}`, `Desired listing date: ${sellerDate(listingDate)}`, `Occupancy: ${occupancy}`, `Budget being considered: ${sellerAmountText(budget)}`, "", "OWNER-ENTERED WORKSHEET", ...items.map((item) => `${item.title}: ${item.status}. ${item.note.trim() || "No notes entered."}`), `Records already available: ${records.length ? records.join("; ") : "None selected"}`, `Questions for Roque: ${questions.trim() || "None entered"}`, "No repair recommendation, contractor quote or return on improvement is implied by this worksheet."].join("\n");
   const ready = errors.length === 0 && Boolean(property.trim() || questions.trim() || items.some((item) => item.status !== "Not reviewed" || item.note.trim()));
   return <>
-    <ToolIntro eyebrow="Before you spend" title="Prepare a useful conversation about preparing your home.">List the work you are considering, the records you have and the decisions you want help making. Roque can review the plan with you before you commit to projects.</ToolIntro>
+    <ToolIntro eyebrow="Before you spend" title="Prepare a useful conversation about preparing your home.">Not sure what to fix before listing? Note the repairs or updates you are considering, what documents you already have and any quotes you need. Talk with Roque before spending money on projects that may not help your sale.</ToolIntro>
     <div className="rounded-sm border border-ink/10 bg-white p-5 md:p-7">
       <div className="grid gap-5 sm:grid-cols-2"><Field label="Property address or private label" value={property} onChange={setProperty} /><Field label="Desired listing date (optional)" type="date" value={listingDate} onChange={setListingDate} /><Field label="Preparation budget being considered (optional)" type="number" suffix="$" value={budget} onChange={setBudget} /><Choice label="Current occupancy" value={occupancy} onChange={setOccupancy} options={["Not specified", "Owner occupied", "Vacant", "Tenant occupied"]} /></div>
-      <h3 className="mt-8 font-display text-2xl text-tide">Work to discuss</h3><p className="mt-2 text-sm leading-relaxed text-ink/60">Choose the status that describes your own plan. Add known conditions or an existing quote; these selections do not represent an inspection or recommendation.</p>
+      <h3 className="mt-8 font-display text-2xl text-tide">Work to discuss</h3><p className="mt-2 text-sm leading-relaxed text-ink/60">For each area, choose whether you are still considering work, need a quote, have finished it or do not plan to do it. Add notes to keep track. This does not replace an inspection or contractor advice.</p>
       <div className="mt-5 space-y-4">{items.map((item, index) => <fieldset key={item.title} className="rounded-sm border border-ink/10 p-4"><legend className="px-1 text-sm font-medium text-tide">{item.title}</legend><div className="grid gap-4 sm:grid-cols-[0.8fr_1.2fr]"><Choice label={`Plan for ${item.title.toLowerCase()}`} value={item.status} options={PREPARATION_STATUSES} onChange={(status) => setItems(items.map((current, position) => position === index ? { ...current, status } : current))} /><Field label="Known condition or question" maxLength={120} value={item.note} onChange={(note) => setItems(items.map((current, position) => position === index ? { ...current, note } : current))} /></div></fieldset>)}</div>
       <fieldset className="mt-7"><legend className="text-sm font-medium text-ink">Records you already have</legend><div className="mt-3 grid gap-3 sm:grid-cols-2">{PREPARATION_RECORDS.map((record) => <label key={record} className="flex items-start gap-3 text-sm text-ink/75"><input type="checkbox" checked={records.includes(record)} onChange={(event) => setRecords(event.target.checked ? [...records, record] : records.filter((item) => item !== record))} className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-tide)]" /><span>{record}</span></label>)}</div></fieldset>
       <div className="mt-6"><Notes label="What would you like Roque to help decide?" value={questions} onChange={setQuestions} maxLength={500} placeholder="For example, which projects deserve a quote before we decide how to prepare the home?" /></div>
@@ -193,13 +227,13 @@ function OffersTool({ costs, setCosts }: { costs: SellerCostForm; setCosts: (cos
   return <>
     <ToolIntro eyebrow="Offer decisions" title="Compare the terms behind each price.">Put up to three offers beside each other. Review proceeds, financing, contingencies and timing together; the worksheet does not select a winner.</ToolIntro>
     <div className="mb-6 grid gap-5 rounded-sm border border-ink/10 bg-white p-5 sm:grid-cols-[1fr_180px]"><Field label="Property address or private label (optional)" value={property} onChange={setProperty} /><label className="block text-sm font-medium text-ink">Offers to compare<select value={count} onChange={(event) => setCount(Number(event.target.value))} className={inputClass}><option value={1}>1 offer</option><option value={2}>2 offers</option><option value={3}>3 offers</option></select></label></div>
+    <section className="mb-6 rounded-sm border border-ink/10 bg-white p-5 md:p-7" aria-label="Fees and payoffs for every offer"><h3 className="font-display text-2xl text-tide">Fees and payoffs used for every offer</h3><p className="mb-6 mt-3 text-sm leading-relaxed text-ink/75">These inputs are shared with Sale proceeds. Enter each offer’s seller credit in its own card below. Nothing is added for a buyer-broker payment already included in another entered cost.</p><CostFields costs={costs} onChange={setCosts} offers /></section>
     <div className={`grid gap-5 ${count === 3 ? "lg:grid-cols-3" : count === 2 ? "lg:grid-cols-2" : "max-w-2xl"}`}>
       {active.map((offer, index) => {
         const price = sellerNumber(offer.price);
-        const concessions = sellerNumber(offer.concessions);
-        const result = price && read.errors.length === 0 && (!offer.concessions || concessions !== null) ? calculateSellerProceeds(price, { ...read.costs, sellerConcessions: concessions ?? 0 }) : null;
+
         return <section key={index} className="space-y-4 rounded-sm border border-tide/15 bg-white p-5"><h3 className="font-display text-2xl text-tide">Offer {index + 1}</h3><Field label="Private offer label" maxLength={40} value={offer.label} onChange={(value) => update(index, "label", value)} /><Field label="Purchase price" suffix="$" type="number" value={offer.price} onChange={(value) => update(index, "price", value)} /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2"><Field label="Seller concessions" suffix="$" type="number" value={offer.concessions} onChange={(value) => update(index, "concessions", value)} /><Field label="Deposit" suffix="$" type="number" value={offer.deposit} onChange={(value) => update(index, "deposit", value)} /></div>
-          <div className="rounded-sm bg-tide/5 p-4"><p className="text-xs text-ink/60">Net at closing from entered amounts</p><p className="mt-1 font-display text-2xl text-tide">{result ? sellerMoney(result.netAtClosing) : "Price / valid costs needed"}</p><p className="mt-2 text-xs leading-relaxed text-ink/60">{read.missing.length || !offer.concessions ? "Unentered common costs or offer concessions are excluded." : "Uses all entered common costs and this offer’s concessions."}</p></div>
+          <SellerAmountSummary price={price} costs={costs} concessions={offer.concessions} />
           <Choice label="Financing type" value={offer.financing} onChange={(value) => update(index, "financing", value)} options={["Not specified", "Cash", "Financed", "Other arrangement"]} />
           <Field label="Requested closing date" type="date" value={offer.closingDate} onChange={(value) => update(index, "closingDate", value)} />
           <Field label="Inspection terms / dates" maxLength={120} value={offer.inspection} onChange={(value) => update(index, "inspection", value)} />
@@ -211,7 +245,7 @@ function OffersTool({ costs, setCosts }: { costs: SellerCostForm; setCosts: (cos
       })}
     </div>
     <p className="mt-5 text-sm leading-relaxed text-ink/65">A deposit is part of the purchase price and is shown for comparison; it is not deducted from proceeds a second time. Record the actual contract terms and have your broker or legal adviser resolve unclear provisions.</p>
-    <details className="mt-6 rounded-sm border border-ink/10 bg-white p-5 md:p-7"><summary className="cursor-pointer font-display text-2xl text-tide">Review the common fee and payoff assumptions</summary><p className="mb-6 mt-3 text-sm leading-relaxed text-ink/65">These inputs are shared with Sale proceeds. Each offer’s concession amount replaces the concession entered in that worksheet. {read.missing.length} common inputs are currently unentered.</p><CostFields costs={costs} onChange={setCosts} offers /></details>
+
     <div className="mt-6"><Notes label="What tradeoffs or unanswered questions matter to you?" maxLength={300} value={notes} onChange={setNotes} /></div>
     <Errors items={errors} />
     <WorksheetReport title="Seller offer comparison" report={report} formName="planning-seller-offers" ready={active.some((offer) => (sellerNumber(offer.price) ?? 0) > 0) && errors.length === 0} hint="Enter at least one offer price and correct invalid amounts to save or send the comparison. Unentered terms and costs remain marked in the report." />
@@ -256,7 +290,7 @@ function ProgressReportTool() {
   ].join("\n");
   const ready = errors.length === 0 && Boolean(property.trim() || preparedBy.trim() || Object.values(metrics).some((value) => value.trim()) || Object.values(notes).some((value) => value.trim()));
   return <>
-    <ToolIntro eyebrow="Keep sellers informed" title="Create a clear weekly progress report.">Record the work completed, the activity you can substantiate and the next decisions. Every number and observation is entered by you; the report begins with no assumed results.</ToolIntro>
+    <ToolIntro eyebrow="Keep sellers informed" title="Create a clear weekly progress report.">Use this to make a simple weekly update about a home listed for sale. Enter only actual marketing work, showing requests, feedback and next steps. Nothing is filled in automatically; check the information before sharing it.</ToolIntro>
     <div className="rounded-sm border border-ink/10 bg-white p-5 md:p-7">
       <div className="grid gap-5 sm:grid-cols-2"><Field label="Property address or private label" value={property} onChange={setProperty} /><Field label="Prepared by (optional)" maxLength={80} value={preparedBy} onChange={setPreparedBy} /><Field label="Reporting period begins" type="date" value={start} onChange={setStart} /><Field label="Reporting period ends" type="date" value={end} onChange={setEnd} /><Field label="Asking price for this report (optional)" suffix="$" type="number" value={price} onChange={setPrice} /></div>
       <h3 className="mt-8 font-display text-2xl text-tide">Recorded activity</h3><p className="mt-2 text-sm leading-relaxed text-ink/60">Enter 0 only if you have confirmed none occurred. Leave a field blank when its count is unknown. Keep online views separate from actual showing activity.</p>

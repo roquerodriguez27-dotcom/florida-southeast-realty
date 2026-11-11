@@ -42,7 +42,7 @@ export default function HomeownerCalendar() {
     <section id="calendar" aria-labelledby="owner-calendar-title" className="scroll-mt-28 rounded-sm border border-tide/15 bg-white p-5 sm:p-8">
       <p className="font-mono text-xs uppercase tracking-[0.16em] text-hibiscus">Keep the next steps visible</p>
       <h2 id="owner-calendar-title" className="mt-2 font-display text-3xl text-tide">Build your homeowner calendar</h2>
-      <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ink/70">Choose the dates you want to keep. The 2027 filing date comes from the county’s annual calendar; insurance and maintenance dates come from you.</p>
+      <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ink/70">Keep track of important homeownership dates. Choose whether to include the official 2027 Palm Beach County homestead filing deadline, then add your own insurance renewal or maintenance reminders. This downloads a calendar file; it does not automatically send alerts.</p>
 
       <fieldset className="mt-6 rounded-sm bg-keystone/60 p-4 sm:p-5">
         <legend className="px-1 text-sm font-semibold text-tide">Official Palm Beach County date</legend>
@@ -54,7 +54,7 @@ export default function HomeownerCalendar() {
       </fieldset>
 
       <fieldset className="mt-6">
-        <legend className="text-sm font-semibold text-tide">Your dates · optional</legend>
+        <legend className="text-sm font-semibold text-tide">Add your own reminders (optional)</legend>
         <div className="mt-3 grid gap-5 sm:grid-cols-2">
           <div>
             <label htmlFor="owner-insurance-date" className="text-sm font-medium text-ink">Insurance renewal or review date</label>
@@ -67,7 +67,7 @@ export default function HomeownerCalendar() {
             <p id="owner-maintenance-help" className="mt-2 text-xs leading-relaxed text-ink/60">Choose a date for work you plan to arrange; this does not book a contractor.</p>
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="owner-maintenance-title" className="text-sm font-medium text-ink">Maintenance label</label>
+            <label htmlFor="owner-maintenance-title" className="text-sm font-medium text-ink">What needs to be done?</label>
             <input id="owner-maintenance-title" type="text" value={maintenanceTitle} onChange={(event) => { setMaintenanceTitle(event.target.value); setMessage(""); }} maxLength={120} placeholder="For example, review roof and gutter maintenance" className={inputClass} aria-describedby="owner-label-help" />
             <p id="owner-label-help" className="mt-2 text-xs text-ink/60">Keep policy numbers, access codes and other sensitive details out of the label.</p>
           </div>

@@ -15,8 +15,8 @@ export default function OwnerPlanningPage() {
       <section className="container-fsre pb-10 pt-32 sm:pb-14">
         <Link href="/planning" className="text-sm text-tide underline underline-offset-4">Your planning workspace</Link>
         <p className="mt-7 font-mono text-xs uppercase tracking-[0.18em] text-hibiscus">Own with a plan</p>
-        <h1 className="mt-3 max-w-4xl font-display text-4xl leading-tight text-tide sm:text-5xl">A few dates. Better records. Fewer loose ends.</h1>
-        <p className="mt-5 max-w-3xl text-lg leading-relaxed text-ink/70">Build a calendar you can keep, review the documents behind your ownership costs, and go straight to the county offices that handle your property records.</p>
+        <h1 className="mt-3 max-w-4xl font-display text-4xl leading-tight text-tide sm:text-5xl">Stay organized after you buy your home.</h1>
+        <p className="mt-5 max-w-3xl text-lg leading-relaxed text-ink/70">Set reminders for insurance, maintenance and tax-related deadlines. Find official resources for property records and homeownership questions, without having to search for them yourself.</p>
         <div className="mt-6 flex flex-wrap gap-4 text-sm">
           <a href="#calendar" className="rounded-sm bg-tide px-5 py-3 font-medium text-white">Build my calendar</a>
           <Link href="/research/homeowner-updates" className="px-1 py-3 text-tide underline underline-offset-4">Read Florida Homeowner Updates</Link>
@@ -44,7 +44,7 @@ export default function OwnerPlanningPage() {
         </section>
 
         <section className="mt-12 border-t border-ink/15 pt-8" aria-labelledby="owner-records-title">
-          <h2 id="owner-records-title" className="font-display text-3xl text-tide">Keep the notice with the deadline</h2>
+          <h2 id="owner-records-title" className="font-display text-3xl text-tide">Keep important home documents together</h2>
           <div className="mt-5 grid gap-5 md:grid-cols-3">
             <div><h3 className="font-semibold text-tide">Property taxes</h3><p className="mt-2 text-sm leading-relaxed text-ink/70">Keep your TRIM notice, exemption correspondence and tax bill together. Check the actual notice for the applicable appeal or payment deadline.</p></div>
             <div><h3 className="font-semibold text-tide">Insurance</h3><p className="mt-2 text-sm leading-relaxed text-ink/70">Keep declarations, renewal terms, inspection requests and agent contact information. Confirm when you need to act before the policy renews.</p></div>

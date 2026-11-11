@@ -67,6 +67,60 @@ export default async function BuyerToolsPage({ searchParams }: Props) {
         <BuyerTools initialListing={initialListing} initialTool={tool} />
       </section>
 
+      <section className="container-fsre mt-10" aria-labelledby="official-property-tax-estimators">
+        <div className="rounded-sm border border-tide/15 bg-white p-6 md:p-8">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-hibiscus">Official county resources</p>
+          <h2 id="official-property-tax-estimators" className="mt-2 font-display text-2xl md:text-3xl text-ink">
+            Estimate property taxes after a purchase
+          </h2>
+          <p className="mt-3 max-w-4xl text-sm leading-relaxed text-ink/70">
+            The seller’s current tax bill may not reflect what you pay after purchasing a home.
+            For a more informed monthly-cost plan, use the property appraiser’s official tool
+            for the county where the home is located. These open on county websites.
+          </p>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {[
+              {
+                county: "Palm Beach County",
+                href: "https://pbcpao.gov/Property/TaxCalculator",
+                note: "Search by property address or parcel number, then estimate with your planned purchase price and homestead status.",
+              },
+              {
+                county: "Broward County",
+                href: "https://web.bcpa.net/BcpaClient/TaxEst.aspx",
+                note: "Enter a prospective purchase price and applicable exemptions. A specific property record may give a more tailored estimate.",
+              },
+              {
+                county: "Miami-Dade County",
+                href: "https://apps.miamidadepa.gov/PAOnlineTools/Taxes/TaxEstimator.aspx",
+                note: "Estimate using county tax rates and review the effects of a sale, homestead eligibility and assessments.",
+              },
+            ].map((county) => (
+              <a
+                key={county.county}
+                href={county.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group rounded-sm border border-ink/10 p-5 transition-colors hover:border-tide/40 hover:bg-keystone/40"
+              >
+                <h3 className="font-display text-lg text-tide">{county.county}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink/65">{county.note}</p>
+                <span className="mt-4 inline-block text-sm font-medium text-tide underline underline-offset-4">
+                  Open official tax estimator
+                </span>
+              </a>
+            ))}
+          </div>
+          <p className="mt-5 text-xs leading-relaxed text-ink/60">
+            County estimates are for planning, not a guaranteed future tax bill. Assessed value
+            can reset following a sale; tax rates, exemptions, eligibility, portability and
+            non-ad valorem assessments may change the total. Confirm the specific property
+            and intended tax year with the county property appraiser. Future-year or
+            Amendment 3 scenarios must not be treated as certified tax bills.
+          </p>
+        </div>
+      </section>
+
       <section className="container-fsre mt-10" aria-label="Next step">
         <div className="rounded-sm border border-tide/15 bg-keystone p-6 md:p-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="max-w-2xl">

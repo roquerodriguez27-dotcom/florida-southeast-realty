@@ -38,7 +38,8 @@ export async function POST(request: Request) {
     const customerEmailConfigured = Boolean(process.env.RESEND_API_KEY?.trim());
     const supabase = createSupabasePublicClient();
     const { data: pendingIdx, error } = await supabase.rpc("capture_saved_search", {
-      p_full_name: displayName,
+      // Keep an omitted name distinct from the notification's display fallback.
+      p_full_name: fullName || null,
       p_email: email,
       p_phone: phone || null,
       p_frequency: frequency,

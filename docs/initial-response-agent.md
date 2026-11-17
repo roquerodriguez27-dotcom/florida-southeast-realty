@@ -23,11 +23,13 @@ The public preferences link requires an explicit submission. It stops inquiry fo
 1. Run the focused draft, delivery, UI, alert and database suites, lint, type checking, production build and existing browser CI.
 2. Apply the additive migration before deploying the app. It creates the separate Vault credential but does not register a schedule.
 3. Verify the protected preview with a synthetic owner inquiry. Keep real customer records out of QA. Test the actual model path separately from mocked model tests.
-4. Sign into the private CRM as an existing broker. Use **Create a test reply draft**, review it, then **Approve and send test**. Check the matching message in that broker inbox independently of the provider response.
+4. Apply the additive owner-test-actions migration, then sign into the private CRM as an existing broker. **Create a test reply draft** claims only that broker's exact test and drafts synchronously on the current app origin. It uses the same daily budget and per-job lease checks without exporting the scheduler credential or invoking the production dispatcher. Confirm whether the draft used AI or the labeled template fallback, review it, then **Approve and send test**. Check the matching message in that broker inbox independently of the provider response.
 5. Use **Email me a test listing alert** once. It uses a current live listing and the existing subscriber template path, labels the sample, and creates no subscription. This proves template delivery; mocked change-detection tests separately exercise new-match, price-change and return-to-market logic.
 6. Only after the worker release is verified, schedule `crm_private.dispatch_followup_worker()` through the existing database scheduler. The function claims one row and never sends an email. A five-minute pilot schedule keeps the 25-claim daily cap.
 
 Use `cron.job` to check for an existing matching job before registering it. Pause the matching job to stop background drafting; this does not delete leads or drafts. Never retrieve the raw Vault credential for browser or client use.
+
+`crm_private.dispatch_followup_worker()` deliberately targets the production domain. Do not invoke it to test a preview. Owner-test claim/complete/fail RPCs require the active broker, an owned `test_mode` row, the exact generation token and draft version; they cannot claim customer inquiries or send messages. The normal production worker and send paths are unchanged.
 
 ## Focused checks
 

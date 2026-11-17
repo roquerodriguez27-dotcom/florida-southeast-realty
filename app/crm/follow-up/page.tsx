@@ -7,6 +7,7 @@ import { createFollowUpTest, sendListingAlertTest, stopFollowUp } from "./action
 
 export const metadata = { title: "Reply drafts | Broker CRM", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 const NOTICES: Record<string, string> = {
   saved: "Draft saved. Review the saved version before sending.",
@@ -20,7 +21,10 @@ const NOTICES: Record<string, string> = {
   send_check_required: "The send result is uncertain. Check the email service or inbox before taking any further action; do not send a duplicate.",
   suppressed: "Inquiry follow-up emails are stopped for this email address, including future inquiries.",
   stopped: "The contact status was saved and pending work was paused or stopped. An email that was already requested may still arrive.",
-  test_queued: "A clearly labeled test inquiry was queued for your brokerage email. The scheduled worker will prepare its draft.",
+  test_ready: "Your labeled test draft is ready to review. Check whether it used AI or the template fallback, then review and approve it to send one test email.",
+  test_pending: "Your test has pending work or is not ready to retry yet. Refresh the queue to check its current status.",
+  test_daily_limit: "The daily drafting limit has been reached. Your test is saved, but no new draft was generated.",
+  test_draft_unavailable: "The test draft could not be confirmed. Refresh the queue to check its status before trying again. No email was sent by this check.",
   alert_test_accepted: "The email service accepted a TEST ONLY listing-alert sample for your brokerage inbox. Check your inbox to confirm receipt. No subscription was created.",
   alert_test_already_requested: "A listing-alert sample has already been requested today. Check your brokerage inbox for the TEST ONLY sample; another copy has not been sent.",
   alert_test_unavailable: "The listing-alert sample could not be confirmed. Check live listing availability and email delivery before trying again.",
@@ -76,7 +80,7 @@ export default async function FollowUpPage({ searchParams }: { searchParams: Pro
               <p className="mt-4 rounded-sm bg-keystone p-3 text-sm font-medium">{FOLLOW_UP_LABELS[selected.state]}</p>
               <details className="mt-5 rounded-sm border border-ink/15 p-4" open><summary className="cursor-pointer text-sm font-semibold">Original inquiry</summary>{selected.source_snapshot.property_interest && <p className="mt-3 break-words text-sm">{selected.source_snapshot.property_interest}</p>}<p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-ink/70">{selected.source_snapshot.message || "No message was supplied. Open the lead record for submitted preferences."}</p></details>
               {selected.draft_mode && <p className="mt-5 text-xs leading-5 text-ink/65">{selected.draft_mode === "ai" ? "AI draft — check its wording and facts against the inquiry." : selected.draft_mode === "template" ? "Template draft — AI drafting was unavailable or the inquiry needed direct staff review. Personalize this reply before sending." : "Manually edited draft — review the saved wording before sending."}</p>}
-              {followUpCanEdit(selected.state) ? <FollowUpEditor key={`${selected.id}:${selected.draft_version}`} id={selected.id} version={selected.draft_version} initialSubject={selected.draft_subject || ""} initialBody={selected.draft_body || ""} canSend={selected.state === "review"} recipient={selected.recipient_email} testMode={selected.test_mode} /> : selected.draft_body ? <div className="mt-4 rounded-sm border border-ink/10 p-4"><h3 className="text-sm font-semibold">{selected.draft_subject}</h3><p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">{selected.draft_body}</p></div> : <p className="mt-4 text-sm leading-6 text-ink/65">The agent checks for pending drafts on its schedule. Refresh this page to see the latest result.</p>}
+              {followUpCanEdit(selected.state) ? <FollowUpEditor key={`${selected.id}:${selected.draft_version}`} id={selected.id} version={selected.draft_version} initialSubject={selected.draft_subject || ""} initialBody={selected.draft_body || ""} canSend={selected.state === "review"} recipient={selected.recipient_email} testMode={selected.test_mode} /> : selected.draft_body ? <div className="mt-4 rounded-sm border border-ink/10 p-4"><h3 className="text-sm font-semibold">{selected.draft_subject}</h3><p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">{selected.draft_body}</p></div> : <p className="mt-4 text-sm leading-6 text-ink/65">{selected.test_mode ? "The owner test prepares its draft when you create it. Refresh the queue to check its status; an unfinished test can be retried from Owner-only checks when its current attempt has ended." : "The agent checks for pending drafts on its schedule. Refresh this page to see the latest result."}</p>}
               {selected.accepted_at && <p className="mt-4 text-sm leading-6 text-ink/65">Approved by {selected.approved_by} at {date(selected.approved_at)}. The email service accepted the request at {date(selected.accepted_at)}. Inbox delivery and replies have not been automatically verified.</p>}
               {(["delivery_unknown", "sending"] as string[]).includes(selected.state) && <p role="alert" className="mt-4 text-sm leading-6 text-hibiscus">Check the email service or recipient’s inbox before sending anything else. This entry cannot be resent while its result is uncertain.</p>}
               {selected.stop_reason && <p className="mt-4 text-sm text-ink/65">Stop reason: {selected.stop_reason.replaceAll("_", " ")}</p>}

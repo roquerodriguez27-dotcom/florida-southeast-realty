@@ -13,9 +13,18 @@ let notifications = 0;
 let authenticated = 0;
 const updates = [];
 const activities = [];
+const outcomeRpcCalls = [];
+const revalidatedPaths = [];
+let outcomeRpcResult = { data: { ok: true }, error: null };
 let taskSnapshot = { id: 3, lead_id: 9, title: "Synthetic reminder", completed_at: null, automation_key: null, due_at: null };
 let taskRescheduledDuringUpdate = false;
-const crmClient = { from(table) {
+const crmClient = {
+  async rpc(name, args) {
+    assert.equal(name,"record_followup_outcome","Contact outcomes use the atomic database operation");
+    outcomeRpcCalls.push({ name, args: { ...args } });
+    return outcomeRpcResult;
+  },
+  from(table) {
   let mode = "select", value;
   const filters = [];
   const query = {
@@ -30,7 +39,7 @@ const crmClient = { from(table) {
 const mocks = {
   "server-only": {},
   "next/server": { NextResponse: { json: (value, options) => Response.json(value, options) } },
-  "next/cache": { revalidatePath() {} },
+  "next/cache": { revalidatePath(value) { revalidatedPaths.push(value); } },
   "next/navigation": { redirect() { throw new Error("Unexpected redirect"); } },
   "@/lib/crm/auth": { requireCrmUser: async () => { authenticated++; return { email: "fixture@example.test" }; }, requireCrmBroker: async () => { throw new Error("Unexpected broker action"); } },
   "@/lib/supabase/server": { createSupabaseServerClient: async () => crmClient },
@@ -102,11 +111,50 @@ assert.equal(updates.length,1,"Completing a task only updates the task");
 assert.equal(updates[0].table,"crm_tasks");
 assert.ok(!("last_contacted_at" in updates[0].payload));
 const outcomeForm = new FormData();for (const [key,value] of Object.entries({leadId:"9",outcome:"attempted",channel:"call",confirmed:"yes"})) outcomeForm.set(key,value);
+let outcomeRevalidationStart = revalidatedPaths.length;
 await actions.recordContactOutcome(outcomeForm);
-assert.equal(updates.length,1,"An unanswered attempt does not advance contact date");
-outcomeForm.set("outcome","conversation");await actions.recordContactOutcome(outcomeForm);
-assert.equal(updates.at(-1).table,"crm_leads");assert.ok(updates.at(-1).payload.last_contacted_at);
+assert.deepEqual(outcomeRpcCalls[0],{
+  name:"record_followup_outcome", args:{ p_lead_id:9,p_outcome:"attempted",p_channel:"call",p_note:"" },
+});
+assert.deepEqual(revalidatedPaths.slice(outcomeRevalidationStart),["/crm","/crm/outcomes","/crm/follow-up"]);
+assert.equal(updates.length,1,"An outcome does not make a separate non-atomic contact-date update");
+outcomeForm.set("outcome","conversation");outcomeForm.set("note","  The client replied.  ");
+outcomeRevalidationStart = revalidatedPaths.length;
+await actions.recordContactOutcome(outcomeForm);
+assert.deepEqual(outcomeRpcCalls[1],{
+  name:"record_followup_outcome", args:{ p_lead_id:9,p_outcome:"conversation",p_channel:"call",p_note:"The client replied." },
+});
+assert.equal(updates.length,1,"The database owns contact timestamps and follow-up pause transitions together");
+assert.deepEqual(revalidatedPaths.slice(outcomeRevalidationStart),["/crm","/crm/outcomes","/crm/follow-up"]);
 assert.equal(authenticated,3,"Each contact action authenticates independently");
+
+// Unconfirmed or invalid outcomes cannot reach persistence or refresh success views.
+const validatedRpcCount = outcomeRpcCalls.length;
+outcomeRevalidationStart = revalidatedPaths.length;
+outcomeForm.set("confirmed","no");
+await assert.rejects(() => actions.recordContactOutcome(outcomeForm),/Confirm the outcome actually occurred/);
+outcomeForm.set("confirmed","yes");outcomeForm.set("outcome","not-an-outcome");
+await assert.rejects(() => actions.recordContactOutcome(outcomeForm));
+outcomeForm.set("outcome","conversation");outcomeForm.set("channel","not-a-channel");
+await assert.rejects(() => actions.recordContactOutcome(outcomeForm));
+outcomeForm.set("channel","call");
+assert.equal(outcomeRpcCalls.length,validatedRpcCount);
+assert.equal(revalidatedPaths.length,outcomeRevalidationStart);
+
+// A rejected or unacknowledged database mutation must not be reported as saved.
+for (const result of [
+  { data:null,error:{ code:"fixture_failure" } },
+  { data:{ ok:false },error:null },
+  { data:null,error:null },
+]) {
+  outcomeRpcResult = result;
+  const before = outcomeRpcCalls.length;
+  await assert.rejects(() => actions.recordContactOutcome(outcomeForm),/contact outcome could not be saved/);
+  assert.equal(outcomeRpcCalls.length,before + 1);
+  assert.equal(revalidatedPaths.length,outcomeRevalidationStart,"Failed outcomes do not refresh success views");
+  assert.equal(updates.length,1,"Failed RPCs do not fall back to separate CRM writes");
+}
+outcomeRpcResult = { data:{ ok:true },error:null };
 
 // A completed automatic reminder clears only its matching date, never a conversation timestamp.
 taskSnapshot = { ...taskSnapshot, automation_key:"lead_follow_up", due_at:"2026-11-10T12:00:00+00:00" };

@@ -11,6 +11,7 @@ const workerToken = 'isolated-followup-contract-test-token';
 const broker = 'broker@qa.localhost';
 const agent = 'agent@qa.localhost';
 const inactiveBroker = 'inactive@qa.localhost';
+const otherBroker = 'other-broker@qa.localhost';
 const subject = 'About your property inquiry';
 const body = 'Thank you for your inquiry. What time would work for a conversation?';
 
@@ -107,10 +108,12 @@ test('initial-response database permissions and state transitions', async (t) =>
     ]) await db.exec(await readFile(new URL(filename, migrationRoot), 'utf8'));
     await sql('INSERT INTO vault.secrets(name,secret) VALUES($1,$2)', ['fsr_followup_worker_token', workerToken]);
     await sql(`INSERT INTO public.crm_users(email,display_name,role,active) VALUES
-      ($1,'Fixture Broker','broker',true),($2,'Fixture Agent','agent',true),($3,'Inactive Broker','broker',false)`,
-    [broker, agent, inactiveBroker]);
+      ($1,'Fixture Broker','broker',true),($2,'Fixture Agent','agent',true),($3,'Inactive Broker','broker',false),
+      ($4,'Other Fixture Broker','broker',true)`,
+    [broker, agent, inactiveBroker, otherBroker]);
     const historical = await lead({ email: 'historical@fixture.localhost' });
     await db.exec(await readFile(new URL('20261117034507_add_reviewed_initial_followups.sql', migrationRoot), 'utf8'));
+    await db.exec(await readFile(new URL('20261117045348_add_owner_test_draft_actions.sql', migrationRoot), 'utf8'));
 
     await t.test('no backfill; only explicitly consented supported new inquiries are queued', async () => {
       assert.equal(await jobFor(historical.id), undefined);
@@ -305,6 +308,100 @@ test('initial-response database permissions and state transitions', async (t) =>
       await owner('record_followup_send_result', [job.id, send.send_attempt_token, 'accepted', 'provider-owner-fixture', null]);
     });
 
+    await t.test('owner-test drafting is restricted to the exact owned test, leaving older customer work untouched', async () => {
+      const customer = await lead();
+      const customerJob = await jobFor(customer.id);
+      const fixture = await owner('create_followup_test');
+      const other = await as('authenticated', otherBroker, () => rpc('create_followup_test'));
+      const claimArgs = [fixture.id];
+      const completeArgs = [fixture.id, '00000000-0000-0000-0000-000000000099', 0, subject, body, 'template', null];
+      const failureArgs = [fixture.id, completeArgs[1], 0, 'Fixture failure'];
+      for (const [name, args] of [
+        ['claim_followup_test_draft', claimArgs], ['complete_followup_test_draft', completeArgs],
+        ['fail_followup_test_draft', failureArgs],
+      ]) {
+        await denied(() => as('anon', null, () => rpc(name, args)));
+        await denied(() => as('authenticated', agent, () => rpc(name, args)));
+        await denied(() => as('authenticated', inactiveBroker, () => rpc(name, args)));
+      }
+      assert.equal((await owner('claim_followup_test_draft', [customerJob.id])).reason, 'not_found');
+      assert.equal((await owner('claim_followup_test_draft', [other.id])).reason, 'not_found');
+      assert.equal((await as('authenticated', otherBroker, () => rpc('claim_followup_test_draft', claimArgs))).reason, 'not_found');
+      const claim = await owner('claim_followup_test_draft', claimArgs);
+      assert.equal(claim.id, fixture.id);
+      assert.equal(claim.test_mode, true);
+      assert.equal(claim.draft_version, 0);
+      assert.equal(JSON.stringify(claim).includes(workerToken), false);
+      assert.equal((await owner('claim_followup_test_draft', claimArgs)).reason, 'not_pending');
+      assert.equal((await jobById(fixture.id)).generation_attempts, 1);
+      assert.equal((await jobById(customerJob.id)).state, 'queued');
+      assert.equal((await jobById(customerJob.id)).generation_attempts, 0);
+      const exactComplete = [fixture.id, claim.generation_token, 0, subject, body, 'ai', 'fixture-model'];
+      const exactFail = [fixture.id, claim.generation_token, 0, 'Fixture failure'];
+      assert.equal((await as('authenticated', otherBroker, () => rpc('complete_followup_test_draft', exactComplete))).reason, 'not_found');
+      assert.equal((await as('authenticated', otherBroker, () => rpc('fail_followup_test_draft', exactFail))).reason, 'not_found');
+      assert.equal((await owner('complete_followup_test_draft', [customerJob.id, ...exactComplete.slice(1)])).reason, 'not_found');
+      assert.equal((await owner('fail_followup_test_draft', [customerJob.id, ...exactFail.slice(1)])).reason, 'not_found');
+      assert.equal((await owner('complete_followup_test_draft', completeArgs)).reason, 'stale_claim');
+      assert.equal((await owner('complete_followup_test_draft', [fixture.id, claim.generation_token, 1, subject, body, 'ai', 'fixture-model'])).reason, 'stale_claim');
+      assert.deepEqual(await owner('complete_followup_test_draft', exactComplete), { ok: true, version: 1 });
+      assert.equal((await owner('claim_followup_test_draft', claimArgs)).reason, 'already_ready');
+      assert.equal((await owner('fail_followup_test_draft', exactFail)).reason, 'stale_claim');
+      const job = await jobById(fixture.id);
+      assert.equal(job.state, 'review');
+      assert.equal(job.draft_mode, 'ai');
+      assert.ok(job.draft_subject.startsWith('TEST ONLY: '));
+      assert.equal(job.send_attempt_number, 0);
+      assert.equal((await sql("SELECT actor FROM crm_private.followup_events WHERE followup_id=$1 AND event='owner_test_draft_claimed'", [fixture.id]))[0].actor, broker);
+      await owner('pause_or_stop_followup', [fixture.id, 'not_relevant', true]);
+      await owner('pause_or_stop_followup', [customerJob.id, 'not_relevant', true]);
+      await as('authenticated', otherBroker, () => rpc('pause_or_stop_followup', [other.id, 'not_relevant', true]));
+    });
+
+    await t.test('owner-test completion cannot outlive consent, recipient or broker access changes', async () => {
+      for (const change of ['consent', 'recipient', 'broker']) {
+        const fixture = await owner('create_followup_test');
+        const claim = await owner('claim_followup_test_draft', [fixture.id]);
+        assert.equal(claim.claimed, true);
+        const args = [fixture.id, claim.generation_token, 0, subject, body, 'template', null];
+        if (change === 'consent') await sql('UPDATE public.crm_leads SET consent=false WHERE id=$1', [fixture.lead_id]);
+        if (change === 'recipient') await sql('UPDATE public.crm_leads SET email=$1 WHERE id=$2', [otherBroker, fixture.lead_id]);
+        if (change === 'broker') {
+          await sql('UPDATE public.crm_users SET active=false WHERE email=$1', [broker]);
+          await denied(() => owner('complete_followup_test_draft', args));
+          await denied(() => owner('fail_followup_test_draft', [fixture.id, claim.generation_token, 0, 'Fixture failure']));
+          await sql('UPDATE public.crm_users SET active=true WHERE email=$1', [broker]);
+          await owner('pause_or_stop_followup', [fixture.id, 'not_relevant', true]);
+        } else {
+          assert.equal((await owner('complete_followup_test_draft', args)).reason, 'stale_claim');
+        }
+        const current = await jobById(fixture.id);
+        assert.equal(current.state, 'stopped');
+        assert.equal(current.draft_version, 0);
+        assert.equal(current.send_attempt_number, 0);
+      }
+    });
+
+    await t.test('owner-test leases fence expired results and retry only the same test within attempt limits', async () => {
+      const fixture = await owner('create_followup_test');
+      const first = await owner('claim_followup_test_draft', [fixture.id]);
+      await sql("UPDATE public.crm_followups SET lease_expires_at=now()-interval '1 minute' WHERE id=$1", [fixture.id]);
+      assert.equal((await owner('complete_followup_test_draft', [fixture.id, first.generation_token, 0, subject, body, 'template', null])).reason, 'stale_claim');
+      const second = await owner('claim_followup_test_draft', [fixture.id]);
+      assert.equal(second.claimed, true);
+      assert.notEqual(second.generation_token, first.generation_token);
+      assert.equal((await owner('fail_followup_test_draft', [fixture.id, first.generation_token, 0, 'Stale failure'])).reason, 'stale_claim');
+      assert.equal((await owner('fail_followup_test_draft', [fixture.id, second.generation_token, 1, 'Wrong version'])).reason, 'stale_claim');
+      assert.equal((await owner('fail_followup_test_draft', [fixture.id, second.generation_token, 0, 'Fixture failure'])).state, 'queued');
+      assert.equal((await owner('claim_followup_test_draft', [fixture.id])).reason, 'not_pending');
+      await sql("UPDATE public.crm_followups SET next_attempt_at=now()-interval '1 minute' WHERE id=$1", [fixture.id]);
+      const third = await owner('claim_followup_test_draft', [fixture.id]);
+      assert.equal(third.claimed, true);
+      assert.equal((await owner('fail_followup_test_draft', [fixture.id, third.generation_token, 0, 'Fixture failure'])).state, 'draft_failed');
+      assert.equal((await owner('claim_followup_test_draft', [fixture.id])).reason, 'not_pending');
+      assert.equal((await jobById(fixture.id)).generation_attempts, 3);
+    });
+
     await t.test('missing send results become unknown, never a new attempt', async () => {
       const { job } = await reviewed();
       const send = await owner('prepare_followup_send', [job.id, 1]);
@@ -324,6 +421,10 @@ test('initial-response database permissions and state transitions', async (t) =>
       assert.equal((await worker('claim_followup_draft')).id, (await jobFor(first.id)).id);
       assert.deepEqual(await worker('claim_followup_draft'), { claimed: false, reason: 'daily_limit' });
       assert.equal((await jobFor(second.id)).state, 'queued');
+      const fixture = await owner('create_followup_test');
+      assert.deepEqual(await owner('claim_followup_test_draft', [fixture.id]), { claimed: false, reason: 'daily_limit' });
+      assert.equal((await jobById(fixture.id)).state, 'queued');
+      assert.equal((await jobById(fixture.id)).generation_attempts, 0);
       assert.equal((await sql("SELECT claims FROM crm_private.followup_daily_budget WHERE day=(now() at time zone 'UTC')::date"))[0].claims, 25);
       assert.equal((await sql('SELECT count(*)::int AS n FROM net.test_http_calls'))[0].n, 0);
     });

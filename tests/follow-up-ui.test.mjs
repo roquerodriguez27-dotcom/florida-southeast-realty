@@ -109,6 +109,22 @@ test("untrusted notice keys do not access object prototypes or crash the broker 
   }
 });
 
+test("owner-test notices distinguish draft readiness, pending work, and failure without claiming an email or scheduled preview worker", async () => {
+  for (const [notice, expected] of [
+    ["test_ready", /Check whether it used AI or the template fallback/],
+    ["test_pending", /pending work or is not ready to retry/],
+    ["test_daily_limit", /no new draft was generated/],
+    ["test_draft_unavailable", /No email was sent by this check/],
+  ]) {
+    const h = crmHarness({ rows: [entry({ state: "queued", test_mode: true, draft_body: null, draft_subject: null })] });
+    const html = await h.render({ id: ID, notice });
+    assert.match(html, expected);
+    assert.match(html, /The owner test prepares its draft when you create it/);
+    assert.doesNotMatch(html, /The scheduled worker will prepare|The agent checks for pending drafts on its schedule/);
+    assert.equal(h.actions.length, 0);
+  }
+});
+
 test("the pending queue is filtered in the database before the 100-row limit", async () => {
   const rows = Array.from({ length: 105 }, (_, index) => entry({
     id: `accepted-${index}`, state: "accepted", created_at: "2026-11-17T04:00:00.000Z",

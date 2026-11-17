@@ -276,3 +276,14 @@ test("a failed public preference change does not claim success and offers recove
   assert.doesNotMatch(html, /has been processed|role="status"/);
   assert.equal(h.actions.length, 0);
 });
+
+// Mobile screens stack a long reply list above its detail. Selecting a row must
+// scroll to the actual review panel, rather than showing the list again.
+test("a selected reply link takes the broker straight to the review panel on narrow screens", async () => {
+  const h = crmHarness({ rows: [entry()] });
+  const html = await h.render();
+  assert.ok(html.includes(`href="/crm/follow-up?id=${ID}#reply-details"`));
+  assert.ok(html.includes('id="reply-details"'));
+  assert.ok(html.includes('tabIndex="-1"') || html.includes('tabindex="-1"'));
+  assert.equal(h.actions.length, 0);
+});

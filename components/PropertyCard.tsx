@@ -45,6 +45,7 @@ export default function PropertyCard({ listing, returnTo }: { listing: Listing; 
         returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""
       }`
     : returnTo || "/properties";
+  const showingHref = validPropertySlug(listing.slug) ? `${propertyHref}#property-showing` : null;
   const photoCount = listing.photoCount
     ?? (listing.images[0] === "/property-placeholder.svg" ? 0 : listing.images.length);
 
@@ -100,6 +101,17 @@ export default function PropertyCard({ listing, returnTo }: { listing: Listing; 
           <IdxAttribution attribution={listing.idx} compact />
         </div>
       </Link>
+      {showingHref ? (
+        <div className="px-4 pb-4">
+          <Link
+            href={showingHref}
+            prefetch={false}
+            className="block rounded-sm bg-hibiscus px-4 py-3 text-center text-sm font-semibold text-sand hover:bg-hibiscus-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide"
+          >
+            Request a showing
+          </Link>
+        </div>
+      ) : null}
       <CompareToggle listing={savedListing} />
     </article>
   );

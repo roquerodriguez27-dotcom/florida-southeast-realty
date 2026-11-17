@@ -6,6 +6,7 @@ on:
     paths:
       - 'app/planning/**'
       - 'app/buyer-tools/**'
+      - 'app/api/saved-search/**'
       - 'components/BuyerTools.tsx'
       - 'components/planning/**'
       - 'lib/planning/**'
@@ -67,7 +68,7 @@ jobs:
           else
             printf '%s\n' 'Installed Next package has no dist/docs directory.' > review-evidence/framework-guides-note.txt
           fi
-      - name: Validate planning, privacy, homeowner content, lint, build and types
+      - name: Validate planning, saved-search registration, privacy, homeowner content, lint, build and types
         shell: bash
         run: |
           set -uo pipefail
@@ -84,6 +85,7 @@ jobs:
             fi
           }
           check planning npm run test:planning-suite
+          check saved-search-route node --test tests/saved-search-route.test.mjs
           check calculator-accuracy node scripts/test-calculator-accuracy.mjs
           check analytics-privacy npm run test:analytics-privacy
           check homeowner-updates npm run test:homeowner-updates

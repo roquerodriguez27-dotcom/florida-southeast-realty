@@ -7,6 +7,12 @@ on:
       - 'app/planning/**'
       - 'app/buyer-tools/**'
       - 'app/api/saved-search/**'
+      - 'app/api/crm/**'
+      - 'app/crm/**'
+      - 'app/follow-up/**'
+      - 'components/crm/**'
+      - 'lib/crm/**'
+      - 'supabase/migrations/**'
       - 'components/BuyerTools.tsx'
       - 'components/planning/**'
       - 'lib/planning/**'
@@ -68,6 +74,12 @@ jobs:
           else
             printf '%s\n' 'Installed Next package has no dist/docs directory.' > review-evidence/framework-guides-note.txt
           fi
+      - name: Validate follow-up database permissions and transitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="$PATH" npm install --prefix "$RUNNER_TEMP/fsr-db-tests" --no-save --ignore-scripts --no-audit --no-fund @electric-sql/pglite@0.5.16
+          env -i HOME="$HOME" PATH="$PATH" FSR_PGLITE_MODULE="$RUNNER_TEMP/fsr-db-tests/node_modules/@electric-sql/pglite/dist/index.js" node --test tests/follow-up-db.test.mjs 2>&1 | tee review-evidence/follow-up-database.log
       - name: Validate planning, saved-search registration, privacy, homeowner content, lint, build and types
         shell: bash
         run: |
@@ -86,6 +98,7 @@ jobs:
           }
           check planning npm run test:planning-suite
           check saved-search-route node --test tests/saved-search-route.test.mjs
+          check lead-reply-delivery node --test tests/follow-up-draft.test.mjs tests/follow-up-delivery.test.mjs tests/follow-up-ui.test.mjs tests/saved-search-delivery.test.mjs
           check calculator-accuracy node scripts/test-calculator-accuracy.mjs
           check analytics-privacy npm run test:analytics-privacy
           check homeowner-updates npm run test:homeowner-updates

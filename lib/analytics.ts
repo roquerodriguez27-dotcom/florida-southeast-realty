@@ -26,7 +26,7 @@ export function analyticsCampaign(value: unknown): AnalyticsCampaign | undefined
 }
 
 export function isPublicAnalyticsPath(path: string): boolean {
-  return path.startsWith("/") && !/^\/(crm|api|auth)(?:\/|$|\?)/i.test(path);
+  return path.startsWith("/") && !/^\/(crm|api|auth|follow-up)(?:\/|$|\?)/i.test(path);
 }
 
 export function isProductionAnalyticsHost(host: string): boolean {

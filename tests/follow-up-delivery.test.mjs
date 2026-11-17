@@ -12,6 +12,7 @@ const compile = path => ts.transpileModule(readFileSync(new URL(path, import.met
 const emailCode = compile("../lib/crm/follow-up-email.ts");
 const workerCode = compile("../app/api/crm/follow-up/process/route.ts");
 const actionCode = compile("../app/crm/follow-up/actions.ts");
+const callbackCode = compile("../app/crm/auth/callback/route.ts");
 const ID = "11111111-1111-4111-8111-111111111111";
 const ATTEMPT = "22222222-2222-4222-8222-222222222222";
 const UNSUBSCRIBE = "33333333-3333-4333-8333-333333333333";
@@ -41,6 +42,83 @@ function evaluate(code, imports, globals = {}) {
   });
   return exported.exports;
 }
+
+function callbackHarness({ environment = "preview", exchangeError = null } = {}) {
+  const exchanges = [];
+  let clients = 0;
+  const exported = evaluate(callbackCode, {
+    "@/lib/site-config": { SITE },
+    "@/lib/supabase/server": { createSupabaseServerClient: async () => {
+      clients++;
+      return { auth: { exchangeCodeForSession: async code => {
+        exchanges.push(code);
+        return { error: exchangeError };
+      } } };
+    } },
+  }, { process: { env: { ...(environment ? { VERCEL_ENV: environment } : {}), NEXT_PUBLIC_SITE_URL: SITE.url } } });
+  return {
+    exchanges, get clients() { return clients; },
+    request(url, headers) { return exported.GET(new Request(url, { headers })); },
+  };
+}
+
+test("CRM callback keeps successful preview sign-in on the origin that receives its cookies", async () => {
+  const h = callbackHarness();
+  const response = await h.request("https://fixture-preview.vercel.app/crm/auth/callback?code=fixture-code");
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get("location"), "https://fixture-preview.vercel.app/crm");
+  assert.deepEqual(h.exchanges, ["fixture-code"]);
+  assert.equal(h.clients, 1);
+});
+
+test("CRM callback keeps a rejected preview code on its preview login page", async () => {
+  const h = callbackHarness({ exchangeError: { code: "fixture_invalid_code" } });
+  const response = await h.request("https://fixture-preview.vercel.app/crm/auth/callback?code=fixture-code");
+  assert.equal(response.headers.get("location"), "https://fixture-preview.vercel.app/crm/login?error=invalid_link");
+  assert.deepEqual(h.exchanges, ["fixture-code"]);
+});
+
+test("CRM callback without a code does not construct an auth client or exchange a session", async () => {
+  const h = callbackHarness();
+  const response = await h.request("https://fixture-preview.vercel.app/crm/auth/callback");
+  assert.equal(response.headers.get("location"), "https://fixture-preview.vercel.app/crm/login?error=invalid_link");
+  assert.equal(h.clients, 0);
+  assert.equal(h.exchanges.length, 0);
+});
+
+test("CRM callback retains the canonical production destination after a successful exchange", async () => {
+  const h = callbackHarness({ environment: "production" });
+  const response = await h.request("https://fixture-production-alias.vercel.app/crm/auth/callback?code=fixture-code");
+  assert.equal(response.headers.get("location"), SITE.url + "/crm");
+  assert.deepEqual(h.exchanges, ["fixture-code"]);
+});
+
+test("CRM callback retains the canonical production error destination", async () => {
+  for (const query of ["", "?code=fixture-code"]) {
+    const h = callbackHarness({ environment: "production", exchangeError: { code: "fixture_invalid_code" } });
+    const response = await h.request("https://fixture-production-alias.vercel.app/crm/auth/callback" + query);
+    assert.equal(response.headers.get("location"), SITE.url + "/crm/login?error=invalid_link");
+  }
+});
+
+test("CRM callback retains the local origin and port without Vercel environment metadata", async () => {
+  const h = callbackHarness({ environment: "" });
+  const response = await h.request("http://localhost:4567/crm/auth/callback?code=fixture-code");
+  assert.equal(response.headers.get("location"), "http://localhost:4567/crm");
+  assert.deepEqual(h.exchanges, ["fixture-code"]);
+});
+
+test("CRM callback ignores client redirect destinations and forwarded-origin headers", async () => {
+  for (const environment of ["preview", "production"]) {
+    const h = callbackHarness({ environment });
+    const response = await h.request("https://fixture-preview.vercel.app/crm/auth/callback?code=fixture-code&next=https://untrusted.example.test&redirect_to=//untrusted.example.test", {
+      "x-forwarded-host": "untrusted.example.test", origin: "https://untrusted.example.test",
+    });
+    const expectedOrigin = environment === "production" ? SITE.url : "https://fixture-preview.vercel.app";
+    assert.equal(response.headers.get("location"), expectedOrigin + "/crm");
+    assert.deepEqual(h.exchanges, ["fixture-code"]);
+  }
+});
 
 function emailHarness({ status = 200, receipt = { id: "provider-message-id" }, fail = false, invalidJson = false, configured = true } = {}) {
   const calls = [], logs = [];

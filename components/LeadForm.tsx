@@ -156,8 +156,8 @@ export default function LeadForm({ formName, fields, submitLabel, successMessage
           <p className="mx-auto max-w-xl text-sm text-ink/75">You changed the worksheet or request details after this submission. The earlier version is saved; the revised version has not been sent.</p>
           <button type="button" onClick={() => { setStatus("idle"); setReceipt(null); setSubmittedContext(null); }} className="mt-3 rounded-sm border border-tide/30 bg-white px-4 py-2.5 text-sm font-medium text-tide">Send updated request</button>
         </div>}
-        {receipt?.stored && receipt.notificationConfigured && !receipt.notificationDelivered ? (
-          <p className="mt-3 text-xs text-hibiscus">Your request is saved, but we couldn&apos;t confirm the email alert to Roque. Please call if your request is urgent.</p>
+        {receipt?.stored && !receipt.notificationDelivered ? (
+          <p className="mt-3 text-xs text-hibiscus">Your request is saved in our CRM, but we couldn&apos;t confirm that an email notification reached the brokerage. For time-sensitive requests, please call.</p>
         ) : null}
         <a href={SITE.phoneHref} className="mt-4 inline-block text-sm font-medium text-tide underline underline-offset-4">Call Roque: {SITE.phoneDisplay}</a>
       </div>

@@ -6,6 +6,9 @@ export const metadata = { title: "CRM Login", robots: { index: false, follow: fa
 function errorMessage(error: string | string[] | undefined) {
   const code = Array.isArray(error) ? error[0] : error;
   if (code === "invalid_link") return "That secure link expired or was already used. Request a new link below.";
+  if (code === "browser_mismatch") return "This browser does not have the sign-in request. Open the link in the same browser and on the same device where you requested it. If that browser is unavailable, start once in this browser and open only its newest email here.";
+  if (code === "request_replaced") return "A newer sign-in request replaced this one. Open only the newest email in the browser where you requested it. Do not request another link yet.";
+  if (code === "exchange_failed") return "The sign-in exchange could not be completed. Please stop requesting links and contact the site administrator so the callback can be checked.";
   if (code === "configuration") return "Secure sign-in is temporarily unavailable. The site return address needs attention.";
   if (code === "unauthorized") return "That email is not authorized for the brokerage CRM.";
   if (code === "email_rate_limit") return "Please wait before requesting another sign-in link. If you just requested one, check your inbox and spam folder.";
@@ -22,7 +25,7 @@ export default async function CrmLoginPage({ searchParams }: { searchParams: Pro
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus">Private brokerage workspace</p>
         <h1 className="font-display text-4xl text-tide mt-3">CRM sign in</h1>
         <p className="text-sm text-ink/65 mt-3">Enter your authorized brokerage email. We’ll send a secure sign-in link—no password required.</p>
-        {params.sent === "1" && <p className="mt-5 rounded-sm bg-seagrass/10 border border-seagrass/30 p-3 text-sm">Check your email for the secure login link.</p>}
+        {params.sent === "1" && <p className="mt-5 rounded-sm bg-seagrass/10 border border-seagrass/30 p-3 text-sm">Check your email for the secure login link. Open the newest link in this same browser on this device. Keep this tab open and do not request another link while checking your email.</p>}
         {loginError && <p className="mt-5 rounded-sm bg-hibiscus/10 border border-hibiscus/30 p-3 text-sm text-hibiscus">{loginError}</p>}
         <form action={sendLoginLink} className="mt-6 space-y-4">
           <label className="block text-xs font-mono uppercase tracking-wide text-ink/60" htmlFor="email">Brokerage email</label>

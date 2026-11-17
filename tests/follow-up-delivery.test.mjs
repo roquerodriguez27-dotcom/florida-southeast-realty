@@ -73,7 +73,7 @@ test("CRM callback keeps successful preview sign-in on the origin that receives 
 });
 
 test("CRM callback keeps a rejected preview code on its preview login page", async () => {
-  const h = callbackHarness({ exchangeError: { code: "fixture_invalid_code" } });
+  const h = callbackHarness({ exchangeError: { code: "otp_expired" } });
   const response = await h.request("https://fixture-preview.vercel.app/crm/auth/callback?code=fixture-code");
   assert.equal(response.headers.get("location"), "https://fixture-preview.vercel.app/crm/login?error=invalid_link");
   assert.deepEqual(h.exchanges, ["fixture-code"]);
@@ -87,6 +87,20 @@ test("CRM callback without a code does not construct an auth client or exchange 
   assert.equal(h.exchanges.length, 0);
 });
 
+test("CRM callback distinguishes browser storage, replaced requests and service failures without leaking the code", async () => {
+  for (const [code, expected] of [
+    ["pkce_code_verifier_not_found", "browser_mismatch"],
+    ["bad_code_verifier", "request_replaced"],
+    ["unexpected_failure", "exchange_failed"],
+  ]) {
+    const h = callbackHarness({ exchangeError: { code } });
+    const response = await h.request("https://fixture-preview.vercel.app/crm/auth/callback?code=private-fixture-code&next=https://untrusted.example.test");
+    assert.equal(response.headers.get("location"), `https://fixture-preview.vercel.app/crm/login?error=${expected}`);
+    assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+    assert.deepEqual(h.exchanges, ["private-fixture-code"]);
+  }
+});
+
 test("CRM callback retains the canonical production destination after a successful exchange", async () => {
   const h = callbackHarness({ environment: "production" });
   const response = await h.request("https://fixture-production-alias.vercel.app/crm/auth/callback?code=fixture-code");
@@ -96,7 +110,7 @@ test("CRM callback retains the canonical production destination after a successf
 
 test("CRM callback retains the canonical production error destination", async () => {
   for (const query of ["", "?code=fixture-code"]) {
-    const h = callbackHarness({ environment: "production", exchangeError: { code: "fixture_invalid_code" } });
+    const h = callbackHarness({ environment: "production", exchangeError: { code: "otp_expired" } });
     const response = await h.request("https://fixture-production-alias.vercel.app/crm/auth/callback" + query);
     assert.equal(response.headers.get("location"), SITE.url + "/crm/login?error=invalid_link");
   }

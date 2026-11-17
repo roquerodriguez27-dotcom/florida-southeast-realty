@@ -45,6 +45,19 @@ test("CRM login cooldown asks the user to wait and check an earlier link without
   assert.doesNotMatch(html, /not authorized|could not be sent|Check your email for the secure login link|\d+ seconds|\d+ minutes|sending limit/);
 });
 
+test("CRM login distinguishes a different browser from expired email and stops repeated sends", async () => {
+  const Page = evaluate(loginPageCode, {
+    "./actions": { sendLoginLink: async () => { assert.fail("Rendering must not send email."); } },
+  }).default;
+  const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ error: "browser_mismatch" }) }));
+  assert.match(html, /same browser and on the same device/);
+  assert.doesNotMatch(html, /expired or was already used/);
+  const sent = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ sent: "1" }) }));
+  assert.match(sent, /do not request another link/);
+  const unknown = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ error: "exchange_failed" }) }));
+  assert.match(unknown, /stop requesting links/);
+});
+
 function entry(patch = {}) {
   return {
     id: ID, lead_id: 101, recipient_email: "visitor@example.test", state: "review", test_mode: false,

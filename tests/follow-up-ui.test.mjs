@@ -15,6 +15,7 @@ const pageCode = compile("../app/crm/follow-up/page.tsx");
 const editorCode = compile("../components/crm/FollowUpEditor.tsx");
 const stateCode = compile("../lib/crm/follow-up.ts");
 const unsubscribeCode = compile("../app/follow-up/unsubscribe/page.tsx");
+const loginPageCode = compile("../app/crm/login/page.tsx");
 const ID = "11111111-1111-4111-8111-111111111111";
 const TOKEN = "22222222-2222-4222-8222-222222222222";
 const SITE = { email: "broker@example.test" };
@@ -33,6 +34,16 @@ function evaluate(code, imports = {}) {
   });
   return loaded.exports;
 }
+
+test("CRM login cooldown asks the user to wait and check an earlier link without a fixed retry interval", async () => {
+  const Page = evaluate(loginPageCode, {
+    "./actions": { sendLoginLink: async () => { assert.fail("Rendering must not request a login email."); } },
+  }).default;
+  const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ error: "email_rate_limit" }) }));
+  assert.match(html, /Please wait before requesting another sign-in link/);
+  assert.match(html, /If you just requested one, check your inbox and spam folder/);
+  assert.doesNotMatch(html, /not authorized|could not be sent|Check your email for the secure login link|\d+ seconds|\d+ minutes|sending limit/);
+});
 
 function entry(patch = {}) {
   return {

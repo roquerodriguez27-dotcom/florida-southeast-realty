@@ -8,6 +8,7 @@ function errorMessage(error: string | string[] | undefined) {
   if (code === "invalid_link") return "That secure link expired or was already used. Request a new link below.";
   if (code === "configuration") return "Secure sign-in is temporarily unavailable. The site return address needs attention.";
   if (code === "unauthorized") return "That email is not authorized for the brokerage CRM.";
+  if (code === "email_rate_limit") return "Please wait before requesting another sign-in link. If you just requested one, check your inbox and spam folder.";
   if (code === "send_failed") return "The secure sign-in link could not be sent. Please try again.";
   return null;
 }

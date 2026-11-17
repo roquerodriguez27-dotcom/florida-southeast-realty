@@ -13,6 +13,7 @@ const emailCode = compile("../lib/crm/follow-up-email.ts");
 const workerCode = compile("../app/api/crm/follow-up/process/route.ts");
 const actionCode = compile("../app/crm/follow-up/actions.ts");
 const callbackCode = compile("../app/crm/auth/callback/route.ts");
+const loginCode = compile("../app/crm/login/actions.ts");
 const ID = "11111111-1111-4111-8111-111111111111";
 const ATTEMPT = "22222222-2222-4222-8222-222222222222";
 const UNSUBSCRIBE = "33333333-3333-4333-8333-333333333333";
@@ -376,6 +377,77 @@ test("failure-recording transport error preserves the controlled unavailable res
 class RedirectSignal extends Error {
   constructor(url) { super(url); this.url = url; }
 }
+
+function loginHarness({ allowed = true, allowlistError = null, sendError = null } = {}) {
+  const rpcCalls = [], requests = [], logs = [];
+  const exported = evaluate(loginCode, {
+    "next/headers": { headers: async () => ({ get: () => "https://fixture-preview.vercel.app" }) },
+    "next/navigation": { redirect(url) { throw new RedirectSignal(url); } },
+    "@/lib/site-config": { SITE },
+    "@/lib/supabase/server": { createSupabaseServerClient: async () => ({
+      rpc: async (name, args) => { rpcCalls.push({ name, args }); return { data: allowed, error: allowlistError }; },
+      auth: { signInWithOtp: async value => { requests.push(value); return { error: sendError }; } },
+    }) },
+  }, {
+    process: { env: { VERCEL_ENV: "preview" } },
+    console: Object.fromEntries(["log", "info", "warn", "error"].map(name => [name, (...args) => logs.push({ name, args })])),
+  });
+  return {
+    rpcCalls, requests, logs,
+    async request() {
+      const form = new FormData();
+      form.set("email", SITE.email);
+      try {
+        await exported.sendLoginLink(form);
+        assert.fail("The login action must redirect.");
+      } catch (error) {
+        if (!(error instanceof RedirectSignal)) throw error;
+        return error.url;
+      }
+    },
+  };
+}
+
+test("CRM login maps the email cooldown code without retrying or exposing provider details", async () => {
+  const h = loginHarness({ sendError: { code: "over_email_send_rate_limit", status: 429, message: "Fixture provider details must stay private" } });
+  assert.equal(await h.request(), "/crm/login?error=email_rate_limit");
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.logs.length, 0);
+});
+
+test("CRM login keeps other send errors generic instead of matching status or message text", async () => {
+  for (const sendError of [
+    { code: "unexpected_failure", status: 500, message: "over_email_send_rate_limit" },
+    { status: 429, message: "Fixture provider failure" },
+  ]) {
+    const h = loginHarness({ sendError });
+    assert.equal(await h.request(), "/crm/login?error=send_failed");
+    assert.equal(h.requests.length, 1);
+    assert.equal(h.logs.length, 0);
+  }
+});
+
+test("CRM login still checks the allowlist before requesting any email", async () => {
+  for (const [options, destination] of [
+    [{ allowed: false }, "/crm/login?error=unauthorized"],
+    [{ allowlistError: { code: "fixture_configuration" } }, "/crm/login?error=configuration"],
+  ]) {
+    const h = loginHarness(options);
+    assert.equal(await h.request(), destination);
+    assert.equal(h.rpcCalls.length, 1);
+    assert.equal(h.rpcCalls[0].name, "crm_login_allowed");
+    assert.equal(h.rpcCalls[0].args.p_email, SITE.email);
+    assert.equal(h.requests.length, 0);
+  }
+});
+
+test("CRM login confirms a successful request only after one provider call", async () => {
+  const h = loginHarness();
+  assert.equal(await h.request(), "/crm/login?sent=1");
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.requests[0].email, SITE.email);
+  assert.equal(h.requests[0].options.emailRedirectTo, "https://fixture-preview.vercel.app/crm/auth/callback");
+});
 
 function actionHarness({ authorized = true, prepared = preparedSend, recordError = null, recordThrows = false, configured = true } = {}) {
   const rpcCalls = [], sends = [];

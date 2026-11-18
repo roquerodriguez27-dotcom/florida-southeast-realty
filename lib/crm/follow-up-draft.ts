@@ -90,6 +90,20 @@ function gatewayAvailable(): boolean {
     || process.env.VERCEL === "1");
 }
 
+// Only fixed categories may reach logs. Provider messages, causes and model
+// output can contain submitted inquiry text or credentials.
+function unavailableReason(error: unknown): string {
+  if (typeof error !== "object" || error === null) return "provider_error";
+  const status = "statusCode" in error ? error.statusCode : undefined;
+  if (status === 401) return "authentication_required";
+  if (status === 402) return "credits_or_budget_required";
+  if (status === 403) return "access_denied";
+  if (status === 404) return "model_unavailable";
+  if (status === 429) return "rate_limited";
+  if (status === 408 || ("name" in error && error.name === "TimeoutError")) return "timeout";
+  return "provider_error";
+}
+
 function safeGeneratedDraft(output: unknown, facts: ReturnType<typeof sanitizeFollowUpFacts>) {
   const parsed = draftSchema.safeParse(output);
   if (!parsed.success) return null;
@@ -120,7 +134,10 @@ export async function createFollowUpDraft(input: FollowUpLeadInput): Promise<Fol
   const facts = sanitizeFollowUpFacts(input);
   const sourceText = JSON.stringify(facts);
   if (DIRECTIVE.test(sourceText) || RESTRICTED_CONTENT.test(sourceText) || NEIGHBORHOOD_STEERING.test(sourceText)) return templateDraft("review");
-  if (!gatewayAvailable()) return templateDraft("unavailable");
+  if (!gatewayAvailable()) {
+    console.warn("CRM AI draft fallback", { reason: "authentication_missing" });
+    return templateDraft("unavailable");
+  }
 
   try {
     const { output } = await generateText({
@@ -148,14 +165,18 @@ export async function createFollowUpDraft(input: FollowUpLeadInput): Promise<Fol
       telemetry: { isEnabled: false },
     });
     const draft = safeGeneratedDraft(output, facts);
-    if (!draft) return templateDraft("invalid");
+    if (!draft) {
+      console.warn("CRM AI draft fallback", { reason: "output_validation" });
+      return templateDraft("invalid");
+    }
     return {
       ...draft,
       staffSummary: "AI draft. " + draft.staffSummary + " Review before sending.",
       generationMode: "ai",
     };
-  } catch {
+  } catch (error) {
     // Provider errors can include the prompt. Keep them out of application logs.
+    console.warn("CRM AI draft fallback", { reason: unavailableReason(error) });
     return templateDraft("unavailable");
   }
 }

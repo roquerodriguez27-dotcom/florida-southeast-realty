@@ -161,8 +161,27 @@ test("provider failure falls back once without logging inquiry content", async (
   const result = await h.createFollowUpDraft(lead);
   assert.equal(result.generationMode, "template");
   assert.equal(h.calls.length, 1);
-  assert.equal(h.logs.length, 0);
+  assert.equal(h.logs.length, 1);
+  assert.equal(h.logs[0][1].reason, "provider_error");
+  assert.doesNotMatch(JSON.stringify(h.logs), /private@example\.test|contactId/);
   assert.doesNotMatch(JSON.stringify(result), /private@example\.test|contactId/);
+});
+
+test("fallback diagnostics expose only fixed categories, never provider details", async () => {
+  for (const [statusCode, reason] of [[401, "authentication_required"], [402, "credits_or_budget_required"], [403, "access_denied"], [404, "model_unavailable"], [408, "timeout"], [429, "rate_limited"], [500, "provider_error"]]) {
+    const h = harness({ error: { statusCode, message: "private@example.test", cause: { apiKey: "secret-key" } } });
+    assert.equal((await h.createFollowUpDraft(lead)).generationMode, "template");
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.logs[0][1].reason, reason);
+    assert.doesNotMatch(JSON.stringify(h.logs), /private@example\.test|secret-key|statusCode|message|cause/);
+  }
+  const invalid = harness({ output: null });
+  await invalid.createFollowUpDraft(lead);
+  assert.equal(invalid.logs[0][1].reason, "output_validation");
+  const missing = harness({ env: {} });
+  await missing.createFollowUpDraft(lead);
+  assert.equal(missing.logs[0][1].reason, "authentication_missing");
+  assert.equal(missing.calls.length, 0);
 });
 
 for (const [label, output] of [
@@ -199,7 +218,9 @@ for (const body of [
     assert.equal(result.generationMode, "template");
     assert.match(result.staffSummary, /did not pass the draft checks/);
     assert.equal(h.calls.length, 1);
-    assert.equal(h.logs.length, 0);
+    assert.equal(h.logs.length, 1);
+    assert.equal(h.logs[0][1].reason, "output_validation");
+    assert.ok(!JSON.stringify(h.logs).includes(body));
   });
 }
 

@@ -184,6 +184,21 @@ test("fallback diagnostics expose only fixed categories, never provider details"
   assert.equal(missing.calls.length, 0);
 });
 
+test("403 diagnostics distinguish account, credit, token and policy denials without leaking details", async () => {
+  for (const [message, type, reason] of [
+    ["AI Gateway requires a valid credit card on file", undefined, "account_verification_required"],
+    ["RestrictedModelsError: unavailable on the free tier", undefined, "model_credit_restriction"],
+    ["OIDC token does not have permission", undefined, "token_access_denied"],
+    ["Request blocked by a routing rule", "forbidden", "gateway_policy_denied"],
+  ]) {
+    const h = harness({ error: { statusCode: 403, type, message: message + " private@example.test secret-key" } });
+    assert.equal((await h.createFollowUpDraft(lead)).generationMode, "template");
+    assert.equal(h.logs[0][1].reason, reason);
+    assert.doesNotMatch(JSON.stringify(h.logs), /private@example|secret-key|message|routing rule/);
+    assert.equal(h.calls.length, 1);
+  }
+});
+
 for (const [label, output] of [
   ["absent output", undefined],
   ["short subject", { ...safeOutput, subject: "Hi" }],

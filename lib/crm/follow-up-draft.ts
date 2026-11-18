@@ -97,7 +97,16 @@ function unavailableReason(error: unknown): string {
   const status = "statusCode" in error ? error.statusCode : undefined;
   if (status === 401) return "authentication_required";
   if (status === 402) return "credits_or_budget_required";
-  if (status === 403) return "access_denied";
+  if (status === 403) {
+    // Inspect locally, emit only a fixed label. Gateway versions can wrap
+    // account/model denials as internal errors while retaining status 403.
+    const message = "message" in error && typeof error.message === "string" ? error.message.toLowerCase() : "";
+    if (/valid credit card|customer.verification|verify your account/.test(message)) return "account_verification_required";
+    if (/restrictedmodels|free tier|free.credit|paid.credit/.test(message)) return "model_credit_restriction";
+    if (/oidc|token.*(?:scope|permission)|(?:scope|permission).*token/.test(message)) return "token_access_denied";
+    if ("type" in error && error.type === "forbidden") return "gateway_policy_denied";
+    return "access_denied";
+  }
   if (status === 404) return "model_unavailable";
   if (status === 429) return "rate_limited";
   if (status === 408 || ("name" in error && error.name === "TimeoutError")) return "timeout";

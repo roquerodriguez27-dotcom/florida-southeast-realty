@@ -70,6 +70,7 @@ function temporaryResponse(reason: ResoSharedReason | "coordination", remainingM
     : reason === "capacity" || reason === "duplicate" ? "capacity_protected" : "upstream_error";
   const code = reason === "coordination" ? "RESO_COORDINATION_UNAVAILABLE"
     : reason === "duplicate" ? "RESO_DUPLICATE_PENDING"
+    : reason === "unavailable" ? "RESO_UPSTREAM_UNAVAILABLE"
     : throttled ? "RESO_THROTTLED" : "RESO_CAPACITY_PROTECTED";
   return new Response(JSON.stringify({ error: { code, message: "MLS requests are temporarily paused. Please try again shortly." } }), {
     status: throttled ? 429 : 503,

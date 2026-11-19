@@ -9,6 +9,7 @@ import LeadForm from "@/components/LeadForm";
 import { searchListingPage } from "@/lib/listings";
 import { IDX_PROVIDER } from "@/lib/idx";
 import SavedSearchAlert from "@/components/SavedSearchAlert";
+import SavedSearchFeedback from "@/components/SavedSearchFeedback";
 import { IdxPageDisclaimer } from "@/components/IdxAttribution";
 import {
   LISTING_AMENITIES,
@@ -26,6 +27,7 @@ const idxLive = IDX_PROVIDER !== "not_connected";
 
 interface Props {
   searchParams: Promise<{
+    alert?: string | string[];
     q?: string;
     location?: string | string[];
     minPrice?: string;
@@ -326,6 +328,7 @@ export default async function PropertiesPage({ searchParams }: Props) {
   return (
     <div className="pt-28 md:pt-32 pb-20">
       <div className="container-fsre">
+        <SavedSearchFeedback status={params.alert} />
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-hibiscus mb-2">Property Search</p>
         <h1 className="font-display text-3xl md:text-5xl text-ink mb-4">
           {noCurrentAddressListing

@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireCrmBroker, requireCrmUser } from "@/lib/crm/auth";
 import { CRM_STATUSES } from "@/lib/crm/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { CONTACT_CHANNELS, CONTACT_OUTCOMES, outcomeBody } from "@/lib/crm/outcomes";
+import { CONTACT_CHANNELS, CONTACT_OUTCOMES } from "@/lib/crm/outcomes";
 
 const idSchema = z.coerce.number().int().positive();
 const emailSchema = z.email().max(254).transform((value) => value.trim().toLowerCase());
@@ -60,26 +60,22 @@ export async function updateLead(formData: FormData) {
 }
 
 export async function recordContactOutcome(formData: FormData) {
-  const user = await requireCrmUser();
+  await requireCrmUser();
   const leadId = idSchema.parse(formData.get("leadId"));
   const outcome = z.enum(CONTACT_OUTCOMES).parse(formData.get("outcome"));
   const channel = z.enum(CONTACT_CHANNELS).parse(formData.get("channel"));
   const note = z.string().trim().max(1500).parse(formData.get("note") ?? "");
   if (formData.get("confirmed") !== "yes") throw new Error("Confirm the outcome actually occurred before recording it.");
   const supabase = await createSupabaseServerClient();
-  const { data: lead, error: readError } = await supabase.from("crm_leads").select("id").eq("id", leadId).single();
-  if (readError || !lead) throw new Error("This lead is unavailable to your account.");
-  const { error: activityError } = await supabase.from("crm_activities").insert({
-    lead_id: leadId, kind: channel, body: outcomeBody(outcome, channel, note), created_by: user.email,
+  // Record the outcome and pause any pending initial response atomically.
+  // The RPC derives the actor and checks broker/assigned-agent access itself.
+  const { data, error } = await supabase.rpc("record_followup_outcome", {
+    p_lead_id: leadId, p_outcome: outcome, p_channel: channel, p_note: note,
   });
-  if (activityError) throw activityError;
-  if (outcome === "conversation" || outcome === "appointment_held") {
-    const { data: updated, error } = await supabase.from("crm_leads")
-      .update({ last_contacted_at: new Date().toISOString() }).eq("id", leadId).select("id").single();
-    if (error || !updated) throw new Error("The activity was recorded, but the lead contact date could not be updated. Refresh the lead before retrying.");
-  }
+  if (error || data?.ok !== true) throw new Error("The contact outcome could not be saved. Refresh the lead before retrying.");
   revalidatePath("/crm");
   revalidatePath("/crm/outcomes");
+  revalidatePath("/crm/follow-up");
 }
 
 export async function addNote(formData: FormData) {

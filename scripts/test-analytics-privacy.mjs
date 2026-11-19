@@ -124,6 +124,7 @@ assert.doesNotMatch(fs.readFileSync(path.join(root, "app/layout.tsx"), "utf8"), 
 for (const scenario of [
   { url: "https://preview.vercel.app/about" },
   { url: "https://www.floridasoutheastrealty.com/crm/leads/private" },
+  { url: "https://www.floridasoutheastrealty.com/follow-up/unsubscribe?token=SECRET-OPT-OUT-TOKEN" },
   { eligible: false },
   { failEligibility: true },
   { optOut: true },

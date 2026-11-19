@@ -39,6 +39,8 @@ export async function sendLoginLink(formData: FormData) {
     email,
     options: { emailRedirectTo, shouldCreateUser: true },
   });
-  if (error) redirect("/crm/login?error=send_failed");
+  if (error) redirect(error.code === "over_email_send_rate_limit"
+    ? "/crm/login?error=email_rate_limit"
+    : "/crm/login?error=send_failed");
   redirect("/crm/login?sent=1");
 }

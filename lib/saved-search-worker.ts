@@ -169,13 +169,19 @@ function listingLine(listing: Listing): string {
   return `${listing.address} — ${money(listing.price)} — ${SITE.url}/properties/${listing.slug}`;
 }
 
-export async function sendSavedSearchEmail(args: {
+type SavedSearchEmailArgs = {
   email: string;
   frequency: string;
   changes: SavedSearchChangeSet;
-  unsubscribeToken: string;
   searchId: string;
-}): Promise<{ configured: boolean; delivered: boolean }> {
+} & ({ unsubscribeToken: string; testPreview?: never } | { unsubscribeToken?: never; testPreview: { id: string } });
+
+export async function sendSavedSearchEmail(args: SavedSearchEmailArgs): Promise<{
+  configured: boolean;
+  /** Provider acceptance only. Inbox receipt requires independent verification. */
+  delivered: boolean;
+  testAlreadyRequested?: boolean;
+}> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     console.error("[saved-search-email:not-configured]", { provider: "resend" });
@@ -184,7 +190,15 @@ export async function sendSavedSearchEmail(args: {
   const from = process.env.RESEND_FROM_EMAIL?.trim()
     || `Florida Southeast Realty <website@${new URL(SITE.url).hostname.replace(/^www\./, "")}>`;
   const sections: string[] = [];
-  if (args.changes.newMatches.length) {
+  if (args.testPreview) {
+    // Only the authenticated broker test helper supplies this branch. The
+    // sample shows one current home and never claims an invented MLS change.
+    if (!/^FSR-ALERT-TEST-\d{8}-[a-f0-9]{16}$/.test(args.testPreview.id)
+      || args.changes.newMatches.length !== 1 || args.changes.priceChanges.length || args.changes.backOnMarket.length) {
+      return { configured: true, delivered: false };
+    }
+    sections.push(`CURRENT MATCHING HOME (DELIVERY TEST)\n${listingLine(args.changes.newMatches[0])}`);
+  } else if (args.changes.newMatches.length) {
     sections.push(`NEW MATCHES\n${args.changes.newMatches.slice(0, 8).map(listingLine).join("\n")}`);
   }
   if (args.changes.priceChanges.length) {
@@ -195,19 +209,29 @@ export async function sendSavedSearchEmail(args: {
   }
   if (!sections.length) return { configured: true, delivered: false };
 
-  const unsubscribeUrl = `${SITE.url}/api/saved-search/unsubscribe?token=${encodeURIComponent(args.unsubscribeToken)}`;
+  const unsubscribeUrl = args.testPreview
+    ? null
+    : `${SITE.url}/api/saved-search/unsubscribe?token=${encodeURIComponent(args.unsubscribeToken)}`;
   const body = [
-    `Florida Southeast Realty ${args.frequency} saved-search update`,
+    args.testPreview
+      ? `TEST ONLY — Florida Southeast Realty saved-search email — ${args.testPreview.id}`
+      : `Florida Southeast Realty ${args.frequency} saved-search update`,
     "",
+    ...(args.testPreview ? [
+      "This broker-requested sample uses a current MLS listing. It does not report a new listing, a price change, or a home returning to market. No customer follow-up is needed.",
+      "",
+    ] : []),
     ...sections,
     "",
     "Listings can change quickly. Verify availability, property details, taxes, association fees, insurance, and other costs before making a decision.",
     "",
     `Search current South Florida homes: ${SITE.url}/properties`,
-    `Stop these alerts: ${unsubscribeUrl}`,
+    args.testPreview ? "This is a one-time test. No saved-search subscription was created." : `Stop these alerts: ${unsubscribeUrl}`,
   ].join("\n");
   const idempotencyKey = createHash("sha256")
-    .update(`${args.searchId}:${body}`)
+    // A broker test stays one request per UTC day even if live inventory
+    // changes between button clicks. A provider conflict is reported below.
+    .update(args.testPreview ? `${args.email.toLowerCase()}:${args.testPreview.id}` : `${args.searchId}:${body}`)
     .digest("hex");
 
   try {
@@ -216,14 +240,16 @@ export async function sendSavedSearchEmail(args: {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "Idempotency-Key": `fsr-saved-search-${idempotencyKey}`,
+        "Idempotency-Key": `${args.testPreview ? "fsr-saved-search-test" : "fsr-saved-search"}-${idempotencyKey}`,
       },
       body: JSON.stringify({
         from,
         to: [args.email],
-        subject: args.changes.newMatches.length
-          ? "New South Florida homes match your saved search"
-          : "Your South Florida saved-search update",
+        subject: args.testPreview
+          ? `TEST ONLY — Saved-search email — ${args.testPreview.id}`
+          : args.changes.newMatches.length
+            ? "New South Florida homes match your saved search"
+            : "Your South Florida saved-search update",
         text: body,
       }),
       signal: AbortSignal.timeout(8_000),
@@ -237,6 +263,10 @@ export async function sendSavedSearchEmail(args: {
           : typeof errorBody.code === "string" ? errorBody.code : undefined;
       } catch {
         providerCode = undefined;
+      }
+      if (args.testPreview && response.status === 409
+        && (providerCode === "invalid_idempotent_request" || providerCode === "concurrent_idempotent_requests")) {
+        return { configured: true, delivered: false, testAlreadyRequested: true };
       }
       console.error("[saved-search-email:provider-rejected]", {
         provider: "resend",

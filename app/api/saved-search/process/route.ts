@@ -54,8 +54,10 @@ async function workerRpc(
   args: Record<string, unknown>,
 ): Promise<{ data: unknown; error: unknown; attempts: number }> {
   let lastError: unknown = null;
+  let attempts = 0;
 
   for (let attempt = 1; attempt <= WORKER_RPC_MAX_ATTEMPTS; attempt += 1) {
+    attempts = attempt;
     try {
       const result = await supabase.rpc(functionName, args);
       if (!result.error) return { data: result.data, error: null, attempts: attempt };
@@ -72,7 +74,7 @@ async function workerRpc(
     }
   }
 
-  return { data: null, error: lastError, attempts: WORKER_RPC_MAX_ATTEMPTS };
+  return { data: null, error: lastError, attempts };
 }
 
 export async function POST(request: Request) {
